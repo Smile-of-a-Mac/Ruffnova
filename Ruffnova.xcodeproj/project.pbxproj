@@ -1,0 +1,611 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10001 /* RuffleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001 /* RuffleApp.swift */; };
+		A10002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002 /* AppDelegate.swift */; };
+		A10003 /* RuffleCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003 /* RuffleCommands.swift */; };
+		A10004 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10004 /* AppState.swift */; };
+		A10005 /* AppToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10005 /* AppToolbar.swift */; };
+		A10006 /* AboutWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10006 /* AboutWindow.swift */; };
+		A10007 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10007 /* ContentView.swift */; };
+		A10008 /* AppSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10008 /* AppSidebar.swift */; };
+		A10009 /* CollectionsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10009 /* CollectionsListView.swift */; };
+		A10010 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10010 /* EmptyStateView.swift */; };
+		A10011 /* FavoritesGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10011 /* FavoritesGridView.swift */; };
+		A10012 /* LibraryContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10012 /* LibraryContentView.swift */; };
+		A10013 /* LibraryFileCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10013 /* LibraryFileCell.swift */; };
+		A10014 /* RecentFileRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10014 /* RecentFileRow.swift */; };
+		A10015 /* RecentListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10015 /* RecentListView.swift */; };
+		A10016 /* PlayerControlBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10016 /* PlayerControlBar.swift */; };
+		A10017 /* RufflePlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10017 /* RufflePlayerView.swift */; };
+		A10018 /* DebugOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10018 /* DebugOverlayView.swift */; };
+		A10019 /* SWFInfoPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10019 /* SWFInfoPanel.swift */; };
+		A10020 /* TraceConsoleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10020 /* TraceConsoleView.swift */; };
+		A10021 /* SettingsPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10021 /* SettingsPersistence.swift */; };
+		A10022 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10022 /* SettingsView.swift */; };
+		A10023 /* RuffleBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10023 /* RuffleBridge.swift */; };
+		A10024 /* StatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10024 /* StatusBarView.swift */; };
+		A10025 /* NotificationName+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10025 /* NotificationName+Extensions.swift */; };
+		A10026 /* Language.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10026 /* Language.swift */; };
+		A10027 /* BookmarkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10027 /* BookmarkManager.swift */; };
+		A10028 /* LibraryPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10028 /* LibraryPersistence.swift */; };
+		A10029 /* LocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10029 /* LocalizationManager.swift */; };
+		A10030 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10030 /* DesignTokens.swift */; };
+		A10031 /* dummy.c in Sources */ = {isa = PBXBuildFile; fileRef = B10031 /* dummy.c */; };
+		A10032 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10032 /* Assets.xcassets */; };
+		A10033 /* zh-Hans.json in Resources */ = {isa = PBXBuildFile; fileRef = B10033 /* zh-Hans.json */; };
+		A10034 /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = B10034 /* en.json */; };
+		A10035 /* libruffle_ffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B10035 /* libruffle_ffi.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B10001 /* RuffleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuffleApp.swift; sourceTree = "<group>"; };
+		B10002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		B10003 /* RuffleCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuffleCommands.swift; sourceTree = "<group>"; };
+		B10004 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		B10005 /* AppToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppToolbar.swift; sourceTree = "<group>"; };
+		B10006 /* AboutWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutWindow.swift; sourceTree = "<group>"; };
+		B10007 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B10008 /* AppSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSidebar.swift; sourceTree = "<group>"; };
+		B10009 /* CollectionsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsListView.swift; sourceTree = "<group>"; };
+		B10010 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		B10011 /* FavoritesGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesGridView.swift; sourceTree = "<group>"; };
+		B10012 /* LibraryContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryContentView.swift; sourceTree = "<group>"; };
+		B10013 /* LibraryFileCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFileCell.swift; sourceTree = "<group>"; };
+		B10014 /* RecentFileRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentFileRow.swift; sourceTree = "<group>"; };
+		B10015 /* RecentListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentListView.swift; sourceTree = "<group>"; };
+		B10016 /* PlayerControlBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerControlBar.swift; sourceTree = "<group>"; };
+		B10017 /* RufflePlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RufflePlayerView.swift; sourceTree = "<group>"; };
+		B10018 /* DebugOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugOverlayView.swift; sourceTree = "<group>"; };
+		B10019 /* SWFInfoPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SWFInfoPanel.swift; sourceTree = "<group>"; };
+		B10020 /* TraceConsoleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TraceConsoleView.swift; sourceTree = "<group>"; };
+		B10021 /* SettingsPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPersistence.swift; sourceTree = "<group>"; };
+		B10022 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B10023 /* RuffleBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuffleBridge.swift; sourceTree = "<group>"; };
+		B10024 /* StatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarView.swift; sourceTree = "<group>"; };
+		B10025 /* NotificationName+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NotificationName+Extensions.swift"; sourceTree = "<group>"; };
+		B10026 /* Language.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Language.swift; sourceTree = "<group>"; };
+		B10027 /* BookmarkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkManager.swift; sourceTree = "<group>"; };
+		B10028 /* LibraryPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryPersistence.swift; sourceTree = "<group>"; };
+		B10029 /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManager.swift; sourceTree = "<group>"; };
+		B10030 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		B10031 /* dummy.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = dummy.c; sourceTree = "<group>"; };
+		B10032 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B10033 /* zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "zh-Hans.json"; sourceTree = "<group>"; };
+		B10034 /* en.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = en.json; sourceTree = "<group>"; };
+		B10035 /* libruffle_ffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libruffle_ffi.a; path = CRuffleFFI/libruffle_ffi.a; sourceTree = "<group>"; };
+		B10036 /* ruffle_ffi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ruffle_ffi.h; path = CRuffleFFI/ruffle_ffi.h; sourceTree = "<group>"; };
+		B10037 /* RuffleBridgingHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RuffleBridgingHeader.h; sourceTree = "<group>"; };
+		B10038 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C10099 /* Ruffnova.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ruffnova.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D10001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10035 /* libruffle_ffi.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		G10000 = {
+			isa = PBXGroup;
+			children = (
+				G10099 /* Products */,
+				G10100 /* App */,
+				G10200 /* Features */,
+				G10300 /* Shared */,
+				G10400 /* Ruffle */,
+				B10032 /* Assets.xcassets */,
+				B10037 /* RuffleBridgingHeader.h */,
+				B10038 /* Info.plist */,
+				G10500 /* CRuffleFFI */,
+				G10600 /* Resources */,
+			);
+			sourceTree = "<group>";
+		};
+		G10099 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C10099 /* Ruffnova.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		G10100 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				B10001 /* RuffleApp.swift */,
+				B10002 /* AppDelegate.swift */,
+				G10120 /* Commands */,
+				G10130 /* Environment */,
+				G10140 /* Toolbar */,
+				G10110 /* Windows */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		G10110 /* Windows */ = {
+			isa = PBXGroup;
+			children = (
+				B10006 /* AboutWindow.swift */,
+				B10007 /* ContentView.swift */,
+			);
+			path = Windows;
+			sourceTree = "<group>";
+		};
+		G10120 /* Commands */ = {
+			isa = PBXGroup;
+			children = (
+				B10003 /* RuffleCommands.swift */,
+			);
+			path = Commands;
+			sourceTree = "<group>";
+		};
+		G10130 /* Environment */ = {
+			isa = PBXGroup;
+			children = (
+				B10004 /* AppState.swift */,
+			);
+			path = Environment;
+			sourceTree = "<group>";
+		};
+		G10140 /* Toolbar */ = {
+			isa = PBXGroup;
+			children = (
+				B10005 /* AppToolbar.swift */,
+			);
+			path = Toolbar;
+			sourceTree = "<group>";
+		};
+		G10200 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				G10210 /* Library */,
+				G10220 /* Player */,
+				G10230 /* Settings */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		G10210 /* Library */ = {
+			isa = PBXGroup;
+			children = (
+				G10211 /* Views */,
+			);
+			path = Library;
+			sourceTree = "<group>";
+		};
+		G10211 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B10008 /* AppSidebar.swift */,
+				B10009 /* CollectionsListView.swift */,
+				B10010 /* EmptyStateView.swift */,
+				B10011 /* FavoritesGridView.swift */,
+				B10012 /* LibraryContentView.swift */,
+				B10013 /* LibraryFileCell.swift */,
+				B10014 /* RecentFileRow.swift */,
+				B10015 /* RecentListView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		G10220 /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				G10221 /* Controls */,
+				G10222 /* Rendering */,
+				G10223 /* Views */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
+		G10221 /* Controls */ = {
+			isa = PBXGroup;
+			children = (
+				B10016 /* PlayerControlBar.swift */,
+			);
+			path = Controls;
+			sourceTree = "<group>";
+		};
+		G10222 /* Rendering */ = {
+			isa = PBXGroup;
+			children = (
+				B10017 /* RufflePlayerView.swift */,
+			);
+			path = Rendering;
+			sourceTree = "<group>";
+		};
+		G10223 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B10018 /* DebugOverlayView.swift */,
+				B10019 /* SWFInfoPanel.swift */,
+				B10020 /* TraceConsoleView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		G10230 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				G10231 /* Models */,
+				G10232 /* Views */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		G10231 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B10021 /* SettingsPersistence.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G10232 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B10022 /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		G10300 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				G10310 /* Components */,
+				G10320 /* Extensions */,
+				G10330 /* Models */,
+				G10340 /* Persistence */,
+				G10350 /* Services */,
+				G10360 /* Styles */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		G10310 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				B10024 /* StatusBarView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		G10320 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				B10025 /* NotificationName+Extensions.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		G10330 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B10026 /* Language.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G10340 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				B10027 /* BookmarkManager.swift */,
+				B10028 /* LibraryPersistence.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		G10350 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B10029 /* LocalizationManager.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G10360 /* Styles */ = {
+			isa = PBXGroup;
+			children = (
+				B10030 /* DesignTokens.swift */,
+			);
+			path = Styles;
+			sourceTree = "<group>";
+		};
+		G10400 /* Ruffle */ = {
+			isa = PBXGroup;
+			children = (
+				G10410 /* Bridge */,
+			);
+			path = Ruffle;
+			sourceTree = "<group>";
+		};
+		G10410 /* Bridge */ = {
+			isa = PBXGroup;
+			children = (
+				B10023 /* RuffleBridge.swift */,
+			);
+			path = Bridge;
+			sourceTree = "<group>";
+		};
+		G10500 /* CRuffleFFI */ = {
+			isa = PBXGroup;
+			children = (
+				B10031 /* dummy.c */,
+				B10035 /* libruffle_ffi.a */,
+				B10036 /* ruffle_ffi.h */,
+			);
+			path = CRuffleFFI;
+			sourceTree = "<group>";
+		};
+		G10600 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B10033 /* zh-Hans.json */,
+				B10034 /* en.json */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		T10001 /* Ruffnova */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L10001 /* Build configuration list for PBXNativeTarget "Ruffnova" */;
+			buildPhases = (
+				D10002 /* Sources */,
+				D10001 /* Frameworks */,
+				D10003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Ruffnova;
+			productName = Ruffnova;
+			productReference = C10099 /* Ruffnova.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		P10001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1540;
+			};
+			buildConfigurationList = L10000 /* Build configuration list for PBXProject "Ruffnova" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				"zh-Hans",
+			);
+			mainGroup = G10000;
+			productRefGroup = G10099 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				T10001 /* Ruffnova */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D10003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10032 /* Assets.xcassets in Resources */,
+				A10033 /* zh-Hans.json in Resources */,
+				A10034 /* en.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D10002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10001 /* RuffleApp.swift in Sources */,
+				A10002 /* AppDelegate.swift in Sources */,
+				A10003 /* RuffleCommands.swift in Sources */,
+				A10004 /* AppState.swift in Sources */,
+				A10005 /* AppToolbar.swift in Sources */,
+				A10006 /* AboutWindow.swift in Sources */,
+				A10007 /* ContentView.swift in Sources */,
+				A10008 /* AppSidebar.swift in Sources */,
+				A10009 /* CollectionsListView.swift in Sources */,
+				A10010 /* EmptyStateView.swift in Sources */,
+				A10011 /* FavoritesGridView.swift in Sources */,
+				A10012 /* LibraryContentView.swift in Sources */,
+				A10013 /* LibraryFileCell.swift in Sources */,
+				A10014 /* RecentFileRow.swift in Sources */,
+				A10015 /* RecentListView.swift in Sources */,
+				A10016 /* PlayerControlBar.swift in Sources */,
+				A10017 /* RufflePlayerView.swift in Sources */,
+				A10018 /* DebugOverlayView.swift in Sources */,
+				A10019 /* SWFInfoPanel.swift in Sources */,
+				A10020 /* TraceConsoleView.swift in Sources */,
+				A10021 /* SettingsPersistence.swift in Sources */,
+				A10022 /* SettingsView.swift in Sources */,
+				A10023 /* RuffleBridge.swift in Sources */,
+				A10024 /* StatusBarView.swift in Sources */,
+				A10025 /* NotificationName+Extensions.swift in Sources */,
+				A10026 /* Language.swift in Sources */,
+				A10027 /* BookmarkManager.swift in Sources */,
+				A10028 /* LibraryPersistence.swift in Sources */,
+				A10029 /* LocalizationManager.swift in Sources */,
+				A10030 /* DesignTokens.swift in Sources */,
+				A10031 /* dummy.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		X10001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		X10002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		X10011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/CRuffleFFI";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					AudioUnit,
+					"-framework",
+					CoreAudio,
+					"-framework",
+					SystemConfiguration,
+				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -DRUST_FFI_AVAILABLE";
+				PRODUCT_BUNDLE_IDENTIFIER = app.ruffnova.native;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/CRuffleFFI";
+				SWIFT_OBJC_BRIDGING_HEADER = RuffleBridgingHeader.h;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		X10012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/CRuffleFFI";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					AudioUnit,
+					"-framework",
+					CoreAudio,
+					"-framework",
+					SystemConfiguration,
+				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -DRUST_FFI_AVAILABLE";
+				PRODUCT_BUNDLE_IDENTIFIER = app.ruffnova.native;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/CRuffleFFI";
+				SWIFT_OBJC_BRIDGING_HEADER = RuffleBridgingHeader.h;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		L10000 /* Build configuration list for PBXProject "Ruffnova" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				X10001 /* Debug */,
+				X10002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		L10001 /* Build configuration list for PBXNativeTarget "Ruffnova" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				X10011 /* Debug */,
+				X10012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = P10001 /* Project object */;
+}

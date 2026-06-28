@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- App Sandbox - required for Mac App Store distribution -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <!-- Network access for loading remote SWF files -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <!-- File access for opening local SWF files via NSOpenPanel -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+    <!-- Allow reading files dragged into the app -->
+    <key>com.apple.security.files.downloads.read-only</key>
+    <true/>
+    <!-- Audio input for SWF content that uses microphone -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <!-- Hardened Runtime exception for loading FFI dylib -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>

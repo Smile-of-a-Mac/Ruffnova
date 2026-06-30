@@ -14,6 +14,7 @@ struct LibraryFileCell: View {
                 fileInfo
             }
             .padding(NativeSpacing.xs)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .scaleEffect(isHovered ? 1.025 : 1.0)
             .brightness(isHovered ? 0.06 : 0)
         }
@@ -28,12 +29,12 @@ struct LibraryFileCell: View {
         .accessibilityValue(file.lastOpened.formatted())
         .contextMenu {
             Button(locManager.localized("menu.open")) { appState.openFile(file.url) }
+            #if os(macOS)
             Divider()
             Button(locManager.localized("menu.showInFinder")) {
-                #if os(macOS)
                 NSWorkspace.shared.activateFileViewerSelecting([file.url])
-                #endif
             }
+            #endif
             Divider()
             Button(locManager.localized("library.removeFromRecent")) {
                 appState.removeFromRecentlyOpened(file)
@@ -47,13 +48,13 @@ struct LibraryFileCell: View {
                 Image(decorative: cgImage, scale: 1.0)
                     .resizable()
                     .aspectRatio(4 / 3, contentMode: .fill)
-                    .frame(height: 112)
+                    .aspectRatio(4 / 3, contentMode: .fit)
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous))
             } else {
                 RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
                     .fill(GlassMaterial.light)
-                    .aspectRatio(4 / 3, contentMode: .fill)
+                    .aspectRatio(4 / 3, contentMode: .fit)
                     .overlay {
                         RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
                             .strokeBorder(.quaternary.opacity(0.55), lineWidth: 0.5)
@@ -65,7 +66,7 @@ struct LibraryFileCell: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .frame(height: 112)
+        .aspectRatio(4 / 3, contentMode: .fit)
     }
 
     private func thumbnailCGImage(from data: Data) -> CGImage? {
@@ -102,6 +103,8 @@ struct LibraryFileCell: View {
                         .foregroundStyle(.tertiary)
                 }
             }
+            .lineLimit(1)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

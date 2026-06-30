@@ -10,23 +10,35 @@ struct IOSContentView: View {
     @EnvironmentObject var locManager: LocalizationManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @Namespace private var playerNamespace
     @State private var selectedIPadSection: AppState.Section? = .library
+    @State private var iPadColumnVisibility: NavigationSplitViewVisibility = .all
 
     private let iPadSections: [AppState.Section] = [.player, .library, .recent, .favorites, .settings]
 
     var body: some View {
-        if horizontalSizeClass == .regular {
-            iPadLayout
-        } else {
-            iPhoneLayout
+        Group {
+            if horizontalSizeClass == .regular {
+                iPadLayout
+            } else {
+                iPhoneLayout
+            }
         }
+        .onAppear {
+            appState.handleSceneActiveStateChanged(scenePhase == .active)
+            appState.setPlayerSurfaceVisible(appState.isPlayerVisible)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            appState.handleSceneActiveStateChanged(phase == .active)
+        }
+        .statusBarHidden(appState.isStageMaximized)
     }
 
     // MARK: - iPad Layout (NavigationSplitView)
 
     private var iPadLayout: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $iPadColumnVisibility) {
             List(iPadSections, id: \.self, selection: $selectedIPadSection) { section in
                 NavigationLink(value: section) {
                     Label(locManager.localized("sidebar.\(section.rawValue)"), systemImage: section.icon)
@@ -34,12 +46,18 @@ struct IOSContentView: View {
             }
             .listStyle(.sidebar)
             .navigationTitle(locManager.localized("app.name"))
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    addContentMenu
+                }
+            }
         } detail: {
             iPadDetailContent(for: appState.selectedSection)
                 .id(appState.selectedSection)
         }
         .onAppear {
             selectedIPadSection = appState.selectedSection
+            iPadColumnVisibility = appState.isStageMaximized ? .detailOnly : .all
         }
         .onChange(of: selectedIPadSection) { _, section in
             guard let section else { return }
@@ -50,9 +68,16 @@ struct IOSContentView: View {
                 selectedIPadSection = newSection
             }
             if newSection == .player {
+                appState.setPlayerSurfaceVisible(appState.isPlayerVisible)
                 appState.resumePlaybackForNavigation()
             } else if appState.currentFileURL != nil {
+                appState.setPlayerSurfaceVisible(false)
                 appState.pausePlaybackForNavigation()
+            }
+        }
+        .onChange(of: appState.isStageMaximized) { _, maximized in
+            withAnimation(.glassSpring) {
+                iPadColumnVisibility = maximized ? .detailOnly : .all
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSWFFile)) { n in
@@ -106,8 +131,10 @@ struct IOSContentView: View {
         }
         .onChange(of: appState.selectedSection) { _, newSection in
             if newSection == .player {
+                appState.setPlayerSurfaceVisible(appState.isPlayerVisible)
                 appState.resumePlaybackForNavigation()
             } else if appState.currentFileURL != nil {
+                appState.setPlayerSurfaceVisible(false)
                 appState.pausePlaybackForNavigation()
             }
         }
@@ -132,6 +159,25 @@ struct IOSContentView: View {
                     }
                 }
             }
+    }
+
+    private var addContentMenu: some View {
+        Menu {
+            Button {
+                appState.showFilePicker()
+            } label: {
+                Label(locManager.localized("toolbar.openSwf"), systemImage: "doc")
+            }
+
+            Button {
+                appState.showFolderPicker()
+            } label: {
+                Label(locManager.localized("toolbar.importFolder"), systemImage: "folder")
+            }
+        } label: {
+            Image(systemName: "plus")
+        }
+        .accessibilityLabel(locManager.localized("toolbar.importHelp"))
     }
 
     private var playerTab: some View {
@@ -212,16 +258,26 @@ struct IOSContentView: View {
     // MARK: - Player View
 
     private var stageBackgroundColor: Color {
-        appState.isStageMaximized ? .black : Color(.systemBackground)
+        usesInlineFullscreen ? .black : Color(.systemBackground)
     }
 
     private var stageBackgroundARGB: UInt32 {
         appState.isStageMaximized ? 0xFF000000 : (colorScheme == .dark ? 0xFF000000 : 0xFFFFFFFF)
     }
 
+    private var usesInlineFullscreen: Bool {
+        appState.isStageMaximized
+    }
+
     private var playerView: some View {
         playerSurface
-            .onAppear(perform: syncStageBackground)
+            .onAppear {
+                appState.setPlayerSurfaceVisible(true)
+                syncStageBackground()
+            }
+            .onDisappear {
+                appState.setPlayerSurfaceVisible(false)
+            }
             .onChange(of: colorScheme) { _, _ in syncStageBackground() }
             .onReceive(NotificationCenter.default.publisher(for: .viewportChanged)) { n in
                 guard let i = n.userInfo,
@@ -234,25 +290,25 @@ struct IOSContentView: View {
 
     private var playerSurface: some View {
         GeometryReader { geo in
-            let stageWidth = appState.isStageMaximized ? geo.size.width : max(0, geo.size.width - NativeSpacing.xxxl)
-            let stageHeight = appState.isStageMaximized ? geo.size.height : max(220, geo.size.height * 0.58)
+            let stageWidth = usesInlineFullscreen ? geo.size.width : max(0, geo.size.width - NativeSpacing.xxxl)
+            let stageHeight = usesInlineFullscreen ? geo.size.height : max(220, geo.size.height * 0.58)
 
             ZStack {
                 stageBackgroundColor.ignoresSafeArea()
 
-                VStack(spacing: appState.isStageMaximized ? 0 : NativeSpacing.xl) {
-                    if !appState.isStageMaximized {
+                VStack(spacing: usesInlineFullscreen ? 0 : NativeSpacing.xl) {
+                    if !usesInlineFullscreen {
                         Spacer(minLength: NativeSpacing.md)
                     }
 
                     RufflePlayerView()
                         .environmentObject(appState)
-                        .clipShape(RoundedRectangle(cornerRadius: appState.isStageMaximized ? 0 : NativeRadius.xl, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: usesInlineFullscreen ? 0 : NativeRadius.xl, style: .continuous))
                         .matchedGeometryEffect(id: "player-stage", in: playerNamespace)
                         .frame(width: stageWidth, height: stageHeight)
                         .zIndex(0)
 
-                    if !appState.isStageMaximized {
+                    if !usesInlineFullscreen {
                         nowPlayingPanel
                             .padding(.horizontal, NativeSpacing.xxxl)
                             .padding(.bottom, NativeSpacing.xl)
@@ -267,7 +323,7 @@ struct IOSContentView: View {
                         .zIndex(3)
                 }
 
-                if appState.isStageMaximized {
+                if usesInlineFullscreen {
                     VStack {
                         HStack {
                             Spacer()
@@ -282,10 +338,10 @@ struct IOSContentView: View {
                 }
             }
         }
-        .ignoresSafeArea(.container, edges: appState.isStageMaximized ? .all : [])
-        .statusBarHidden(appState.isStageMaximized)
-        .toolbar(appState.isStageMaximized ? .hidden : .visible, for: .navigationBar)
-        .toolbar(appState.isStageMaximized ? .hidden : .visible, for: .tabBar)
+        .ignoresSafeArea(.container, edges: usesInlineFullscreen ? .all : [])
+        .statusBarHidden(usesInlineFullscreen)
+        .toolbar(usesInlineFullscreen ? .hidden : .visible, for: .navigationBar)
+        .toolbar(usesInlineFullscreen ? .hidden : .visible, for: .tabBar)
         .animation(.glassSpring, value: appState.isStageMaximized)
     }
 
@@ -297,7 +353,7 @@ struct IOSContentView: View {
                         .font(.headline.weight(.bold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-                    Text(appState.currentFileURL?.lastPathComponent ?? locManager.localized("workspace.dropMessage"))
+                    Text(appState.currentFileURL?.lastPathComponent ?? locManager.localized("workspace.openIOSMessage"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

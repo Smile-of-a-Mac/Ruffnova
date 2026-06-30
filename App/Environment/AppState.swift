@@ -146,6 +146,11 @@ final class AppState: ObservableObject {
     private var timelinePollTimer: Timer?
     private var loadTimeoutTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
+    #if os(iOS)
+    private var pausedForSystemInterruption = false
+    private var sceneIsActive = true
+    private var playerSurfaceVisible = false
+    #endif
 
     init() {
         setupNotifications()
@@ -215,6 +220,8 @@ final class AppState: ObservableObject {
     func initializeBridge(metalLayer: CAMetalLayer, width: UInt32, height: UInt32, scaleFactor: Float) {
         if let bridge {
             bridge.updateSurface(metalLayer: metalLayer, width: width, height: height)
+            bridge.setViewport(width: width, height: height, scaleFactor: scaleFactor)
+            updateIOSRenderLoopAvailability()
             return
         }
         let storedQuality = SettingsPersistence.shared.quality
@@ -235,6 +242,7 @@ final class AppState: ObservableObject {
         bridge?.setVolume(isMuted ? 0.0 : volume)
         bridge?.setLooping(isLooping)
         bridge?.setSpeed(playbackSpeed)
+        updateIOSRenderLoopAvailability()
         #if RUST_FFI_AVAILABLE
         let letterboxSetting = UserDefaults.standard.string(forKey: "letterbox") ?? "fullscreen"
         switch letterboxSetting {
@@ -314,7 +322,7 @@ final class AppState: ObservableObject {
             syncPlayingState()
         }
         detectContentType()
-        startTimelinePolling()
+        updateIOSRenderLoopAvailability()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.adoptStageSize()
         }
@@ -414,6 +422,49 @@ final class AppState: ObservableObject {
         showControlBarTemporarily()
     }
 
+    func setPlayerSurfaceVisible(_ visible: Bool) {
+        #if os(iOS)
+        playerSurfaceVisible = visible
+        updateIOSRenderLoopAvailability()
+        #endif
+    }
+
+    func handleSceneActiveStateChanged(_ active: Bool) {
+        #if os(iOS)
+        sceneIsActive = active
+        if active {
+            updateIOSRenderLoopAvailability()
+            let shouldResumePlayback = pausedForSystemInterruption && currentFileURL != nil && playerSurfaceVisible
+            pausedForSystemInterruption = false
+            if shouldResumePlayback {
+                isPlaying = true
+                bridge?.setPlaying(true)
+                showControlBarTemporarily()
+            }
+        } else {
+            if isPlaying {
+                pausedForSystemInterruption = true
+                isPlaying = false
+                bridge?.setPlaying(false)
+                controlBarOnPause()
+            }
+            updateIOSRenderLoopAvailability()
+        }
+        #endif
+    }
+
+    private func updateIOSRenderLoopAvailability() {
+        #if os(iOS)
+        let shouldRender = sceneIsActive && playerSurfaceVisible && currentFileURL != nil && bridge != nil
+        bridge?.setRenderLoopActive(shouldRender)
+        if shouldRender {
+            startTimelinePolling()
+        } else {
+            stopTimelinePolling()
+        }
+        #endif
+    }
+
     var isPlayerVisible: Bool {
         currentFileURL != nil && selectedSection == .player
     }
@@ -422,6 +473,7 @@ final class AppState: ObservableObject {
         pausePlayback()
         stopTimelinePolling()
         currentFileURL = nil
+        updateIOSRenderLoopAvailability()
         selectedSection = .library
         hideControlBarTask?.cancel()
         showControlBar = true

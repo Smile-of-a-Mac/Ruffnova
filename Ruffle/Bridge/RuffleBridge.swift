@@ -38,6 +38,12 @@ final class RuffleBridge {
     private var playerPointer: OpaquePointer?
     private var rendererPointer: OpaquePointer?
     private let metalLayer: CAMetalLayer
+    private var viewportWidth: UInt32
+    private var viewportHeight: UInt32
+    private var viewportScaleFactor: Float
+    private let configuredQuality: Int32
+    private let configuredAutoplay: Bool
+    private let configuredMaxExecutionSecs: Float
     private var displayTimer: Timer?
     private var lastFrameTime: UInt64 = 0
     private var renderedFrames: UInt64 = 0
@@ -45,12 +51,17 @@ final class RuffleBridge {
     private var fpsLastTime: UInt64 = 0
     private var currentFPS: Double = 0
     private let timeBase: mach_timebase_info_data_t
+    private var renderLoopActive = true
 
     /// Called on each rendered frame with (fps, frameCount).
     var onFrameUpdate: ((Double, UInt64) -> Void)?
 
     // MARK: - Speed state (applied to dt in renderFrame)
     private var playbackSpeed: Float = 1.0
+    private var currentVolume: Float = 1.0
+    private var currentLetterboxMode: RuffleLetterbox = RuffleLetterbox_Fullscreen
+    private var currentBackgroundColor: UInt32 = 0xFF000000
+    private var currentFullscreen = false
 
     // Mock state
     private var mockIsPlaying: Bool = false
@@ -66,28 +77,18 @@ final class RuffleBridge {
           autoplay: Bool = true,
           maxExecutionSecs: Float = 15.0) {
         self.metalLayer = metalLayer
+        self.viewportWidth = width
+        self.viewportHeight = height
+        self.viewportScaleFactor = scaleFactor
+        self.configuredQuality = quality
+        self.configuredAutoplay = autoplay
+        self.configuredMaxExecutionSecs = maxExecutionSecs
         var info = mach_timebase_info_data_t()
         mach_timebase_info(&info)
         self.timeBase = info
 
         #if RUST_FFI_AVAILABLE
-        rendererPointer = ruffle_renderer_create(
-            Unmanaged.passUnretained(metalLayer).toOpaque(),
-            width, height, scaleFactor
-        )
-        guard rendererPointer != nil else {
-            Logger.ruffle.error("Failed to create renderer")
-            return nil
-        }
-        let config = RuffleConfig(
-            width: width, height: height, scale_factor: scaleFactor,
-            quality: quality, autoplay: autoplay, max_execution_secs: maxExecutionSecs
-        )
-        playerPointer = ruffle_player_create_with_renderer(config, rendererPointer)
-        guard playerPointer != nil else {
-            Logger.ruffle.error("Failed to create player")
-            ruffle_renderer_free(rendererPointer)
-            rendererPointer = nil
+        guard recreatePlayer() else {
             return nil
         }
         #else
@@ -146,6 +147,7 @@ final class RuffleBridge {
     #endif
 
     private func renderFrame() {
+        guard renderLoopActive else { return }
         #if RUST_FFI_AVAILABLE
         guard let player = playerPointer else { return }
         let now = mach_absolute_time()
@@ -175,8 +177,68 @@ final class RuffleBridge {
 
     // MARK: - Public API
 
+    #if RUST_FFI_AVAILABLE
+    private func recreatePlayer() -> Bool {
+        if let playerPointer {
+            ruffle_player_free(playerPointer)
+            self.playerPointer = nil
+        }
+        if let rendererPointer {
+            ruffle_renderer_free(rendererPointer)
+            self.rendererPointer = nil
+        }
+
+        rendererPointer = ruffle_renderer_create(
+            Unmanaged.passUnretained(metalLayer).toOpaque(),
+            viewportWidth, viewportHeight, viewportScaleFactor
+        )
+        guard rendererPointer != nil else {
+            Logger.ruffle.error("Failed to recreate renderer")
+            return false
+        }
+
+        let config = RuffleConfig(
+            width: viewportWidth,
+            height: viewportHeight,
+            scale_factor: viewportScaleFactor,
+            quality: configuredQuality,
+            autoplay: configuredAutoplay,
+            max_execution_secs: configuredMaxExecutionSecs
+        )
+        playerPointer = ruffle_player_create_with_renderer(config, rendererPointer)
+        guard playerPointer != nil else {
+            Logger.ruffle.error("Failed to recreate player")
+            ruffle_renderer_free(rendererPointer)
+            rendererPointer = nil
+            return false
+        }
+
+        ruffle_player_set_volume(playerPointer, currentVolume)
+        _ = ruffle_player_set_speed(playerPointer, playbackSpeed)
+        _ = ruffle_player_set_looping(playerPointer, loopFlag)
+        _ = ruffle_player_set_letterbox_mode(playerPointer, currentLetterboxMode)
+        _ = ruffle_player_set_background_color(playerPointer, currentBackgroundColor)
+        ruffle_player_set_fullscreen(playerPointer, currentFullscreen)
+        lastFrameTime = 0
+        return true
+    }
+    #endif
+
+    func setRenderLoopActive(_ active: Bool) {
+        renderLoopActive = active
+        if active {
+            lastFrameTime = 0
+        }
+        #if os(iOS)
+        displayLink?.isPaused = !active
+        #else
+        displayTimer?.fireDate = active ? .distantPast : .distantFuture
+        #endif
+    }
+
     func loadURL(_ url: URL) {
         #if RUST_FFI_AVAILABLE
+        guard recreatePlayer() else { return }
         guard let player = playerPointer else { return }
         let result = url.absoluteString.withCString { ruffle_player_load_url(player, $0) }
         if result != RUFFLE_RESULT_OK {
@@ -191,6 +253,7 @@ final class RuffleBridge {
 
     func loadData(_ data: Data, url: URL? = nil) {
         #if RUST_FFI_AVAILABLE
+        guard recreatePlayer() else { return }
         guard let player = playerPointer else { return }
         data.withUnsafeBytes { buf in
             guard let ptr = buf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
@@ -230,6 +293,7 @@ final class RuffleBridge {
     }
 
     func setVolume(_ v: Float) {
+        currentVolume = v
         #if RUST_FFI_AVAILABLE
         guard let p = playerPointer else { return }
         ruffle_player_set_volume(p, v)
@@ -301,6 +365,7 @@ final class RuffleBridge {
     }
 
     func setLetterboxMode(_ mode: RuffleLetterbox) {
+        currentLetterboxMode = mode
         #if RUST_FFI_AVAILABLE
         guard let p = playerPointer else { return }
         _ = ruffle_player_set_letterbox_mode(p, mode)
@@ -308,6 +373,7 @@ final class RuffleBridge {
     }
 
     func setBackgroundColor(_ color: UInt32) {
+        currentBackgroundColor = color
         #if RUST_FFI_AVAILABLE
         guard let p = playerPointer else { return }
         _ = ruffle_player_set_background_color(p, color)
@@ -339,6 +405,7 @@ final class RuffleBridge {
     func isLooping() -> Bool { loopFlag }
 
     func setFullscreen(_ v: Bool) {
+        currentFullscreen = v
         #if RUST_FFI_AVAILABLE
         guard let p = playerPointer else { return }
         ruffle_player_set_fullscreen(p, v)
@@ -346,6 +413,9 @@ final class RuffleBridge {
     }
 
     func setViewport(width: UInt32, height: UInt32, scaleFactor: Float) {
+        viewportWidth = width
+        viewportHeight = height
+        viewportScaleFactor = scaleFactor
         #if RUST_FFI_AVAILABLE
         guard let p = playerPointer, let r = rendererPointer else { return }
         ruffle_player_set_viewport(p, width, height, scaleFactor)

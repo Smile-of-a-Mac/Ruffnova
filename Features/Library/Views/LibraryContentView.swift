@@ -96,7 +96,7 @@ struct LibraryGridView: View {
 
     private var columns: [GridItem] {
         #if os(iOS)
-        [GridItem(.flexible(), spacing: 40), GridItem(.flexible(), spacing: 40)]
+        [GridItem(.adaptive(minimum: 280, maximum: 320), spacing: NativeSpacing.xxxl)]
         #else
         [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: NativeSpacing.xxxl)]
         #endif
@@ -122,7 +122,6 @@ struct LibraryGridView: View {
                 LazyVGrid(columns: columns, spacing: NativeSpacing.xl) {
                     ForEach(appState.recentFiles) { file in
                         LibraryFileCell(file: file)
-                            .frame(maxWidth: .infinity)
                     }
                 }
                 .padding(.horizontal, gridHorizontalPadding)

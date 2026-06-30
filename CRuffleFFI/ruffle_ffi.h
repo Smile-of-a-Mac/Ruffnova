@@ -91,6 +91,7 @@ RuffleResult ruffle_player_set_looping(RufflePlayer*, bool looping);
 RuffleResult ruffle_player_set_speed(RufflePlayer*, float speed);
 RuffleResult ruffle_player_set_scale_mode(RufflePlayer*, RuffleScaleMode);
 RuffleResult ruffle_player_set_letterbox_mode(RufflePlayer*, RuffleLetterbox);
+RuffleResult ruffle_player_set_background_color(RufflePlayer*, unsigned int color);
 RuffleResult ruffle_player_set_quality(RufflePlayer*, int quality);
 RuffleResult ruffle_player_recreate_surface(RufflePlayer*, void *metal_layer, unsigned int width, unsigned int height);
 

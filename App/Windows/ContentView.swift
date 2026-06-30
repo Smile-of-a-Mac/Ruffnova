@@ -1,9 +1,14 @@
-// ContentView — Glass-based main application view.
+// ContentView — macOS glass-based main application view.
 // Window glass is the foundation. Sidebar blends in. Content floats above.
 // Toolbar is invisible. Only floating controls exist.
 
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#elseif os(iOS)
+import UIKit
+#endif
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
@@ -60,8 +65,10 @@ struct ContentView: View {
             appState.bridge?.sendKeyEvent(keyCode: kc, charCode: cc, isDown: dn, modifiers: UInt32(mod))
         }
         .onChange(of: appState.selectedSection) { newSection in
-            if newSection != .library && appState.currentFileURL != nil {
-                appState.pausePlayback()
+            if newSection == .player {
+                appState.resumePlaybackForNavigation()
+            } else if appState.currentFileURL != nil {
+                appState.pausePlaybackForNavigation()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleSWFInfo)) { _ in
@@ -167,10 +174,18 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private var platformBackground: Color {
+        #if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        Color(.systemBackground)
+        #endif
+    }
+
     private var playerView: some View {
         ZStack {
             Color.clear
-                .background(.regularMaterial)
+                .background(platformBackground)
                 .ignoresSafeArea()
 
             if appState.isStageMaximized {
@@ -260,9 +275,11 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if os(macOS)
         .onExitCommand {
             appState.exitStageMaximized()
         }
+        #endif
     }
 
     private var playerTitleBadge: some View {
@@ -361,6 +378,7 @@ struct ContentView: View {
     }
 
     private func handleZipDrop(_ url: URL) {
+        #if os(macOS)
         do {
             let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
@@ -373,6 +391,7 @@ struct ContentView: View {
         } catch {
             DispatchQueue.main.async { appState.errorMessage = locManager.localized("error.zipExtract") }
         }
+        #endif
     }
 }
 

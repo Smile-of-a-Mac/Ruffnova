@@ -4,6 +4,9 @@ import UniformTypeIdentifiers
 struct AppToolbar: ToolbarContent {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
@@ -50,7 +53,11 @@ struct AppToolbar: ToolbarContent {
 
     private var settingsButton: some View {
         Button {
+            #if os(macOS)
+            openWindow(id: "ruffnova-settings")
+            #else
             appState.selectedSection = .settings
+            #endif
         } label: {
             Label(locManager.localized("toolbar.settings"), systemImage: "gearshape")
         }
@@ -61,6 +68,7 @@ struct AppToolbar: ToolbarContent {
     // MARK: - Panel Helpers
 
     private func showOpenPanel() {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "swf")].compactMap { $0 }
         panel.allowsMultipleSelection = false
@@ -69,9 +77,11 @@ struct AppToolbar: ToolbarContent {
         if panel.runModal() == .OK, let url = panel.url {
             appState.openFile(url)
         }
+        #endif
     }
 
     private func showImportFolderPanel() {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -80,6 +90,7 @@ struct AppToolbar: ToolbarContent {
         if panel.runModal() == .OK, let url = panel.url {
             appState.browseDirectory(url)
         }
+        #endif
     }
 }
 

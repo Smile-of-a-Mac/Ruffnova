@@ -16,9 +16,10 @@ enum Language: String, CaseIterable {
     }
 
     static func detectDeviceLanguage() -> Language {
-        let code = Locale.current.language.languageCode?.identifier ?? ""
-        if code.hasPrefix("zh") {
-            return .simplifiedChinese
+        if let preferred = Locale.preferredLanguages.first {
+            if preferred.hasPrefix("zh") {
+                return .simplifiedChinese
+            }
         }
         return .english
     }

@@ -5,6 +5,9 @@ import Foundation
 import Metal
 import QuartzCore
 import OSLog
+#if os(iOS)
+import UIKit
+#endif
 #if RUST_FFI_AVAILABLE
 import CRuffleFFI
 #endif
@@ -53,6 +56,11 @@ final class RuffleBridge {
     private var mockIsPlaying: Bool = false
     private var mockVolume: Float = 1.0
 
+    // Platform-specific display link
+    #if os(iOS)
+    private var displayLink: CADisplayLink?
+    #endif
+
     init?(metalLayer: CAMetalLayer, width: UInt32, height: UInt32, scaleFactor: Float,
           quality: Int32 = RuffleQuality.high.rawValue,
           autoplay: Bool = true,
@@ -90,7 +98,11 @@ final class RuffleBridge {
     }
 
     deinit {
+        #if os(iOS)
+        displayLink?.invalidate()
+        #else
         displayTimer?.invalidate()
+        #endif
         #if RUST_FFI_AVAILABLE
         if let p = playerPointer { ruffle_player_free(p) }
         if let r = rendererPointer { ruffle_renderer_free(r) }
@@ -100,6 +112,11 @@ final class RuffleBridge {
     // MARK: - Display Link
 
     private func setupDisplayTimer() {
+        #if os(iOS)
+        let link = CADisplayLink(target: self, selector: #selector(displayLinkTick))
+        link.add(to: .main, forMode: .common)
+        displayLink = link
+        #else
         displayTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
@@ -109,12 +126,24 @@ final class RuffleBridge {
         if let timer = displayTimer {
             RunLoop.main.add(timer, forMode: .common)
         }
+        #endif
     }
 
     private func stopDisplayTimer() {
+        #if os(iOS)
+        displayLink?.invalidate()
+        displayLink = nil
+        #else
         displayTimer?.invalidate()
         displayTimer = nil
+        #endif
     }
+
+    #if os(iOS)
+    @objc private func displayLinkTick() {
+        renderFrame()
+    }
+    #endif
 
     private func renderFrame() {
         #if RUST_FFI_AVAILABLE
@@ -275,6 +304,13 @@ final class RuffleBridge {
         #if RUST_FFI_AVAILABLE
         guard let p = playerPointer else { return }
         _ = ruffle_player_set_letterbox_mode(p, mode)
+        #endif
+    }
+
+    func setBackgroundColor(_ color: UInt32) {
+        #if RUST_FFI_AVAILABLE
+        guard let p = playerPointer else { return }
+        _ = ruffle_player_set_background_color(p, color)
         #endif
     }
 

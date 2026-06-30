@@ -15,7 +15,6 @@
 		A10006 /* AboutWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10006 /* AboutWindow.swift */; };
 		A10007 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10007 /* ContentView.swift */; };
 		A10008 /* AppSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10008 /* AppSidebar.swift */; };
-		A10009 /* CollectionsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10009 /* CollectionsListView.swift */; };
 		A10010 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10010 /* EmptyStateView.swift */; };
 		A10011 /* FavoritesGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10011 /* FavoritesGridView.swift */; };
 		A10012 /* LibraryContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10012 /* LibraryContentView.swift */; };
@@ -41,7 +40,14 @@
 		A10032 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10032 /* Assets.xcassets */; };
 		A10033 /* zh-Hans.json in Resources */ = {isa = PBXBuildFile; fileRef = B10033 /* zh-Hans.json */; };
 		A10034 /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = B10034 /* en.json */; };
-		A10035 /* libruffle_ffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B10035 /* libruffle_ffi.a */; };
+		A10038 /* IOSContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10041 /* IOSContentView.swift */; };
+		A10039 /* IOSAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10042 /* IOSAppDelegate.swift */; };
+		A10040 /* FilePickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10043 /* FilePickerService.swift */; };
+		A10041 /* InputProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10044 /* InputProvider.swift */; };
+		A10042 /* MacFilePickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10045 /* MacFilePickerService.swift */; };
+		A10043 /* MacInputProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10046 /* MacInputProvider.swift */; };
+		A10044 /* IOSFilePickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10047 /* IOSFilePickerService.swift */; };
+		A10045 /* IOSInputProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10048 /* IOSInputProvider.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -53,7 +59,6 @@
 		B10006 /* AboutWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutWindow.swift; sourceTree = "<group>"; };
 		B10007 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B10008 /* AppSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSidebar.swift; sourceTree = "<group>"; };
-		B10009 /* CollectionsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsListView.swift; sourceTree = "<group>"; };
 		B10010 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		B10011 /* FavoritesGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesGridView.swift; sourceTree = "<group>"; };
 		B10012 /* LibraryContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryContentView.swift; sourceTree = "<group>"; };
@@ -83,6 +88,15 @@
 		B10036 /* ruffle_ffi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ruffle_ffi.h; path = CRuffleFFI/ruffle_ffi.h; sourceTree = "<group>"; };
 		B10037 /* RuffleBridgingHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RuffleBridgingHeader.h; sourceTree = "<group>"; };
 		B10038 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B10041 /* IOSContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSContentView.swift; sourceTree = "<group>"; };
+		B10042 /* IOSAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSAppDelegate.swift; sourceTree = "<group>"; };
+		B10043 /* FilePickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePickerService.swift; sourceTree = "<group>"; };
+		B10044 /* InputProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputProvider.swift; sourceTree = "<group>"; };
+		B10045 /* MacFilePickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacFilePickerService.swift; sourceTree = "<group>"; };
+		B10046 /* MacInputProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacInputProvider.swift; sourceTree = "<group>"; };
+		B10047 /* IOSFilePickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSFilePickerService.swift; sourceTree = "<group>"; };
+		B10048 /* IOSInputProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSInputProvider.swift; sourceTree = "<group>"; };
+		B10049 /* Info-iOS.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-iOS.plist"; sourceTree = "<group>"; };
 		C10099 /* Ruffnova.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ruffnova.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -91,7 +105,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10035 /* libruffle_ffi.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -106,9 +119,11 @@
 				G10200 /* Features */,
 				G10300 /* Shared */,
 				G10400 /* Ruffle */,
+				G10700 /* Platform */,
 				B10032 /* Assets.xcassets */,
 				B10037 /* RuffleBridgingHeader.h */,
 				B10038 /* Info.plist */,
+				B10049 /* Info-iOS.plist */,
 				G10500 /* CRuffleFFI */,
 				G10600 /* Resources */,
 			);
@@ -131,6 +146,7 @@
 				G10130 /* Environment */,
 				G10140 /* Toolbar */,
 				G10110 /* Windows */,
+				G10150 /* iOS */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -168,6 +184,14 @@
 			path = Toolbar;
 			sourceTree = "<group>";
 		};
+		G10150 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				B10042 /* IOSAppDelegate.swift */,
+			);
+			path = iOS;
+			sourceTree = "<group>";
+		};
 		G10200 /* Features */ = {
 			isa = PBXGroup;
 			children = (
@@ -190,7 +214,6 @@
 			isa = PBXGroup;
 			children = (
 				B10008 /* AppSidebar.swift */,
-				B10009 /* CollectionsListView.swift */,
 				B10010 /* EmptyStateView.swift */,
 				B10011 /* FavoritesGridView.swift */,
 				B10012 /* LibraryContentView.swift */,
@@ -271,6 +294,7 @@
 				G10340 /* Persistence */,
 				G10350 /* Services */,
 				G10360 /* Styles */,
+				G10370 /* Protocols */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -324,6 +348,15 @@
 			path = Styles;
 			sourceTree = "<group>";
 		};
+		G10370 /* Protocols */ = {
+			isa = PBXGroup;
+			children = (
+				B10043 /* FilePickerService.swift */,
+				B10044 /* InputProvider.swift */,
+			);
+			path = Protocols;
+			sourceTree = "<group>";
+		};
 		G10400 /* Ruffle */ = {
 			isa = PBXGroup;
 			children = (
@@ -357,6 +390,58 @@
 				B10034 /* en.json */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		G10700 /* Platform */ = {
+			isa = PBXGroup;
+			children = (
+				G10710 /* macOS */,
+				G10720 /* iOS */,
+			);
+			path = Platform;
+			sourceTree = "<group>";
+		};
+		G10710 /* macOS */ = {
+			isa = PBXGroup;
+			children = (
+				G10711 /* Services */,
+			);
+			path = macOS;
+			sourceTree = "<group>";
+		};
+		G10711 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B10045 /* MacFilePickerService.swift */,
+				B10046 /* MacInputProvider.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G10720 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				G10721 /* Services */,
+				G10722 /* Views */,
+			);
+			path = iOS;
+			sourceTree = "<group>";
+		};
+		G10721 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B10047 /* IOSFilePickerService.swift */,
+				B10048 /* IOSInputProvider.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G10722 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B10041 /* IOSContentView.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -432,7 +517,6 @@
 				A10006 /* AboutWindow.swift in Sources */,
 				A10007 /* ContentView.swift in Sources */,
 				A10008 /* AppSidebar.swift in Sources */,
-				A10009 /* CollectionsListView.swift in Sources */,
 				A10010 /* EmptyStateView.swift in Sources */,
 				A10011 /* FavoritesGridView.swift in Sources */,
 				A10012 /* LibraryContentView.swift in Sources */,
@@ -455,6 +539,14 @@
 				A10029 /* LocalizationManager.swift in Sources */,
 				A10030 /* DesignTokens.swift in Sources */,
 				A10031 /* dummy.c in Sources */,
+				A10038 /* IOSContentView.swift in Sources */,
+				A10039 /* IOSAppDelegate.swift in Sources */,
+				A10040 /* FilePickerService.swift in Sources */,
+				A10041 /* InputProvider.swift in Sources */,
+				A10042 /* MacFilePickerService.swift in Sources */,
+				A10043 /* MacInputProvider.swift in Sources */,
+				A10044 /* IOSFilePickerService.swift in Sources */,
+				A10045 /* IOSInputProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -526,14 +618,46 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1a;
+				DEVELOPMENT_TEAM = B8NH9LK6K6;
+				ENABLE_DEBUG_DYLIB = NO;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				INFOPLIST_FILE = Info.plist;
+				"INFOPLIST_FILE[sdk=iphoneos*]" = "Info-iOS.plist";
+				"INFOPLIST_FILE[sdk=iphonesimulator*]" = "Info-iOS.plist";
+				"INFOPLIST_FILE[sdk=macosx*]" = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Ruffnova;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/CRuffleFFI";
-				OTHER_LDFLAGS = (
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/CRuffleFFI/ios";
+				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/CRuffleFFI/ios-sim";
+				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = "$(SRCROOT)/CRuffleFFI/macos";
+				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = "$(inherited)";
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
+					"-lruffle_ffi",
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					CoreAudio,
+				);
+				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"-lruffle_ffi",
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					CoreAudio,
+				);
+				"OTHER_LDFLAGS[sdk=macosx*]" = (
+					"$(inherited)",
+					"-lruffle_ffi",
 					"-framework",
 					AudioToolbox,
 					"-framework",
@@ -546,9 +670,12 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -DRUST_FFI_AVAILABLE";
 				PRODUCT_BUNDLE_IDENTIFIER = app.ruffnova.native;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/CRuffleFFI";
 				SWIFT_OBJC_BRIDGING_HEADER = RuffleBridgingHeader.h;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -558,14 +685,45 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1a;
+				DEVELOPMENT_TEAM = B8NH9LK6K6;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				INFOPLIST_FILE = Info.plist;
+				"INFOPLIST_FILE[sdk=iphoneos*]" = "Info-iOS.plist";
+				"INFOPLIST_FILE[sdk=iphonesimulator*]" = "Info-iOS.plist";
+				"INFOPLIST_FILE[sdk=macosx*]" = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Ruffnova;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/CRuffleFFI";
-				OTHER_LDFLAGS = (
+				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/CRuffleFFI/ios";
+				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/CRuffleFFI/ios-sim";
+				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = "$(SRCROOT)/CRuffleFFI/macos";
+				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = "$(inherited)";
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
+					"-lruffle_ffi",
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					CoreAudio,
+				);
+				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"-lruffle_ffi",
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					CoreAudio,
+				);
+				"OTHER_LDFLAGS[sdk=macosx*]" = (
+					"$(inherited)",
+					"-lruffle_ffi",
 					"-framework",
 					AudioToolbox,
 					"-framework",
@@ -578,9 +736,12 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -DRUST_FFI_AVAILABLE";
 				PRODUCT_BUNDLE_IDENTIFIER = app.ruffnova.native;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/CRuffleFFI";
 				SWIFT_OBJC_BRIDGING_HEADER = RuffleBridgingHeader.h;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};

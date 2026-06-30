@@ -238,6 +238,13 @@ RuffleResult ruffle_player_get_playback_info(const RufflePlayer *ptr, RufflePlay
 /// `ptr` must be valid. `out` must be a valid pointer to a `RuffleMetadata`.
 RuffleResult ruffle_player_get_metadata(RufflePlayer *ptr, RuffleMetadata *out);
 
+/// Set the stage background color used by Ruffle when the SWF does not provide one.
+/// Color format is AARRGGBB.
+///
+/// # Safety
+/// `ptr` must be valid.
+RuffleResult ruffle_player_set_background_color(RufflePlayer *ptr, unsigned int color);
+
 /// Seek to a specific frame number.
 ///
 /// # Safety

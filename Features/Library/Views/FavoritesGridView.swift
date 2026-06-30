@@ -9,14 +9,6 @@ struct FavoritesGridView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
-                VStack(alignment: .leading, spacing: NativeSpacing.sm) {
-                    Text(locManager.localized("sidebar.favorites"))
-                        .font(.largeTitle)
-                    Text(locManager.localized("library.noFavorites.subtitle"))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-
                 LazyVGrid(columns: columns, spacing: NativeSpacing.xl) {
                     ForEach(appState.favoriteEntries) { bookmark in
                         Button { appState.openFile(bookmark.url) } label: {

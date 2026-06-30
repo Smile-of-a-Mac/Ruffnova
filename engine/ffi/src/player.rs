@@ -646,6 +646,28 @@ pub unsafe extern "C" fn ruffle_player_get_metadata(
     RuffleResult::Ok
 }
 
+/// Set the stage background color used by Ruffle when the SWF does not provide one.
+/// Color format is AARRGGBB.
+///
+/// # Safety
+/// `ptr` must be valid.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ruffle_player_set_background_color(
+    ptr: *mut RufflePlayer,
+    color: c_uint,
+) -> RuffleResult {
+    if ptr.is_null() {
+        return RuffleResult::ErrorNullPointer;
+    }
+    let player = unsafe { &(*ptr).inner };
+    let mut guard = match player.lock() {
+        Ok(g) => g,
+        Err(_) => return RuffleResult::ErrorLockPoisoned,
+    };
+    guard.set_background_color(Some(ruffle_core::Color::from_rgba(color)));
+    RuffleResult::Ok
+}
+
 // ─── Seek ────────────────────────────────────────────────────────────────────
 
 /// Seek to a specific frame number.

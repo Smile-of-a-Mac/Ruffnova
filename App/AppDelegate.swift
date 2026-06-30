@@ -1,5 +1,6 @@
 // AppDelegate — Handles application lifecycle and macOS-specific integration.
 
+#if os(macOS)
 import Cocoa
 import SwiftUI
 import UniformTypeIdentifiers
@@ -69,3 +70,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.hasShadow = true
     }
 }
+#endif

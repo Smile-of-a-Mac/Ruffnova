@@ -10,7 +10,7 @@ name = "ruffle_ffi"
 crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
-ruffle_core = { path = "../core", features = ["audio", "mp3", "aac", "nellymoser", "default_compatibility_rules"] }
+ruffle_core = { path = "../core", features = ["audio", "mp3", "aac", "nellymoser", "default_compatibility_rules", "default_font"] }
 ruffle_render = { path = "../render" }
 ruffle_render_wgpu = { path = "../render/wgpu" }
 ruffle_video_software = { path = "../video/software" }

@@ -10,8 +10,6 @@ struct AppSidebar: View {
     @FocusState private var searchFocused: Bool
 
     private let primarySections: [AppState.Section] = [.player, .library, .recent, .favorites]
-    private let librarySections: [AppState.Section] = [.collections, .downloads]
-    private let settingsSections: [AppState.Section] = [.settings]
 
     var body: some View {
         VStack(alignment: .leading, spacing: NativeSpacing.xl) {
@@ -23,25 +21,17 @@ struct AppSidebar: View {
                 }
             }
 
-            VStack(spacing: NativeSpacing.xs) {
-                ForEach(librarySections, id: \.self) { section in
-                    sidebarButton(for: section)
-                }
-            }
-
             Spacer()
-
-            VStack(spacing: NativeSpacing.xs) {
-                ForEach(settingsSections, id: \.self) { section in
-                    sidebarButton(for: section)
-                }
-            }
         }
         .padding(.top, NativeSpacing.section + NativeSpacing.md)
         .padding(.horizontal, NativeSpacing.lg)
         .padding(.bottom, NativeSpacing.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        #if os(macOS)
         .background(Color(nsColor: .windowBackgroundColor))
+        #else
+        .background(Color(.systemBackground))
+        #endif
         .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
     }
 

@@ -19,14 +19,14 @@ struct LibraryContentView: View {
             recentView
         case .favorites:
             favoritesView
-        case .collections:
-            collectionsView
-        case .downloads:
-            emptySection("square.and.arrow.down", "sidebar.downloads", "library.noDownloads.subtitle")
         case .settings:
+            #if os(macOS)
+            libraryView
+            #else
             SettingsView()
                 .environmentObject(appState)
                 .environmentObject(locManager)
+            #endif
         }
     }
 
@@ -66,18 +66,6 @@ struct LibraryContentView: View {
         }
     }
 
-    // MARK: - Collections View
-
-    private var collectionsView: some View {
-        Group {
-            if appState.collections.isEmpty {
-                emptySection("folder", "library.noCollections", "library.noCollections.subtitle")
-            } else {
-                CollectionsListView()
-            }
-        }
-    }
-
     // MARK: - Empty Section
 
     private func emptySection(_ icon: String, _ titleKey: String, _ subtitleKey: String) -> some View {
@@ -106,27 +94,38 @@ struct LibraryGridView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
 
-    private let columns = [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: NativeSpacing.xxxl)]
+    private var columns: [GridItem] {
+        #if os(iOS)
+        [GridItem(.flexible(), spacing: 40), GridItem(.flexible(), spacing: 40)]
+        #else
+        [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: NativeSpacing.xxxl)]
+        #endif
+    }
+
+    private var gridHorizontalPadding: CGFloat {
+        #if os(iOS)
+        NativeSpacing.xxxl
+        #else
+        NativeSpacing.section
+        #endif
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
-                VStack(alignment: .leading, spacing: NativeSpacing.sm) {
-                    Text(locManager.localized("library.title"))
-                        .font(.largeTitle)
-                    Text(String(format: locManager.localized("library.fileCount"), appState.recentFiles.count))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, NativeSpacing.section)
-                .padding(.top, NativeSpacing.section)
+                Text(String(format: locManager.localized("library.fileCount"), appState.recentFiles.count))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, NativeSpacing.section)
+                    .padding(.top, NativeSpacing.section)
 
                 LazyVGrid(columns: columns, spacing: NativeSpacing.xl) {
                     ForEach(appState.recentFiles) { file in
                         LibraryFileCell(file: file)
+                            .frame(maxWidth: .infinity)
                     }
                 }
-                .padding(.horizontal, NativeSpacing.section)
+                .padding(.horizontal, gridHorizontalPadding)
                 .padding(.bottom, NativeSpacing.section)
             }
         }

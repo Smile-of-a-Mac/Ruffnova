@@ -30,7 +30,9 @@ struct LibraryFileCell: View {
             Button(locManager.localized("menu.open")) { appState.openFile(file.url) }
             Divider()
             Button(locManager.localized("menu.showInFinder")) {
+                #if os(macOS)
                 NSWorkspace.shared.activateFileViewerSelecting([file.url])
+                #endif
             }
             Divider()
             Button(locManager.localized("library.removeFromRecent")) {
@@ -41,8 +43,8 @@ struct LibraryFileCell: View {
 
     private var thumbnailPreview: some View {
         ZStack {
-            if let data = file.thumbnailData, let nsImage = NSImage(data: data) {
-                Image(nsImage: nsImage)
+            if let data = file.thumbnailData, let cgImage = thumbnailCGImage(from: data) {
+                Image(decorative: cgImage, scale: 1.0)
                     .resizable()
                     .aspectRatio(4 / 3, contentMode: .fill)
                     .frame(height: 112)
@@ -64,6 +66,18 @@ struct LibraryFileCell: View {
             }
         }
         .frame(height: 112)
+    }
+
+    private func thumbnailCGImage(from data: Data) -> CGImage? {
+        #if os(macOS)
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
+        return cgImage
+        #else
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
+        return cgImage
+        #endif
     }
 
     private var fileInfo: some View {

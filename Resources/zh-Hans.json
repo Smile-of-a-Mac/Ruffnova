@@ -1,5 +1,6 @@
 {
     "language.name": "简体中文",
+    "app.name": "Ruffnova",
     "swuffle.app.name": "Ruffnova",
     "swuffle.app.subtitle": "SwiftUI Flash 播放器",
 
@@ -40,7 +41,7 @@
     "settings.rendering.graphics.auto": "自动",
     "settings.rendering.graphics.metal": "Metal",
     "settings.rendering.graphics.vulkan": "Vulkan",
-    "settings.rendering.graphics.metal.recommended": "推荐使用 Metal 以获得 macOS 上的最佳性能。",
+    "settings.rendering.graphics.metal.recommended": "推荐使用 Metal 以获得 %@ 上的最佳性能。",
 
     "settings.rendering.stage": "舞台",
     "settings.rendering.stage.subtitle": "SWF 舞台配置",
@@ -112,6 +113,7 @@
     "workspace.openSwf": "打开 SWF 文件",
     "workspace.dropHint": "松开以打开",
     "workspace.dropMessage": "将 Shockwave Flash 文件拖放到此处，或从 Mac 中选择文件。",
+    "workspace.openIOSMessage": "从“文件”中选择一个 SWF 文件开始播放。",
     "workspace.chooseFile": "选择文件",
     "workspace.openPanel.title": "打开 SWF 文件",
     "workspace.openPanel.message": "选择一个 Shockwave Flash (.swf) 文件来播放",

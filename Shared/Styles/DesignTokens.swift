@@ -1,4 +1,4 @@
-// DesignTokens — macOS 26 Liquid Glass design system.
+// DesignTokens — Multi-platform design system.
 // Material hierarchy creates depth. Whitespace creates structure.
 // Never fake glass — always use native system materials.
 
@@ -9,8 +9,13 @@ import SwiftUI
 enum NativeSpacing {
     static let xs: CGFloat = 4
     static let sm: CGFloat = 8
+    #if os(iOS)
+    static let md: CGFloat = 16
+    static let lg: CGFloat = 20
+    #else
     static let md: CGFloat = 12
     static let lg: CGFloat = 16
+    #endif
     static let xl: CGFloat = 20
     static let xxl: CGFloat = 24
     static let xxxl: CGFloat = 32
@@ -83,6 +88,12 @@ struct LiquidGlassModifier<S: InsettableShape>: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .background(material, in: shape)
+            .overlay {
+                shape
+                    .strokeBorder(.white.opacity(0.20), lineWidth: 0.7)
+            }
+            .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 8)
     }
 }
 
@@ -104,9 +115,15 @@ extension View {
 
     /// Content should inherit the window material instead of painting an opaque surface.
     func glassWindowBase() -> some View {
-        self
+        #if os(macOS)
+        return self
             .background(Color(nsColor: .windowBackgroundColor))
             .scrollContentBackground(.hidden)
+        #else
+        return self
+            .background(Color(.systemBackground))
+            .scrollContentBackground(.hidden)
+        #endif
     }
 
     func liquidGlassCapsule(material: Material = GlassMaterial.ultraLight) -> some View {

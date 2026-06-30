@@ -3,6 +3,9 @@ import UniformTypeIdentifiers
 
 struct RuffleCommands: Commands {
     @ObservedObject var appState: AppState
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
 
     private var loc: LocalizationManager { LocalizationManager.shared }
 
@@ -46,10 +49,12 @@ struct RuffleCommands: Commands {
 
         // MARK: - Edit Menu
         CommandGroup(replacing: .appSettings) {
+            #if os(macOS)
             Button(loc.localized("menu.preferences")) {
-                appState.selectedSection = .settings
+                openWindow(id: "ruffnova-settings")
             }
             .keyboardShortcut(",", modifiers: .command)
+            #endif
         }
 
         // MARK: - Control Menu
@@ -161,6 +166,7 @@ struct RuffleCommands: Commands {
         // MARK: - Help Menu
         CommandGroup(replacing: .help) {
             Button(loc.localized("menu.about")) {
+                #if os(macOS)
                 let window = NSWindow(
                     contentRect: NSRect(x: 0, y: 0, width: 360, height: 420),
                     styleMask: [.titled, .closable],
@@ -172,20 +178,25 @@ struct RuffleCommands: Commands {
                 window.isReleasedWhenClosed = false
                 window.makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
+                #endif
             }
 
             Divider()
 
             Button(loc.localized("menu.help")) {
+                #if os(macOS)
                 if let url = URL(string: "https://ruffle.rs") {
                     NSWorkspace.shared.open(url)
                 }
+                #endif
             }
 
             Button(loc.localized("menu.reportIssue")) {
+                #if os(macOS)
                 if let url = URL(string: "https://github.com/ruffle-rs/ruffle/issues") {
                     NSWorkspace.shared.open(url)
                 }
+                #endif
             }
         }
     }
@@ -207,6 +218,7 @@ struct RuffleCommands: Commands {
     }
 
     private func showOpenPanel() {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "swf")].compactMap { $0 }
         panel.allowsMultipleSelection = false
@@ -218,5 +230,6 @@ struct RuffleCommands: Commands {
         if panel.runModal() == .OK, let url = panel.url {
             appState.openFile(url)
         }
+        #endif
     }
 }

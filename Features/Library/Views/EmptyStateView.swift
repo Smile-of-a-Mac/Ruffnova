@@ -183,6 +183,7 @@ struct EmptyStateView: View {
     // MARK: - Panels
 
     private func showOpenPanel() {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "swf")].compactMap { $0 }
         panel.allowsMultipleSelection = false
@@ -190,9 +191,13 @@ struct EmptyStateView: View {
         if panel.runModal() == .OK, let url = panel.url {
             appState.openFile(url)
         }
+        #else
+        appState.showFilePicker()
+        #endif
     }
 
     private func showImportFolderPanel() {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -201,5 +206,8 @@ struct EmptyStateView: View {
         if panel.runModal() == .OK, let url = panel.url {
             appState.browseDirectory(url)
         }
+        #else
+        appState.showFolderPicker()
+        #endif
     }
 }

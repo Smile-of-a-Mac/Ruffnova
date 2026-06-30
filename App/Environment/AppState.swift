@@ -4,6 +4,11 @@ import QuartzCore
 import MetalKit
 import UniformTypeIdentifiers
 import OSLog
+#if os(macOS)
+import AppKit
+#elseif os(iOS)
+import UIKit
+#endif
 #if RUST_FFI_AVAILABLE
 import CRuffleFFI
 #endif
@@ -21,13 +26,6 @@ struct RecentFile: Identifiable, Codable, Equatable {
     }
 }
 
-struct FlashCollection: Identifiable, Codable, Equatable {
-    let id: UUID
-    var name: String
-    var files: [URL]
-    let createdAt: Date
-}
-
 enum SwfContentType: String {
     case animation
     case interactive
@@ -40,8 +38,6 @@ final class AppState: ObservableObject {
         case library
         case recent
         case favorites
-        case collections
-        case downloads
         case settings
 
         var icon: String {
@@ -50,8 +46,6 @@ final class AppState: ObservableObject {
             case .library:     return "play.rectangle"
             case .recent:      return "clock"
             case .favorites:   return "star"
-            case .collections: return "folder"
-            case .downloads:   return "square.and.arrow.down"
             case .settings:    return "gearshape"
             }
         }
@@ -62,8 +56,6 @@ final class AppState: ObservableObject {
             case .library:     return "Library"
             case .recent:      return "Recent"
             case .favorites:   return "Favorites"
-            case .collections: return "Collections"
-            case .downloads:   return "Downloads"
             case .settings:    return "Settings"
             }
         }
@@ -87,7 +79,6 @@ final class AppState: ObservableObject {
         didSet { LibraryPersistence.shared.saveRecentFiles(recentFiles) }
     }
     @Published var bookmarks: [URL] = []
-    @Published var collections: [FlashCollection] = []
     let bookmarkManager = BookmarkManager()
 
     var favoriteEntries: [Bookmark] { bookmarkManager.bookmarks }
@@ -110,6 +101,7 @@ final class AppState: ObservableObject {
     @Published var sidebarCollapsed: Bool = false
     @Published var showSWFInfoPanel: Bool = false
     @Published var showTraceConsole: Bool = false
+    private var pausedForNavigation = false
 
     var formattedCurrentTime: String {
         let secs = frameRate > 0 ? Double(currentFrame) / Double(frameRate) : 0
@@ -147,6 +139,10 @@ final class AppState: ObservableObject {
 
     private(set) var bridge: RuffleBridge?
     private var pendingFileURL: URL?
+    #if os(iOS)
+    private var filePickerService: IOSFilePickerService?
+    private var securityScopedURL: URL?
+    #endif
     private var timelinePollTimer: Timer?
     private var loadTimeoutTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
@@ -161,7 +157,6 @@ final class AppState: ObservableObject {
         bookmarkManager.$bookmarks.sink { [weak self] newBookmarks in
             self?.bookmarks = newBookmarks.map { $0.url }
         }.store(in: &cancellables)
-        loadCollections()
     }
 
     private func restoreSettings() {
@@ -198,12 +193,14 @@ final class AppState: ObservableObject {
     }
 
     private func setupFullscreenObserver() {
+        #if os(macOS)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleFullscreenExit),
             name: NSWindow.didExitFullScreenNotification,
             object: nil
         )
+        #endif
     }
 
     @objc private func handleFullscreenExit() {
@@ -258,6 +255,12 @@ final class AppState: ObservableObject {
     }
 
     func openFile(_ url: URL) {
+        #if os(iOS)
+        if securityScopedURL != url {
+            securityScopedURL?.stopAccessingSecurityScopedResource()
+            securityScopedURL = url.startAccessingSecurityScopedResource() ? url : nil
+        }
+        #endif
         isLoading = true
         errorMessage = nil
         currentFileURL = url
@@ -370,6 +373,14 @@ final class AppState: ObservableObject {
         guard sw > 0, sh > 0 else { return }
         stageWidth = sw
         stageHeight = sh
+        updateIOSOrientations()
+    }
+
+    private func updateIOSOrientations() {
+        #if os(iOS)
+        let supportsLandscapeFullscreen = isStageMaximized && stageWidth >= stageHeight
+        IOSOrientationController.update(to: supportsLandscapeFullscreen ? .allButUpsideDown : .portrait)
+        #endif
     }
 
     func togglePlayPause() {
@@ -387,6 +398,20 @@ final class AppState: ObservableObject {
         isPlaying = false
         bridge?.setPlaying(false)
         controlBarOnPause()
+    }
+
+    func pausePlaybackForNavigation() {
+        guard isPlaying else { return }
+        pausedForNavigation = true
+        pausePlayback()
+    }
+
+    func resumePlaybackForNavigation() {
+        guard pausedForNavigation, currentFileURL != nil else { return }
+        pausedForNavigation = false
+        isPlaying = true
+        bridge?.setPlaying(true)
+        showControlBarTemporarily()
     }
 
     var isPlayerVisible: Bool {
@@ -419,27 +444,64 @@ final class AppState: ObservableObject {
     func toggleFullscreen() {
         isFullscreen.toggle()
         bridge?.setFullscreen(isFullscreen)
+        #if os(macOS)
         if let window = NSApp.keyWindow {
             window.toggleFullScreen(nil)
         }
+        #endif
     }
 
     func toggleStageMaximized() {
+        #if os(macOS)
         guard !isStageMaximized else { return }
         isStageMaximized = true
         if let window = NSApp.keyWindow {
             window.toggleFullScreen(nil)
         }
+        #else
+        isStageMaximized.toggle()
+        updateIOSOrientations()
+        #endif
     }
 
     func exitStageMaximized() {
         guard isStageMaximized else { return }
         isStageMaximized = false
+        #if os(macOS)
         NSApp.keyWindow?.toggleFullScreen(nil)
+        #else
+        updateIOSOrientations()
+        #endif
     }
 
     func toggleSidebar() {
         sidebarCollapsed.toggle()
+    }
+
+    func showFilePicker() {
+        #if os(iOS)
+        let service = IOSFilePickerService()
+        filePickerService = service
+        service.pickSWFFile { [weak self] url in
+            self?.filePickerService = nil
+            if let url {
+                DispatchQueue.main.async { self?.openFile(url) }
+            }
+        }
+        #endif
+    }
+
+    func showFolderPicker() {
+        #if os(iOS)
+        let service = IOSFilePickerService()
+        filePickerService = service
+        service.pickFolder { [weak self] url in
+            self?.filePickerService = nil
+            if let url {
+                DispatchQueue.main.async { self?.browseDirectory(url) }
+            }
+        }
+        #endif
     }
 
     func removeFromRecentlyOpened(_ file: RecentFile) {
@@ -451,6 +513,7 @@ final class AppState: ObservableObject {
     }
 
     func captureThumbnail() {
+        #if os(macOS)
         guard let frameView = findPlayerFrameView() else { return }
         let window = frameView.window
         guard let window, window.windowNumber > 0 else { return }
@@ -480,8 +543,10 @@ final class AppState: ObservableObject {
         if let idx = recentFiles.firstIndex(where: { $0.url == currentFileURL }) {
             recentFiles[idx].thumbnailData = png
         }
+        #endif
     }
 
+    #if os(macOS)
     private func findPlayerFrameView() -> NSView? {
         guard let window = NSApp.keyWindow ?? NSApp.windows.first,
               let view = window.contentView else { return nil }
@@ -495,8 +560,10 @@ final class AppState: ObservableObject {
         }
         return nil
     }
+    #endif
 
     func saveScreenshot() {
+        #if os(macOS)
         guard let metalView = findPlayerFrameView() as? MTKView,
               let drawable = metalView.currentDrawable else {
             errorMessage = LocalizationManager.shared.localized("error.screenshotFailed")
@@ -544,6 +611,9 @@ final class AppState: ObservableObject {
                 try? png.write(to: url)
             }
         }
+        #else
+        errorMessage = LocalizationManager.shared.localized("error.screenshotFailed")
+        #endif
     }
 
     func startTimelinePolling() {
@@ -588,6 +658,18 @@ final class AppState: ObservableObject {
     }
 
     func browseDirectory(_ url: URL) {
+        #if os(iOS)
+        if securityScopedURL != url {
+            securityScopedURL?.stopAccessingSecurityScopedResource()
+            securityScopedURL = url.startAccessingSecurityScopedResource() ? url : nil
+        }
+        defer {
+            if securityScopedURL == url {
+                securityScopedURL?.stopAccessingSecurityScopedResource()
+                securityScopedURL = nil
+            }
+        }
+        #endif
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: url,
             includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey],
@@ -637,51 +719,4 @@ final class AppState: ObservableObject {
         return bookmarkManager.bookmarks.contains(where: { $0.url == url })
     }
 
-    private var collectionsURL: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("RuffleFlashPlayer")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("collections.json")
-    }
-
-    func createCollection(name: String) {
-        let collection = FlashCollection(id: UUID(), name: name, files: [], createdAt: Date())
-        collections.append(collection)
-        persistCollections()
-    }
-
-    func addToCollection(_ collectionID: FlashCollection.ID, url: URL) {
-        guard let idx = collections.firstIndex(where: { $0.id == collectionID }) else { return }
-        var collection = collections[idx]
-        if !collection.files.contains(url) {
-            collection.files.append(url)
-            collections[idx] = collection
-            persistCollections()
-        }
-    }
-
-    func removeFromCollection(_ collectionID: FlashCollection.ID, url: URL) {
-        guard let idx = collections.firstIndex(where: { $0.id == collectionID }) else { return }
-        var collection = collections[idx]
-        collection.files.removeAll { $0 == url }
-        collections[idx] = collection
-        persistCollections()
-    }
-
-    func deleteCollection(_ collectionID: FlashCollection.ID) {
-        collections.removeAll { $0.id == collectionID }
-        persistCollections()
-    }
-
-    private func loadCollections() {
-        guard let data = try? Data(contentsOf: collectionsURL),
-              let decoded = try? JSONDecoder().decode([FlashCollection].self, from: data)
-        else { return }
-        collections = decoded
-    }
-
-    private func persistCollections() {
-        guard let data = try? JSONEncoder().encode(collections) else { return }
-        try? data.write(to: collectionsURL)
-    }
 }

@@ -5,7 +5,8 @@ import PackageDescription
 let package = Package(
     name: "Ruffnova",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v13),
+        .iOS(.v17),
     ],
     targets: [
         .target(
@@ -15,14 +16,33 @@ let package = Package(
             publicHeadersPath: ".",
             linkerSettings: [
                 .linkedLibrary("ruffle_ffi"),
-                .unsafeFlags(["-L", "CRuffleFFI"]),
+                .unsafeFlags(["-L", "CRuffleFFI/macos"], .when(platforms: [.macOS])),
+                .unsafeFlags(["-L", "CRuffleFFI/ios"], .when(platforms: [.iOS])),
             ]
         ),
         .executableTarget(
             name: "Ruffnova",
             dependencies: ["CRuffleFFI"],
-            path: "Ruffnova",
-            exclude: ["RuffleBridgingHeader.h", "Info.plist", "Ruffnova.entitlements"],
+            path: ".",
+            exclude: [
+                "RuffleBridgingHeader.h",
+                "Info.plist",
+                "Ruffnova.entitlements",
+                "Ruffnova.xcodeproj",
+                ".git",
+                ".gitignore",
+                ".swiftpm",
+                ".DS_Store",
+                "engine",
+                "swfs",
+                "docs",
+                "CRuffleFFI",
+                "README.md",
+                "RELEASE_AUDIT.md",
+                "AGENT.md",
+                "build_app.sh",
+                "build_engine.sh",
+            ],
             resources: [
                 .process("Assets.xcassets"),
                 .process("Resources"),
@@ -34,13 +54,14 @@ let package = Package(
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalKit"),
                 .linkedFramework("QuartzCore"),
-                .linkedFramework("Cocoa"),
                 .linkedFramework("CoreAudio"),
                 .linkedFramework("CoreFoundation"),
                 .linkedFramework("AudioToolbox"),
-                .linkedFramework("AudioUnit"),
-                .linkedFramework("SystemConfiguration"),
-                .linkedFramework("IOKit"),
+                .linkedFramework("AudioUnit", .when(platforms: [.macOS])),
+                .linkedFramework("Cocoa", .when(platforms: [.macOS])),
+                .linkedFramework("SystemConfiguration", .when(platforms: [.macOS])),
+                .linkedFramework("IOKit", .when(platforms: [.macOS])),
+                .linkedFramework("UIKit", .when(platforms: [.iOS])),
             ]
         ),
     ]

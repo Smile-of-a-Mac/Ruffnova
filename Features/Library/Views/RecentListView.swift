@@ -10,14 +10,6 @@ struct RecentListView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
-                VStack(alignment: .leading, spacing: NativeSpacing.sm) {
-                    Text(locManager.localized("sidebar.recent"))
-                        .font(.largeTitle)
-                    Text(locManager.localized("workspace.recent.subtitle"))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-
                 LazyVStack(spacing: NativeSpacing.sm) {
                     ForEach(appState.recentFiles) { file in
                         RecentFileRow(file: file)

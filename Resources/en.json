@@ -1,5 +1,6 @@
 {
     "language.name": "English",
+    "app.name": "Ruffnova",
     "swuffle.app.name": "Ruffnova",
     "swuffle.app.subtitle": "SwiftUI Flash Player",
 
@@ -40,7 +41,7 @@
     "settings.rendering.graphics.auto": "Auto",
     "settings.rendering.graphics.metal": "Metal",
     "settings.rendering.graphics.vulkan": "Vulkan",
-    "settings.rendering.graphics.metal.recommended": "Metal is recommended for the best performance on macOS.",
+    "settings.rendering.graphics.metal.recommended": "Metal is recommended for the best performance on %@.",
 
     "settings.rendering.stage": "Stage",
     "settings.rendering.stage.subtitle": "SWF stage configuration",
@@ -112,6 +113,7 @@
     "workspace.openSwf": "Open a SWF File",
     "workspace.dropHint": "Release to Open",
     "workspace.dropMessage": "Drag a Shockwave Flash file here, or choose one from your Mac.",
+    "workspace.openIOSMessage": "Choose an SWF file from Files to start playing.",
     "workspace.chooseFile": "Choose File",
     "workspace.openPanel.title": "Open SWF File",
     "workspace.openPanel.message": "Choose a Shockwave Flash (.swf) file to play",

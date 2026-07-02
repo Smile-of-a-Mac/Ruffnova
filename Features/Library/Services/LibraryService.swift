@@ -2,16 +2,17 @@ import Foundation
 import OSLog
 
 @MainActor
-final class LibraryService {
+final class LibraryService: ObservableObject {
     static let shared = LibraryService()
 
-    private(set) var items: [LibraryItem] = []
+    @Published private(set) var items: [LibraryItem] = []
 
     private let storageURL: URL
     private let versionURL: URL
     private let schemaVersion = 1
     private let logger = Logger(subsystem: "com.ruffnova", category: "library")
     private let fileManager = FileManager.default
+    private let thumbnailService = ThumbnailService.shared
 
     private init() {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -48,16 +49,26 @@ final class LibraryService {
 
     func update(_ id: UUID, changes: (inout LibraryItem) -> Void) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        objectWillChange.send()
         changes(&items[index])
         save()
     }
 
     func remove(_ id: UUID) {
+        if let item = item(with: id) {
+            thumbnailService.remove(item.thumbnailIdentifier)
+            BookmarkManager.shared.remove(url: item.url)
+            CollectionService.shared.removeItemFromAllCollections(item.id)
+        }
         items.removeAll { $0.id == id }
         save()
     }
 
     func removeAll() {
+        for item in items {
+            thumbnailService.remove(item.thumbnailIdentifier)
+        }
+        BookmarkManager.shared.removeAll()
         items.removeAll()
         save()
     }
@@ -77,6 +88,14 @@ final class LibraryService {
     // MARK: - Sorting
 
     func sorted(by order: LibrarySortOrder, ascending: Bool = true) -> [LibraryItem] {
+        sortedItems(items, by: order, ascending: ascending)
+    }
+
+    func items(matching filter: LibraryFilter, sortedBy order: LibrarySortOrder, ascending: Bool = true) -> [LibraryItem] {
+        sortedItems(filteredItems(items, by: filter), by: order, ascending: ascending)
+    }
+
+    private func sortedItems(_ items: [LibraryItem], by order: LibrarySortOrder, ascending: Bool) -> [LibraryItem] {
         let sorted: [LibraryItem]
         switch order {
         case .name:
@@ -94,6 +113,10 @@ final class LibraryService {
     // MARK: - Filtering
 
     func filtered(by filter: LibraryFilter) -> [LibraryItem] {
+        filteredItems(items, by: filter)
+    }
+
+    private func filteredItems(_ items: [LibraryItem], by filter: LibraryFilter) -> [LibraryItem] {
         switch filter {
         case .all:
             return items
@@ -107,15 +130,16 @@ final class LibraryService {
         case .compatibilityIssues:
             return items.filter { $0.compatibilityStatus == .unsupported }
         case .animation:
-            return items.filter { $0.compatibilityStatus == .compatible }
+            return items.filter { $0.contentType == .animation }
         case .interactive:
-            return items.filter { $0.compatibilityStatus == .unknown }
+            return items.filter { $0.contentType == .interactive }
         }
     }
 
     // MARK: - Bookmark Resolution
 
     func resolveBookmarks() {
+        objectWillChange.send()
         for index in items.indices {
             guard let bookmarkData = items[index].bookmarkData else {
                 let data = createBookmarkData(for: items[index].url)
@@ -149,6 +173,7 @@ final class LibraryService {
 
     func locateFile(for id: UUID, newURL: URL) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        objectWillChange.send()
         items[index].url = newURL
         items[index].name = newURL.lastPathComponent
         items[index].bookmarkData = createBookmarkData(for: newURL)
@@ -225,6 +250,7 @@ final class LibraryService {
 
         for bookmark in bookmarks {
             if let index = items.firstIndex(where: { $0.url == bookmark.url }) {
+                objectWillChange.send()
                 items[index].isFavorite = true
             } else {
                 let item = LibraryItem(
@@ -260,12 +286,31 @@ final class LibraryService {
     private func load() {
         guard let data = try? Data(contentsOf: storageURL) else { return }
         do {
-            let decoded = try JSONDecoder().decode([LibraryItem].self, from: data)
+            var decoded = try JSONDecoder().decode([LibraryItem].self, from: data)
+            let migratedThumbnails = migrateLegacyThumbnails(in: &decoded)
             items = decoded
+            if migratedThumbnails {
+                save()
+            }
             logger.info("Loaded \(decoded.count) library items")
         } catch {
             logger.error("Failed to load library: \(error.localizedDescription)")
         }
+    }
+
+    private func migrateLegacyThumbnails(in decoded: inout [LibraryItem]) -> Bool {
+        var didMigrate = false
+        for index in decoded.indices {
+            guard decoded[index].thumbnailIdentifier == nil,
+                  let thumbnailData = decoded[index].thumbnailData,
+                  let identifier = thumbnailService.store(thumbnailData, for: decoded[index].id)
+            else { continue }
+
+            decoded[index].thumbnailIdentifier = identifier
+            decoded[index].thumbnailData = nil
+            didMigrate = true
+        }
+        return didMigrate
     }
 
     private func save() {

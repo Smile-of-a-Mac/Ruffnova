@@ -3,6 +3,7 @@ import SwiftUI
 struct RecentFileRow: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @ObservedObject private var libraryService = LibraryService.shared
     let file: LibraryItem
 
     var body: some View {
@@ -36,7 +37,7 @@ struct RecentFileRow: View {
         .accessibilityLabel(file.name)
         .contextMenu {
             Button(locManager.localized("library.removeFromRecent")) {
-                LibraryService.shared.remove(file.id)
+                libraryService.remove(file.id)
             }
         }
     }

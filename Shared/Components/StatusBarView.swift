@@ -9,6 +9,7 @@ import SwiftUI
 struct StatusBarView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @ObservedObject private var libraryService = LibraryService.shared
 
     private let ruffleVersion = "0.1.0"
 
@@ -99,15 +100,19 @@ struct StatusBarView: View {
     // MARK: - Labels
 
     private var swfCountLabel: String {
-        if appState.swfCount == 0 {
+        if libraryService.items.isEmpty {
             return locManager.localized("statusbar.noFiles")
         }
-        let key = appState.swfCount == 1 ? "statusbar.fileCount" : "statusbar.fileCount.plural"
-        return String(format: locManager.localized(key), appState.swfCount)
+        let count = libraryService.items.count
+        let key = count == 1 ? "statusbar.fileCount" : "statusbar.fileCount.plural"
+        return String(format: locManager.localized(key), count)
     }
 
     private var librarySizeLabel: String {
-        appState.librarySize
+        let totalSize = libraryService.items.reduce(0) { $0 + $1.fileSize }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: totalSize)
     }
 }
 

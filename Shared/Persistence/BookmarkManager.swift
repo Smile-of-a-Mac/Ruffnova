@@ -10,14 +10,21 @@ struct Bookmark: Identifiable, Codable, Equatable {
 
 @MainActor
 final class BookmarkManager: ObservableObject {
+    static let shared = BookmarkManager()
+
     @Published var bookmarks: [Bookmark] = []
     private let storageURL: URL
 
-    init() {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("RuffleFlashPlayer")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        storageURL = dir.appendingPathComponent("bookmarks.json")
+    init(storageURL: URL? = nil) {
+        if let storageURL {
+            self.storageURL = storageURL
+            try? FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        } else {
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let dir = appSupport.appendingPathComponent("RuffleFlashPlayer")
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            self.storageURL = dir.appendingPathComponent("bookmarks.json")
+        }
         load()
     }
 
@@ -29,7 +36,7 @@ final class BookmarkManager: ObservableObject {
             addedDate: Date(),
             frame: frame
         )
-        guard !bookmarks.contains(where: { $0.url == url }) else { return }
+        guard !contains(url) else { return }
         bookmarks.insert(bookmark, at: 0)
         save()
     }
@@ -37,6 +44,15 @@ final class BookmarkManager: ObservableObject {
     func remove(_ bookmark: Bookmark) {
         bookmarks.removeAll { $0.id == bookmark.id }
         save()
+    }
+
+    func remove(url: URL) {
+        bookmarks.removeAll { urlsMatch($0.url, url) }
+        save()
+    }
+
+    func contains(_ url: URL) -> Bool {
+        bookmarks.contains { urlsMatch($0.url, url) }
     }
 
     func removeAll() {
@@ -54,5 +70,9 @@ final class BookmarkManager: ObservableObject {
     private func save() {
         guard let data = try? JSONEncoder().encode(bookmarks) else { return }
         try? data.write(to: storageURL)
+    }
+
+    private func urlsMatch(_ lhs: URL, _ rhs: URL) -> Bool {
+        lhs.standardizedFileURL.resolvingSymlinksInPath() == rhs.standardizedFileURL.resolvingSymlinksInPath()
     }
 }

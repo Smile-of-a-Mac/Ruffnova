@@ -1,6 +1,6 @@
 import Foundation
 
-enum PlayerIssue: LocalizedError {
+enum PlayerIssue: Error, Equatable, Identifiable {
     case fileInaccessible
     case fileMissing
     case fileDamaged
@@ -12,49 +12,86 @@ enum PlayerIssue: LocalizedError {
     case scriptTimeout
     case unknown(String)
 
-    var errorDescription: String? {
+    var id: String {
         switch self {
         case .fileInaccessible:
-            return "File could not be accessed"
+            return "fileInaccessible"
         case .fileMissing:
-            return "File not found"
+            return "fileMissing"
         case .fileDamaged:
-            return "File appears to be damaged"
+            return "fileDamaged"
         case .ruffleLoadFailure:
-            return "Ruffle failed to load the SWF"
+            return "ruffleLoadFailure"
         case .unsupportedAPI:
-            return "SWF uses an unsupported API"
+            return "unsupportedAPI"
         case .networkBlocked:
-            return "Network access was blocked"
+            return "networkBlocked"
         case .filesystemBlocked:
-            return "Filesystem access was blocked"
+            return "filesystemBlocked"
         case .renderInitFailure:
-            return "Failed to initialize renderer"
+            return "renderInitFailure"
         case .scriptTimeout:
-            return "Script execution timed out"
+            return "scriptTimeout"
         case .unknown(let detail):
-            return detail
+            return "unknown-\(detail)"
         }
     }
 
-    var recoverySuggestion: String? {
+    var messageKey: String? {
+        switch self {
+        case .fileInaccessible:
+            return "diagnostics.issue.fileInaccessible"
+        case .fileMissing:
+            return "diagnostics.issue.fileMissing"
+        case .fileDamaged:
+            return "diagnostics.issue.fileDamaged"
+        case .ruffleLoadFailure:
+            return "diagnostics.issue.ruffleLoadFailure"
+        case .unsupportedAPI:
+            return "diagnostics.issue.unsupportedAPI"
+        case .networkBlocked:
+            return "diagnostics.issue.networkBlocked"
+        case .filesystemBlocked:
+            return "diagnostics.issue.filesystemBlocked"
+        case .renderInitFailure:
+            return "diagnostics.issue.renderInitFailure"
+        case .scriptTimeout:
+            return "diagnostics.issue.scriptTimeout"
+        case .unknown:
+            return nil
+        }
+    }
+
+    var fallbackMessage: String? {
+        if case .unknown(let detail) = self { return detail }
+        return nil
+    }
+
+    func displayMessage(localize: (String) -> String) -> String {
+        if let messageKey {
+            return localize(messageKey)
+        }
+        return fallbackMessage ?? localize("diagnostics.issue.unknown")
+    }
+
+    var recoverySuggestionKey: String? {
         switch self {
         case .fileInaccessible, .fileMissing:
-            return "Check that the file exists and you have permission to access it"
+            return "diagnostics.recovery.checkFileAccess"
         case .fileDamaged:
-            return "Try re-downloading or using a different SWF file"
+            return "diagnostics.recovery.fileDamaged"
         case .ruffleLoadFailure:
-            return "The SWF may use features Ruffle does not yet support"
+            return "diagnostics.recovery.ruffleLoadFailure"
         case .unsupportedAPI:
-            return "This SWF uses ActionScript or APIs that are not yet implemented"
+            return "diagnostics.recovery.unsupportedAPI"
         case .networkBlocked:
-            return "You can change network permissions in Settings"
+            return "diagnostics.recovery.networkBlocked"
         case .filesystemBlocked:
-            return "You can change filesystem permissions in Settings"
+            return "diagnostics.recovery.filesystemBlocked"
         case .renderInitFailure:
-            return "Try restarting the app or switching render backends"
+            return "diagnostics.recovery.renderInitFailure"
         case .scriptTimeout:
-            return "Try increasing the max execution duration in Settings"
+            return "diagnostics.recovery.scriptTimeout"
         case .unknown:
             return nil
         }

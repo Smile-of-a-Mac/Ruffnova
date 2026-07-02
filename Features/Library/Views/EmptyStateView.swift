@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 struct EmptyStateView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @ObservedObject private var libraryService = LibraryService.shared
     @Binding var isDropTargeted: Bool
 
     @State private var appeared = false
@@ -36,7 +37,7 @@ struct EmptyStateView: View {
             }
             .padding(.bottom, NativeSpacing.section)
 
-            if !LibraryService.shared.items.isEmpty {
+            if !libraryService.items.isEmpty {
                 recentFilesSection
                     .padding(.bottom, NativeSpacing.section)
             }
@@ -127,7 +128,7 @@ struct EmptyStateView: View {
 
     @ViewBuilder
     private var recentFilesSection: some View {
-        let recentLibraryItems = LibraryService.shared.sorted(by: .lastOpened)
+        let recentLibraryItems = libraryService.sorted(by: .lastOpened)
             .filter { $0.availabilityStatus == .available }
             .prefix(6)
         if !recentLibraryItems.isEmpty {

@@ -4,6 +4,7 @@ import QuartzCore
 import MetalKit
 import UniformTypeIdentifiers
 import OSLog
+import ImageIO
 #if os(macOS)
 import AppKit
 #elseif os(iOS)
@@ -72,45 +73,51 @@ final class AppState: ObservableObject {
     @Published var swfContentType: SwfContentType = .animation
 
     @Published var showControlBar: Bool = true
-    private var hideControlBarTask: DispatchWorkItem?
+    @Published var playerMode: PlayerMode = .normal
+    private let playerViewModel = PlayerViewModel()
+    private enum StageMaximizedExitIntent {
+        case keepCurrentMode
+        case enterNormalMode
+    }
 
     @Published var currentFileURL: URL?
     @Published var recentFiles: [RecentFile] = [] {
         didSet { LibraryPersistence.shared.saveRecentFiles(recentFiles) }
     }
     @Published var bookmarks: [URL] = []
-    let bookmarkManager = BookmarkManager()
+    let bookmarkManager = BookmarkManager.shared
 
     var favoriteEntries: [Bookmark] { bookmarkManager.bookmarks }
 
     @Published var searchText: String = ""
     @Published var isSearching: Bool = false
-    var searchResults: [RecentFile] {
-        guard !searchText.isEmpty else { return [] }
-        return recentFiles.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-    }
+    @Published var searchFocusRequest: Int = 0
 
-    var librarySearchResults: [LibraryItem] {
-        guard !searchText.isEmpty else { return [] }
-        return LibraryService.shared.items.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText) ||
-            $0.tags.contains { $0.localizedCaseInsensitiveContains(searchText) } ||
-            $0.notes.localizedCaseInsensitiveContains(searchText)
-        }
-    }
+    lazy var searchViewModel = SearchViewModel(
+        searchService: SearchService.shared,
+        libraryService: LibraryService.shared,
+        appState: self
+    )
 
     @Published var librarySize: String = "--"
     @Published var swfCount: Int = 0
 
     @Published var selectedSection: Section = .library
+    @Published var selectedCollectionID: UUID?
     @Published var showToolbar: Bool = true
+    @Published var toolbarRefreshToken: Int = 0
     @Published var showDebugUI: Bool = false
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var sidebarCollapsed: Bool = false
     @Published var showSWFInfoPanel: Bool = false
     @Published var showTraceConsole: Bool = false
+    @Published var showDiagnostics: Bool = false
+    @Published var playerIssues: [PlayerIssue] = []
     private var pausedForNavigation = false
+    private let playerInputCoordinator = PlayerInputCoordinator()
+    private var isRestoringPlaybackPreferences = false
+    private var pendingStageMaximizedExitIntent: StageMaximizedExitIntent?
 
     var formattedCurrentTime: String {
         let secs = frameRate > 0 ? Double(currentFrame) / Double(frameRate) : 0
@@ -166,6 +173,9 @@ final class AppState: ObservableObject {
     }
 
     init() {
+        playerViewModel.onControlBarVisibilityChanged = { [weak self] isVisible in
+            self?.showControlBar = isVisible
+        }
         setupNotifications()
         setupFullscreenObserver()
         restoreSettings()
@@ -193,11 +203,31 @@ final class AppState: ObservableObject {
 
     private func setupPersistence() {
         let s = SettingsPersistence.shared
-        $quality.sink { s.quality = $0.rawValue }.store(in: &cancellables)
-        $volume.sink { s.volume = $0 }.store(in: &cancellables)
-        $isMuted.sink { s.isMuted = $0 }.store(in: &cancellables)
-        $isLooping.sink { s.isLooping = $0 }.store(in: &cancellables)
-        $playbackSpeed.sink { s.speed = $0 }.store(in: &cancellables)
+        $quality.sink { [weak self] value in
+            guard let self, !self.isRestoringPlaybackPreferences else { return }
+            s.quality = value.rawValue
+            self.persistPlaybackPreferences()
+        }.store(in: &cancellables)
+        $volume.sink { [weak self] value in
+            guard let self, !self.isRestoringPlaybackPreferences else { return }
+            s.volume = value
+            self.persistPlaybackPreferences()
+        }.store(in: &cancellables)
+        $isMuted.sink { [weak self] value in
+            guard let self, !self.isRestoringPlaybackPreferences else { return }
+            s.isMuted = value
+            self.persistPlaybackPreferences()
+        }.store(in: &cancellables)
+        $isLooping.sink { [weak self] value in
+            guard let self, !self.isRestoringPlaybackPreferences else { return }
+            s.isLooping = value
+            self.persistPlaybackPreferences()
+        }.store(in: &cancellables)
+        $playbackSpeed.sink { [weak self] value in
+            guard let self, !self.isRestoringPlaybackPreferences else { return }
+            s.speed = value
+            self.persistPlaybackPreferences()
+        }.store(in: &cancellables)
         $showDebugUI.sink { s.showDebugUI = $0 }.store(in: &cancellables)
         $showToolbar.sink { s.showToolbar = $0 }.store(in: &cancellables)
         $maxExecutionDuration.sink { s.maxExecutionDuration = $0 }.store(in: &cancellables)
@@ -224,7 +254,10 @@ final class AppState: ObservableObject {
     }
 
     @objc private func handleFullscreenExit() {
-        isStageMaximized = false
+        guard isStageMaximized else { return }
+        let intent = pendingStageMaximizedExitIntent ?? defaultStageMaximizedExitIntent(restoreWorkspaceChrome: true)
+        pendingStageMaximizedExitIntent = nil
+        finishStageMaximizedExit(intent: intent)
     }
 
     @objc private func handleOpenSWF(_ notification: Notification) {
@@ -257,21 +290,20 @@ final class AppState: ObservableObject {
         bridge?.setVolume(isMuted ? 0.0 : volume)
         bridge?.setLooping(isLooping)
         bridge?.setSpeed(playbackSpeed)
+        applyLetterbox(SettingsPersistence.shared.letterbox)
         updateIOSRenderLoopAvailability()
-        #if RUST_FFI_AVAILABLE
-        let letterboxSetting = UserDefaults.standard.string(forKey: "letterbox") ?? "fullscreen"
-        switch letterboxSetting {
-        case "on":
-            bridge?.setLetterboxMode(RuffleLetterbox_On)
-        case "off":
-            bridge?.setLetterboxMode(RuffleLetterbox_Off)
-        default:
-            bridge?.setLetterboxMode(RuffleLetterbox_Fullscreen)
+
+        guard bridge != nil else {
+            presentPlayerIssue(.renderInitFailure)
+            return
         }
-        #endif
 
         if let url = pendingFileURL {
-            bridge?.loadURL(url)
+            guard bridge?.loadURL(url) == true else {
+                pendingFileURL = nil
+                presentPlayerIssue(.ruffleLoadFailure)
+                return
+            }
             pendingFileURL = nil
             afterMovieLoaded()
         }
@@ -286,8 +318,16 @@ final class AppState: ObservableObject {
         #endif
         isLoading = true
         errorMessage = nil
+        playerIssues = []
+        showDiagnostics = false
         currentFileURL = url
         loadTimeoutTask?.cancel()
+
+        if let issue = fileAccessIssue(for: url) {
+            selectedSection = .player
+            presentPlayerIssue(issue)
+            return
+        }
 
         let resourceValues = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
         let recentFile = RecentFile(
@@ -321,15 +361,19 @@ final class AppState: ObservableObject {
             ))
         }
 
+        restorePlaybackPreferences(for: url)
+
         loadTimeoutTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 15_000_000_000)
             guard let self, self.isLoading else { return }
-            self.isLoading = false
-            self.errorMessage = LocalizationManager.shared.localized("error.loadTimeout")
+            self.presentPlayerIssue(.scriptTimeout, fallbackMessageKey: "error.loadTimeout")
         }
 
         if let bridge {
-            bridge.loadURL(url)
+            guard bridge.loadURL(url) else {
+                presentPlayerIssue(.ruffleLoadFailure)
+                return
+            }
             afterMovieLoaded()
         } else {
             pendingFileURL = url
@@ -343,25 +387,41 @@ final class AppState: ObservableObject {
     }
 
     private func afterMovieLoaded() {
+        restoreLastPlaybackFrame()
         let shouldAutoplay = UserDefaults.standard.object(forKey: "autoplay") as? Bool ?? true
         if shouldAutoplay {
             bridge?.setPlaying(true)
             syncPlayingState()
         }
         detectContentType()
+        enterGameModeIfNeeded()
         updateIOSRenderLoopAvailability()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.adoptStageSize()
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
             self?.adoptStageSize()
+            self?.persistCurrentMetadata()
             self?.isLoading = false
             self?.loadTimeoutTask?.cancel()
+            NotificationCenter.default.post(name: .swfLoaded, object: nil)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             self?.captureThumbnail()
         }
         scheduleControlBarHide()
+    }
+
+    private func restoreLastPlaybackFrame() {
+        guard let url = currentFileURL,
+              let item = LibraryService.shared.item(for: url),
+              let frame = item.playbackPreferences?.lastPlaybackFrame ?? item.lastPlaybackFrame,
+              frame > 0
+        else { return }
+
+        bridge?.seekFrame(frame)
+        currentFrame = frame
+        seekPosition = Double(frame)
     }
 
     private func detectContentType() {
@@ -372,34 +432,162 @@ final class AppState: ObservableObject {
         } else {
             swfContentType = .interactive
         }
+        if let url = currentFileURL, let item = LibraryService.shared.item(for: url) {
+            LibraryService.shared.update(item.id) {
+                $0.contentType = swfContentType == .animation ? .animation : .interactive
+            }
+        }
         Logger.appState.info("content type: \(self.swfContentType.rawValue) (totalFrames=\(totalFrames))")
     }
 
+    private func enterGameModeIfNeeded() {
+        guard swfContentType == .interactive else { return }
+        if playerMode == .normal {
+            setPlayerMode(.game)
+        } else {
+            applyPlayerModeLayout()
+        }
+        requestPlayerFocus()
+        handlePlayerPointerActivity()
+    }
+
     func showControlBarTemporarily() {
-        showControlBar = true
-        scheduleControlBarHide()
+        playerViewModel.showControlBarTemporarily(isPlaying: isPlaying)
+        showControlBar = playerViewModel.showControlBar
+    }
+
+    func handlePlayerPointerActivity() {
+        playerInputCoordinator.pointerMoved(isPlaying: isPlaying, mode: playerMode) { [weak self] visible in
+            self?.showControlBar = visible
+        }
+    }
+
+    private func fileAccessIssue(for url: URL) -> PlayerIssue? {
+        guard url.isFileURL else { return nil }
+        let path = url.path
+        guard FileManager.default.fileExists(atPath: path) else {
+            return .fileMissing
+        }
+        guard FileManager.default.isReadableFile(atPath: path) else {
+            return .fileInaccessible
+        }
+        return nil
+    }
+
+    func presentPlayerIssue(_ issue: PlayerIssue, fallbackMessageKey: String? = nil) {
+        isLoading = false
+        loadTimeoutTask?.cancel()
+        playerIssues = [issue]
+        errorMessage = fallbackMessageKey.map { LocalizationManager.shared.localized($0) }
+            ?? issue.displayMessage(localize: LocalizationManager.shared.localized)
+        if let url = currentFileURL {
+            markLibraryItem(for: url, issue: issue)
+        }
+    }
+
+    private func markLibraryItem(for url: URL, issue: PlayerIssue) {
+        guard let item = LibraryService.shared.item(for: url) else { return }
+        LibraryService.shared.update(item.id) {
+            switch issue {
+            case .fileMissing:
+                $0.availabilityStatus = .missing
+            case .fileDamaged, .ruffleLoadFailure, .unsupportedAPI, .scriptTimeout:
+                $0.compatibilityStatus = .unsupported
+            default:
+                break
+            }
+        }
+    }
+
+    func makeCompatibilityReport() -> CompatibilityReport {
+        let metadata = currentMetadataForDiagnostics()
+        let engineVersion = metadata.flatMap { $0.playerVersion > 0 ? String($0.playerVersion) : nil }
+        let traceMessages = TraceConsole.shared.messages.map(\.text)
+        return DiagnosticsService.shared.makeReport(
+            fileURL: currentFileURL,
+            fileSize: currentFileSizeForDiagnostics(),
+            metadata: metadata,
+            currentFrame: currentFrame,
+            issues: playerIssues,
+            permissionPolicy: LocalizationManager.shared.localized("diagnostics.permissionPolicy.default"),
+            traceMessages: traceMessages,
+            engineVersion: engineVersion
+        )
+    }
+
+    private func currentMetadataForDiagnostics() -> SWFMetadata? {
+        if let url = currentFileURL,
+           let itemMetadata = LibraryService.shared.item(for: url)?.metadata {
+            return itemMetadata
+        }
+
+        guard let bridgeMetadata = bridge?.getMetadata() else { return nil }
+        return SWFMetadata(
+            stageWidth: bridgeMetadata.movieWidth,
+            stageHeight: bridgeMetadata.movieHeight,
+            frameRate: bridgeMetadata.frameRate,
+            totalFrames: bridgeMetadata.totalFrames,
+            swfVersion: bridgeMetadata.swfVersion,
+            playerVersion: bridgeMetadata.playerVersion,
+            isActionScript3: bridgeMetadata.isAS3
+        )
+    }
+
+    private func currentFileSizeForDiagnostics() -> Int64 {
+        guard let url = currentFileURL else { return 0 }
+        if let item = LibraryService.shared.item(for: url), item.fileSize > 0 {
+            return item.fileSize
+        }
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey])
+        return Int64(values?.fileSize ?? 0)
+    }
+
+    func handlePlayerEscape() {
+        playerInputCoordinator.handleEscape(
+            isStageMaximized: isStageMaximized,
+            mode: playerMode,
+            exitStage: { [weak self] in self?.exitStageMaximized() },
+            setMode: { [weak self] mode in self?.setPlayerMode(mode) }
+        )
+    }
+
+    func handleStageDoubleClick() {
+        playerInputCoordinator.handleStageDoubleClick(mode: playerMode) { [weak self] in
+            guard let self else { return }
+            if self.isStageMaximized {
+                self.exitStageMaximized()
+            } else {
+                self.toggleStageMaximized()
+            }
+        }
     }
 
     func keepControlBarVisible() {
-        showControlBar = true
-        hideControlBarTask?.cancel()
+        preparePlayerChromeForStableLayout()
+    }
+
+    private func preparePlayerChromeForStableLayout() {
+        playerInputCoordinator.cancelOverlayHide()
+        playerViewModel.keepControlBarVisible()
+        showControlBar = playerViewModel.showControlBar
+    }
+
+    private func prepareNormalPlayerLayout() {
+        preparePlayerChromeForStableLayout()
+        sidebarCollapsed = false
     }
 
     private func scheduleControlBarHide() {
-        hideControlBarTask?.cancel()
-        guard isPlaying else { return }
-        let task = DispatchWorkItem { [weak self] in
-            Task { @MainActor in
-                self?.showControlBar = false
-            }
-        }
-        hideControlBarTask = task
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: task)
+        playerViewModel.showControlBarTemporarily(isPlaying: isPlaying)
+        showControlBar = playerViewModel.showControlBar
     }
 
     func controlBarOnPause() {
-        hideControlBarTask?.cancel()
-        showControlBar = true
+        playerViewModel.controlBarOnPause()
+        showControlBar = playerViewModel.showControlBar
+        playerInputCoordinator.playbackPaused { [weak self] visible in
+            self?.showControlBar = visible
+        }
     }
 
     func adoptStageSize() {
@@ -409,6 +597,137 @@ final class AppState: ObservableObject {
         stageWidth = sw
         stageHeight = sh
         updateIOSOrientations()
+    }
+
+    private func persistCurrentMetadata() {
+        guard let url = currentFileURL,
+              let item = LibraryService.shared.item(for: url),
+              let bridgeMetadata = bridge?.getMetadata()
+        else { return }
+
+        let metadata = SWFMetadata(
+            stageWidth: bridgeMetadata.movieWidth,
+            stageHeight: bridgeMetadata.movieHeight,
+            frameRate: bridgeMetadata.frameRate,
+            totalFrames: bridgeMetadata.totalFrames,
+            swfVersion: bridgeMetadata.swfVersion,
+            playerVersion: bridgeMetadata.playerVersion,
+            isActionScript3: bridgeMetadata.isAS3
+        )
+
+        LibraryService.shared.update(item.id) {
+            $0.metadata = metadata
+            $0.lastPlaybackFrame = currentFrame
+        }
+    }
+
+    private func restorePlaybackPreferences(for url: URL) {
+        guard let item = LibraryService.shared.item(for: url) else { return }
+        let settings = SettingsPersistence.shared
+        let preferences = item.playbackPreferences ?? PlaybackPreferences(
+            volume: settings.volume,
+            isMuted: settings.isMuted,
+            qualityRawValue: settings.quality,
+            letterbox: settings.letterbox,
+            isLooping: settings.isLooping,
+            speed: settings.speed,
+            lastPlaybackFrame: item.lastPlaybackFrame,
+            preferredMode: .normal
+        )
+
+        isRestoringPlaybackPreferences = true
+        volume = preferences.volume
+        isMuted = preferences.isMuted
+        quality = preferences.quality
+        isLooping = preferences.isLooping
+        playbackSpeed = preferences.speed
+        playerMode = preferences.preferredMode
+        isRestoringPlaybackPreferences = false
+
+        bridge?.setVolume(isMuted ? 0.0 : volume)
+        bridge?.setLooping(isLooping)
+        bridge?.setSpeed(playbackSpeed)
+        applyLetterbox(preferences.letterbox)
+        applyPlayerModeLayout()
+    }
+
+    private func persistPlaybackPreferences() {
+        guard !isRestoringPlaybackPreferences,
+              let url = currentFileURL,
+              let item = LibraryService.shared.item(for: url)
+        else { return }
+
+        let preferences = PlaybackPreferences(
+            volume: volume,
+            isMuted: isMuted,
+            qualityRawValue: quality.rawValue,
+            letterbox: SettingsPersistence.shared.letterbox,
+            isLooping: isLooping,
+            speed: playbackSpeed,
+            lastPlaybackFrame: currentFrame,
+            preferredMode: playerMode
+        )
+
+        LibraryService.shared.update(item.id) {
+            $0.playbackPreferences = preferences
+            $0.lastPlaybackFrame = currentFrame
+        }
+    }
+
+    private func applyLetterbox(_ value: String) {
+        #if RUST_FFI_AVAILABLE
+        switch value {
+        case "on":
+            bridge?.setLetterboxMode(RuffleLetterbox_On)
+        case "off":
+            bridge?.setLetterboxMode(RuffleLetterbox_Off)
+        default:
+            bridge?.setLetterboxMode(RuffleLetterbox_Fullscreen)
+        }
+        #endif
+    }
+
+    func setPlayerMode(_ mode: PlayerMode) {
+        if mode == .normal {
+            enterNormalPlayerMode()
+        } else {
+            playerMode = mode
+            applyPlayerModeLayout()
+        }
+        persistPlaybackPreferences()
+    }
+
+    private func applyPlayerModeLayout() {
+        switch playerMode {
+        case .normal:
+            enterNormalPlayerMode()
+        case .cinema:
+            sidebarCollapsed = true
+            preparePlayerChromeForStableLayout()
+        case .game:
+            sidebarCollapsed = true
+            preparePlayerChromeForStableLayout()
+            if !isStageMaximized {
+                toggleStageMaximized()
+            }
+        }
+    }
+
+    private func enterNormalPlayerMode() {
+        if isStageMaximized {
+            requestStageMaximizedExit(intent: .enterNormalMode)
+            return
+        }
+        applyNormalPlayerLayout()
+    }
+
+    private func applyNormalPlayerLayout() {
+        prepareNormalPlayerLayout()
+        playerMode = .normal
+    }
+
+    func requestPlayerFocus() {
+        NotificationCenter.default.post(name: .focusPlayerStage, object: nil)
     }
 
     private func updateIOSOrientations() {
@@ -432,6 +751,7 @@ final class AppState: ObservableObject {
         guard isPlaying else { return }
         isPlaying = false
         bridge?.setPlaying(false)
+        persistPlaybackPreferences()
         controlBarOnPause()
     }
 
@@ -497,23 +817,25 @@ final class AppState: ObservableObject {
     }
 
     func closeFile() {
+        persistPlaybackPreferences()
         pausePlayback()
         stopTimelinePolling()
+        enterNormalPlayerMode()
         currentFileURL = nil
         updateIOSRenderLoopAvailability()
         selectedSection = .library
-        hideControlBarTask?.cancel()
-        showControlBar = true
     }
 
     func setVolume(_ newVolume: Float) {
         volume = newVolume
         bridge?.setVolume(newVolume)
+        persistPlaybackPreferences()
     }
 
     func toggleMute() {
         isMuted.toggle()
         bridge?.setVolume(isMuted ? 0.0 : volume)
+        persistPlaybackPreferences()
     }
 
     func stepForward() {
@@ -534,6 +856,7 @@ final class AppState: ObservableObject {
         #if os(macOS)
         guard !isStageMaximized else { return }
         isStageMaximized = true
+        setWindowToolbarVisible(false)
         if let window = NSApp.keyWindow {
             window.toggleFullScreen(nil)
         }
@@ -543,18 +866,77 @@ final class AppState: ObservableObject {
         #endif
     }
 
-    func exitStageMaximized() {
+    func exitStageMaximized(restoreWorkspaceChrome: Bool = true) {
         guard isStageMaximized else { return }
-        isStageMaximized = false
+        requestStageMaximizedExit(intent: defaultStageMaximizedExitIntent(restoreWorkspaceChrome: restoreWorkspaceChrome))
+    }
+
+    private func requestStageMaximizedExit(intent: StageMaximizedExitIntent) {
+        guard isStageMaximized else { return }
         #if os(macOS)
+        pendingStageMaximizedExitIntent = intent
         NSApp.keyWindow?.toggleFullScreen(nil)
         #else
+        finishStageMaximizedExit(intent: intent)
+        #endif
+    }
+
+    private func defaultStageMaximizedExitIntent(restoreWorkspaceChrome: Bool) -> StageMaximizedExitIntent {
+        restoreWorkspaceChrome && playerMode == .game ? .enterNormalMode : .keepCurrentMode
+    }
+
+    private func finishStageMaximizedExit(intent: StageMaximizedExitIntent) {
+        switch intent {
+        case .enterNormalMode:
+            applyNormalPlayerLayout()
+            persistPlaybackPreferences()
+        case .keepCurrentMode:
+            preparePlayerChromeForStableLayout()
+        }
+        isStageMaximized = false
+        toolbarRefreshToken += 1
+        setWindowToolbarVisible(true)
         updateIOSOrientations()
+    }
+
+    private func setWindowToolbarVisible(_ visible: Bool) {
+        #if os(macOS)
+        (NSApp.keyWindow ?? NSApp.mainWindow)?.toolbar?.isVisible = visible
+        DispatchQueue.main.async {
+            (NSApp.keyWindow ?? NSApp.mainWindow)?.toolbar?.isVisible = visible
+        }
         #endif
     }
 
     func toggleSidebar() {
         sidebarCollapsed.toggle()
+    }
+
+    func updateSearchText(_ text: String) {
+        searchText = text
+        searchViewModel.updateSearchText(text)
+        isSearching = searchViewModel.isSearching
+    }
+
+    func clearSearch() {
+        searchText = ""
+        searchViewModel.clearSearch()
+        isSearching = false
+    }
+
+    func requestSearchFocus() {
+        sidebarCollapsed = false
+        searchFocusRequest += 1
+    }
+
+    func selectSection(_ section: Section) {
+        selectedCollectionID = nil
+        selectedSection = section
+    }
+
+    func selectCollection(_ id: UUID) {
+        selectedCollectionID = id
+        selectedSection = .library
     }
 
     func showFilePicker() {
@@ -592,41 +974,155 @@ final class AppState: ObservableObject {
     }
 
     func captureThumbnail() {
-        #if os(macOS)
-        guard let frameView = findPlayerFrameView() else { return }
-        let window = frameView.window
-        guard let window, window.windowNumber > 0 else { return }
+        #if os(macOS) || os(iOS)
+        guard let url = currentFileURL,
+              let item = LibraryService.shared.item(for: url),
+              shouldAttemptThumbnail(for: item)
+        else { return }
 
-        let windowRect = frameView.convert(frameView.bounds, to: nil)
-        let screenRect = window.convertToScreen(windowRect)
-
-        guard let cgImage = CGWindowListCreateImage(
-            screenRect, .optionIncludingWindow,
-            CGWindowID(window.windowNumber), .nominalResolution
-        ) else { return }
+        guard let metalView = findPlayerMetalView(),
+              let cgImage = currentDrawableImage(from: metalView)
+        else {
+            markThumbnailFailure(for: item.id)
+            return
+        }
 
         let w = cgImage.width
         let h = cgImage.height
-        guard w > 0, h > 0 else { return }
+        guard w > 0, h > 0 else {
+            markThumbnailFailure(for: item.id)
+            return
+        }
 
-        let maxSize: CGFloat = 320
-        let scale = min(maxSize / CGFloat(w), maxSize / CGFloat(h), 1.0)
-        let scaledSize = NSSize(width: CGFloat(w) * scale, height: CGFloat(h) * scale)
-        let scaledImage = NSImage(cgImage: cgImage, size: scaledSize)
-
-        guard let tiff = scaledImage.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff),
-              let png = bitmap.representation(using: .png, properties: [:])
-        else { return }
+        guard let png = pngThumbnailData(from: cgImage, maxPixelSize: 320) else {
+            markThumbnailFailure(for: item.id)
+            return
+        }
 
         if let idx = recentFiles.firstIndex(where: { $0.url == currentFileURL }) {
             recentFiles[idx].thumbnailData = png
         }
-        if let item = LibraryService.shared.items.first(where: { $0.url == currentFileURL }) {
-            LibraryService.shared.update(item.id) { $0.thumbnailData = png }
+
+        guard let identifier = ThumbnailService.shared.store(png, for: item.id) else {
+            markThumbnailFailure(for: item.id)
+            return
+        }
+
+        LibraryService.shared.update(item.id) {
+            $0.thumbnailIdentifier = identifier
+            $0.thumbnailData = nil
+            $0.thumbnailGenerationFailedAt = nil
         }
         #endif
     }
+
+    private func shouldAttemptThumbnail(for item: LibraryItem) -> Bool {
+        if item.thumbnailIdentifier != nil { return false }
+        guard let failedAt = item.thumbnailGenerationFailedAt else { return true }
+        return Date().timeIntervalSince(failedAt) > 86_400
+    }
+
+    private func markThumbnailFailure(for id: UUID) {
+        LibraryService.shared.update(id) {
+            $0.thumbnailGenerationFailedAt = Date()
+        }
+    }
+
+    #if os(macOS) || os(iOS)
+    private func currentDrawableImage(from metalView: MTKView) -> CGImage? {
+        guard let texture = metalView.currentDrawable?.texture else { return nil }
+        return image(from: texture)
+    }
+
+    private func image(from texture: MTLTexture) -> CGImage? {
+        let width = Int(texture.width)
+        let height = Int(texture.height)
+        guard width > 0, height > 0, !texture.isFramebufferOnly else { return nil }
+
+        let bytesPerRow = width * 4
+        var pixelData = [UInt8](repeating: 0, count: height * bytesPerRow)
+        texture.getBytes(
+            &pixelData,
+            bytesPerRow: bytesPerRow,
+            from: MTLRegionMake2D(0, 0, width, height),
+            mipmapLevel: 0
+        )
+
+        for index in stride(from: 0, to: pixelData.count, by: 4) {
+            let blue = pixelData[index]
+            pixelData[index] = pixelData[index + 2]
+            pixelData[index + 2] = blue
+        }
+
+        guard let provider = CGDataProvider(data: Data(pixelData) as CFData) else { return nil }
+        return CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        )
+    }
+
+    private func pngThumbnailData(from image: CGImage, maxPixelSize: CGFloat) -> Data? {
+        guard let scaled = scaledImage(image, maxPixelSize: maxPixelSize) else { return nil }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            data,
+            UTType.png.identifier as CFString,
+            1,
+            nil
+        ) else { return nil }
+
+        CGImageDestinationAddImage(destination, scaled, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return data as Data
+    }
+
+    private func scaledImage(_ image: CGImage, maxPixelSize: CGFloat) -> CGImage? {
+        let width = image.width
+        let height = image.height
+        guard width > 0, height > 0 else { return nil }
+
+        let scale = min(maxPixelSize / CGFloat(width), maxPixelSize / CGFloat(height), 1.0)
+        let scaledWidth = max(1, Int(CGFloat(width) * scale))
+        let scaledHeight = max(1, Int(CGFloat(height) * scale))
+        guard scaledWidth != width || scaledHeight != height else { return image }
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: scaledWidth,
+            height: scaledHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: scaledWidth * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+
+        context.interpolationQuality = .medium
+        context.draw(image, in: CGRect(x: 0, y: 0, width: scaledWidth, height: scaledHeight))
+        return context.makeImage()
+    }
+
+    private func findPlayerMetalView() -> MTKView? {
+        #if os(macOS)
+        findPlayerFrameView() as? MTKView
+        #else
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .compactMap { findMTKView(in: $0) }
+            .first
+        #endif
+    }
+    #endif
 
     #if os(macOS)
     private func findPlayerFrameView() -> NSView? {
@@ -637,6 +1133,16 @@ final class AppState: ObservableObject {
 
     private func findMTKView(in view: NSView) -> NSView? {
         if view is MTKView { return view }
+        for subview in view.subviews {
+            if let found = findMTKView(in: subview) { return found }
+        }
+        return nil
+    }
+    #endif
+
+    #if os(iOS)
+    private func findMTKView(in view: UIView) -> MTKView? {
+        if let metalView = view as? MTKView { return metalView }
         for subview in view.subviews {
             if let found = findMTKView(in: subview) { return found }
         }
@@ -726,17 +1232,23 @@ final class AppState: ObservableObject {
         }
     }
 
-    func seekToFrame(_ frame: UInt32) { bridge?.seekFrame(frame) }
+    func seekToFrame(_ frame: UInt32) {
+        bridge?.seekFrame(frame)
+        currentFrame = frame
+        persistPlaybackPreferences()
+    }
     func seekToEnd() { bridge?.seekFrame(totalFrames) }
     func stepBackward() { bridge?.stepBack(1) }
     func rewind() { bridge?.rewind() }
     func toggleLoop() {
         isLooping.toggle()
         bridge?.setLooping(isLooping)
+        persistPlaybackPreferences()
     }
     func setSpeed(_ speed: Float) {
         playbackSpeed = speed
         bridge?.setSpeed(speed)
+        persistPlaybackPreferences()
     }
 
     func browseDirectory(_ url: URL) {
@@ -777,6 +1289,30 @@ final class AppState: ObservableObject {
         updateLibraryStats()
     }
 
+    func openImportedContent(_ content: ImportedContent) {
+        switch content {
+        case .swf(let url):
+            openFile(url)
+        case .directory(let url):
+            browseDirectory(url)
+        case .zip(let url):
+            do {
+                let resolved = try ImportService.shared.resolveImport(for: url)
+                openImportedContent(resolved)
+            } catch {
+                presentImportError(error)
+            }
+        }
+    }
+
+    func presentImportError(_ error: Error) {
+        if let importError = error as? ImportError {
+            errorMessage = LocalizationManager.shared.localized(importError.messageKey)
+        } else {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func updateLibraryStats() {
         let allItems = LibraryService.shared.items
         let totalSize = allItems.reduce(0) { $0 + $1.fileSize }
@@ -787,22 +1323,21 @@ final class AppState: ObservableObject {
     }
 
     func toggleFavorite(for url: URL) {
-        if bookmarkManager.bookmarks.contains(where: { $0.url == url }) {
-            if let bookmark = bookmarkManager.bookmarks.first(where: { $0.url == url }) {
-                bookmarkManager.remove(bookmark)
-            }
-        } else {
+        let shouldFavorite = !bookmarkManager.contains(url)
+        if shouldFavorite {
             bookmarkManager.add(url: url, frame: currentFrame)
+        } else {
+            bookmarkManager.remove(url: url)
         }
         bookmarks = bookmarkManager.bookmarks.map { $0.url }
-        if let item = LibraryService.shared.items.first(where: { $0.url == url }) {
-            LibraryService.shared.update(item.id) { $0.isFavorite.toggle() }
+        if let item = LibraryService.shared.item(for: url) {
+            LibraryService.shared.update(item.id) { $0.isFavorite = shouldFavorite }
         }
     }
 
     var isFavorite: Bool {
         guard let url = currentFileURL else { return false }
-        return bookmarkManager.bookmarks.contains(where: { $0.url == url })
+        return bookmarkManager.contains(url)
     }
 
 }

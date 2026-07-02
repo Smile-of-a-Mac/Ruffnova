@@ -7,16 +7,16 @@ enum ImportedContent {
     case zip(URL)
 }
 
-enum ImportError: LocalizedError {
+enum ImportError: Error {
     case unsupportedFormat
     case zipExtractionFailed
     case directoryScanFailed
 
-    var errorDescription: String? {
+    var messageKey: String {
         switch self {
-        case .unsupportedFormat: return "Unsupported file format"
-        case .zipExtractionFailed: return "Could not extract ZIP file"
-        case .directoryScanFailed: return "Could not scan directory"
+        case .unsupportedFormat: return "error.unsupportedFormat"
+        case .zipExtractionFailed: return "error.zipExtract"
+        case .directoryScanFailed: return "error.directoryScan"
         }
     }
 }
@@ -39,6 +39,19 @@ final class ImportService {
             return .directory(url)
         }
         return nil
+    }
+
+    func resolveImport(for url: URL) throws -> ImportedContent {
+        guard let content = classify(url) else {
+            throw ImportError.unsupportedFormat
+        }
+
+        switch content {
+        case .swf, .directory:
+            return content
+        case .zip:
+            return .directory(try extractZip(url))
+        }
     }
 
     func extractZip(_ url: URL) throws -> URL {

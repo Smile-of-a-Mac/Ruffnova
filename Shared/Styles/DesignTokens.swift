@@ -67,6 +67,8 @@ extension Animation {
     static let glassSnap = Animation.spring(response: 0.25, dampingFraction: 0.78)
     /// Gentle spring for floating element appearance
     static let glassFloat = Animation.spring(response: 0.4, dampingFraction: 0.82)
+    /// Slower, steadier motion for stage fullscreen transitions.
+    static let stageFullscreen = Animation.spring(response: 0.46, dampingFraction: 0.9, blendDuration: 0.08)
 }
 
 // MARK: - Glass Card Modifier
@@ -132,6 +134,12 @@ extension View {
 
     func toolbarGlassCapsule(material: Material = GlassMaterial.ultraLight) -> some View {
         self
+            .background(material, in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(.separator.opacity(0.45), lineWidth: 0.7)
+            }
+            .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
     }
 
     func toolbarGlassCircle(size: CGFloat = 36, material: Material = GlassMaterial.ultraLight) -> some View {

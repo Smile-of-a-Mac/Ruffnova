@@ -21,4 +21,13 @@ extension Notification.Name {
 
     /// Posted to toggle the trace console.
     static let toggleTraceConsole = Notification.Name("toggleTraceConsole")
+
+    /// Posted when an import folder action is requested.
+    static let importFolder = Notification.Name("importFolder")
+
+    /// Posted to focus the search field.
+    static let focusSearch = Notification.Name("focusSearch")
+
+    /// Posted to move keyboard focus to the player stage.
+    static let focusPlayerStage = Notification.Name("focusPlayerStage")
 }

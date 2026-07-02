@@ -42,10 +42,11 @@ struct ContentView: View {
             }
         }
         .toolbar {
-            if !appState.isStageMaximized {
-                AppToolbar()
-            }
+            AppToolbar(refreshToken: appState.toolbarRefreshToken)
         }
+        #if os(macOS)
+        .toolbar(appState.isStageMaximized ? .hidden : .visible, for: .windowToolbar)
+        #endif
         .onDrop(of: [.fileURL, .folder].compactMap { $0 }, isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }
@@ -55,7 +56,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .viewportChanged)) { n in
             guard let i = n.userInfo,
                   let w = i["width"] as? UInt32, let h = i["height"] as? UInt32,
-                  let s = i["scaleFactor"] as? Float else { return }
+                  let s = i["scaleFactor"] as? Float,
+                  w >= 16, h >= 16
+            else { return }
             DispatchQueue.main.async { appState.bridge?.setViewport(width: w, height: h, scaleFactor: s) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .keyEvent)) { n in
@@ -77,6 +80,23 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .toggleTraceConsole)) { _ in
             appState.showTraceConsole.toggle()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .importFolder)) { _ in
+            #if os(macOS)
+            let panel = NSOpenPanel()
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = false
+            panel.allowsMultipleSelection = false
+            panel.message = locManager.localized("library.chooseFolder.message")
+            panel.prompt = locManager.localized("library.chooseFolder")
+
+            if panel.runModal() == .OK, let url = panel.url {
+                appState.browseDirectory(url)
+            }
+            #endif
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusSearch)) { _ in
+            appState.requestSearchFocus()
+        }
         .sheet(isPresented: $appState.showSWFInfoPanel) {
             SWFInfoPanel()
                 .environmentObject(appState)
@@ -85,6 +105,12 @@ struct ContentView: View {
         .sheet(isPresented: $appState.showTraceConsole) {
             TraceConsoleView()
                 .frame(width: 500, height: 400)
+        }
+        .sheet(isPresented: $appState.showDiagnostics) {
+            DiagnosticsView()
+                .environmentObject(appState)
+                .environmentObject(locManager)
+                .frame(width: 560, height: 560)
         }
     }
 
@@ -110,25 +136,27 @@ struct ContentView: View {
 
     // MARK: - Search Results
 
+    private var searchViewModel: SearchViewModel { appState.searchViewModel }
+
     private var searchResultsView: some View {
         VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
             VStack(alignment: .leading, spacing: NativeSpacing.sm) {
                 Text(locManager.localized("search.results"))
                     .font(.largeTitle)
-                Text(String(format: locManager.localized("search.results.count"), appState.librarySearchResults.count))
+                Text(String(format: locManager.localized("search.results.count"), searchViewModel.searchResults.count))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, NativeSpacing.section)
             .padding(.top, NativeSpacing.section)
 
-            if appState.librarySearchResults.isEmpty {
+            if searchViewModel.searchResults.isEmpty {
                 emptySearchState
             } else {
                 ScrollView {
                     LazyVStack(spacing: NativeSpacing.sm) {
-                        ForEach(appState.librarySearchResults) { file in
-                            RecentFileRow(file: file)
+                        ForEach(searchViewModel.searchResults) { file in
+                            SearchRow(item: file, viewModel: searchViewModel)
                         }
                     }
                     .padding(.horizontal, NativeSpacing.xxxl)
@@ -150,9 +178,66 @@ struct ContentView: View {
             Text(String(format: locManager.localized("search.noResults.match"), appState.searchText))
                 .font(.callout)
                 .foregroundStyle(.secondary)
+            HStack(spacing: NativeSpacing.md) {
+                Button {
+                    appState.clearSearch()
+                } label: {
+                    Text(locManager.localized("search.clear"))
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    NotificationCenter.default.post(name: .importFolder, object: nil)
+                } label: {
+                    Text(locManager.localized("empty.importFolder"))
+                }
+                .buttonStyle(.bordered)
+            }
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private struct SearchRow: View {
+        let item: LibraryItem
+        let viewModel: SearchViewModel
+
+        var body: some View {
+            Button {
+                viewModel.openResult(item)
+            } label: {
+                HStack(spacing: NativeSpacing.md) {
+                    Image(systemName: item.isFavorite ? "star.fill" : "doc")
+                        .foregroundStyle(item.isFavorite ? .yellow : .secondary)
+                        .frame(width: 20)
+
+                    VStack(alignment: .leading, spacing: NativeSpacing.xs) {
+                        Text(item.name)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+
+                        Text(item.url.path)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    if !item.tags.isEmpty {
+                        Text(item.tags.joined(separator: ", "))
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, NativeSpacing.md)
+                .padding(.vertical, NativeSpacing.sm)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     // MARK: - Player View
@@ -195,12 +280,14 @@ struct ContentView: View {
                 playerStage
                     .ignoresSafeArea()
 
-                playerTitleBadge
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(.trailing, NativeSpacing.md)
-                    .padding(.top, NativeSpacing.md)
+                if shouldShowPlayerChrome {
+                    playerTitleBadge
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .padding(.trailing, NativeSpacing.md)
+                        .padding(.top, NativeSpacing.md)
+                }
 
-                if appState.showToolbar && appState.currentFileURL != nil {
+                if shouldShowPlayerControls {
                     VStack {
                         Spacer()
                         PlayerControlBar()
@@ -213,13 +300,15 @@ struct ContentView: View {
                 VStack(spacing: 0) {
                     playerStage
                         .overlay(alignment: .topTrailing) {
-                            playerTitleBadge
-                                .padding(.top, NativeSpacing.sm)
-                                .padding(.trailing, NativeSpacing.sm)
+                            if shouldShowPlayerChrome || appState.playerMode == .normal {
+                                playerTitleBadge
+                                    .padding(.top, NativeSpacing.sm)
+                                    .padding(.trailing, NativeSpacing.sm)
+                            }
                         }
                         .layoutPriority(1)
 
-                    if appState.showToolbar {
+                    if shouldShowPlayerControls {
                         PlayerControlBar()
                             .environmentObject(appState)
                             .padding(.vertical, NativeSpacing.md)
@@ -228,10 +317,10 @@ struct ContentView: View {
             } else {
                 playerStage
                     .onHover { hovering in
-                        if hovering { appState.showControlBarTemporarily() }
+                        if hovering { appState.handlePlayerPointerActivity() }
                     }
 
-                if appState.showToolbar && appState.currentFileURL != nil {
+                if shouldShowPlayerControls {
                     VStack {
                         Spacer()
                         PlayerControlBar()
@@ -241,10 +330,12 @@ struct ContentView: View {
                     }
                 }
 
-                playerTitleBadge
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(.trailing, NativeSpacing.xl)
-                    .padding(.top, 56)
+                if shouldShowPlayerChrome || appState.playerMode == .normal {
+                    playerTitleBadge
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .padding(.trailing, NativeSpacing.xl)
+                        .padding(.top, 56)
+                }
             }
 
             if appState.showDebugUI {
@@ -277,9 +368,17 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         #if os(macOS)
         .onExitCommand {
-            appState.exitStageMaximized()
+            appState.handlePlayerEscape()
         }
         #endif
+    }
+
+    private var shouldShowPlayerChrome: Bool {
+        appState.showToolbar && appState.showControlBar && appState.currentFileURL != nil
+    }
+
+    private var shouldShowPlayerControls: Bool {
+        shouldShowPlayerChrome && appState.playerMode != .game
     }
 
     private var playerTitleBadge: some View {
@@ -313,6 +412,10 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+
+            PlayerModeMenu()
+                .environmentObject(appState)
+                .environmentObject(locManager)
         }
         .padding(.horizontal, NativeSpacing.md)
         .padding(.vertical, NativeSpacing.xs)
@@ -333,6 +436,9 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.horizontal, appState.isStageMaximized ? 0 : max(NativeSpacing.sm, (geo.size.width - geo.size.height * CGFloat(appState.stageWidth) / CGFloat(max(appState.stageHeight, 1))) / 2))
                 .padding(.vertical, appState.isStageMaximized ? 0 : NativeSpacing.sm)
+                .onHover { hovering in
+                    if hovering { appState.handlePlayerPointerActivity() }
+                }
         }
     }
 
@@ -344,6 +450,12 @@ struct ContentView: View {
                 .foregroundStyle(.yellow)
             Text(msg).font(.callout)
             Spacer()
+            if !appState.playerIssues.isEmpty {
+                Button(locManager.localized("diagnostics.openDetails")) {
+                    appState.showDiagnostics = true
+                }
+                .controlSize(.small)
+            }
             Button(locManager.localized("player.dismiss")) { appState.errorMessage = nil }
                 .controlSize(.small)
         }
@@ -362,36 +474,17 @@ struct ContentView: View {
                 p.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { data, _ in
                     guard let d = data as? Data,
                           let url = URL(dataRepresentation: d, relativeTo: nil) else { return }
-                    let ext = url.pathExtension.lowercased()
 
-                    if ext == "swf" {
-                        DispatchQueue.main.async { appState.openFile(url) }
-                    } else if ext == "zip" {
-                        handleZipDrop(url)
-                    } else if url.hasDirectoryPath {
-                        DispatchQueue.main.async { appState.browseDirectory(url) }
+                    do {
+                        let importedContent = try ImportService.shared.resolveImport(for: url)
+                        DispatchQueue.main.async { appState.openImportedContent(importedContent) }
+                    } catch {
+                        DispatchQueue.main.async { appState.presentImportError(error) }
                     }
                 }
             }
         }
         return hasSupported
-    }
-
-    private func handleZipDrop(_ url: URL) {
-        #if os(macOS)
-        do {
-            let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-            process.arguments = ["-o", url.path, "-d", tmpDir.path]
-            try process.run()
-            process.waitUntilExit()
-            DispatchQueue.main.async { appState.browseDirectory(tmpDir) }
-        } catch {
-            DispatchQueue.main.async { appState.errorMessage = locManager.localized("error.zipExtract") }
-        }
-        #endif
     }
 }
 

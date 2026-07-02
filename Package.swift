@@ -27,6 +27,7 @@ let package = Package(
             exclude: [
                 "RuffleBridgingHeader.h",
                 "Info.plist",
+                "Info-iOS.plist",
                 "Ruffnova.entitlements",
                 "Ruffnova.xcodeproj",
                 ".git",
@@ -35,6 +36,7 @@ let package = Package(
                 ".DS_Store",
                 "engine",
                 "swfs",
+                "Tests",
                 "docs",
                 "CRuffleFFI",
                 "README.md",
@@ -63,6 +65,11 @@ let package = Package(
                 .linkedFramework("IOKit", .when(platforms: [.macOS])),
                 .linkedFramework("UIKit", .when(platforms: [.iOS])),
             ]
+        ),
+        .testTarget(
+            name: "RuffnovaTests",
+            dependencies: ["Ruffnova"],
+            path: "Tests/RuffnovaTests"
         ),
     ]
 )

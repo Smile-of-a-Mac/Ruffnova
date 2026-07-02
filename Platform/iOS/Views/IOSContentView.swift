@@ -14,6 +14,7 @@ struct IOSContentView: View {
     @Namespace private var playerNamespace
     @State private var selectedIPadSection: AppState.Section? = .library
     @State private var iPadColumnVisibility: NavigationSplitViewVisibility = .all
+    @State private var hidesStageSystemChrome = false
 
     private let iPadSections: [AppState.Section] = [.player, .library, .recent, .favorites, .settings]
 
@@ -28,11 +29,15 @@ struct IOSContentView: View {
         .onAppear {
             appState.handleSceneActiveStateChanged(scenePhase == .active)
             appState.setPlayerSurfaceVisible(appState.isPlayerVisible)
+            hidesStageSystemChrome = appState.isStageMaximized
         }
         .onChange(of: scenePhase) { _, phase in
             appState.handleSceneActiveStateChanged(phase == .active)
         }
-        .statusBarHidden(appState.isStageMaximized)
+        .onChange(of: appState.isStageMaximized) { _, maximized in
+            syncStageSystemChrome(for: maximized)
+        }
+        .statusBarHidden(hidesStageSystemChrome)
     }
 
     // MARK: - iPad Layout (NavigationSplitView)
@@ -76,7 +81,7 @@ struct IOSContentView: View {
             }
         }
         .onChange(of: appState.isStageMaximized) { _, maximized in
-            withAnimation(.glassSpring) {
+            withAnimation(.stageFullscreen) {
                 iPadColumnVisibility = maximized ? .detailOnly : .all
             }
         }
@@ -257,10 +262,6 @@ struct IOSContentView: View {
 
     // MARK: - Player View
 
-    private var stageBackgroundColor: Color {
-        usesInlineFullscreen ? .black : Color(.systemBackground)
-    }
-
     private var stageBackgroundARGB: UInt32 {
         appState.isStageMaximized ? 0xFF000000 : (colorScheme == .dark ? 0xFF000000 : 0xFFFFFFFF)
     }
@@ -292,30 +293,40 @@ struct IOSContentView: View {
         GeometryReader { geo in
             let stageWidth = usesInlineFullscreen ? geo.size.width : max(0, geo.size.width - NativeSpacing.xxxl)
             let stageHeight = usesInlineFullscreen ? geo.size.height : max(220, geo.size.height * 0.58)
+            let normalPanelReserve = NativeSpacing.section + 132
+            let normalStageCenterMinY = stageHeight / 2 + NativeSpacing.md
+            let normalStageCenterMaxY = max(normalStageCenterMinY, geo.size.height - stageHeight / 2 - NativeSpacing.md)
+            let normalStageCenterY = min(
+                max(geo.size.height - stageHeight / 2 - normalPanelReserve, normalStageCenterMinY),
+                normalStageCenterMaxY
+            )
+            let stageCenterY = usesInlineFullscreen ? geo.size.height / 2 : normalStageCenterY
 
             ZStack {
-                stageBackgroundColor.ignoresSafeArea()
+                Color(.systemBackground).ignoresSafeArea()
+                Color.black
+                    .opacity(usesInlineFullscreen ? 1 : 0)
+                    .ignoresSafeArea()
 
-                VStack(spacing: usesInlineFullscreen ? 0 : NativeSpacing.xl) {
-                    if !usesInlineFullscreen {
-                        Spacer(minLength: NativeSpacing.md)
-                    }
+                RufflePlayerView()
+                    .environmentObject(appState)
+                    .clipShape(RoundedRectangle(cornerRadius: usesInlineFullscreen ? 0 : NativeRadius.xl, style: .continuous))
+                    .matchedGeometryEffect(id: "player-stage", in: playerNamespace)
+                    .frame(width: stageWidth, height: stageHeight)
+                    .position(x: geo.size.width / 2, y: stageCenterY)
+                    .zIndex(0)
 
-                    RufflePlayerView()
-                        .environmentObject(appState)
-                        .clipShape(RoundedRectangle(cornerRadius: usesInlineFullscreen ? 0 : NativeRadius.xl, style: .continuous))
-                        .matchedGeometryEffect(id: "player-stage", in: playerNamespace)
-                        .frame(width: stageWidth, height: stageHeight)
-                        .zIndex(0)
-
-                    if !usesInlineFullscreen {
-                        nowPlayingPanel
-                            .padding(.horizontal, NativeSpacing.xxxl)
-                            .padding(.bottom, NativeSpacing.xl)
-                            .zIndex(2)
-                    }
+                VStack {
+                    Spacer()
+                    nowPlayingPanel
+                        .padding(.horizontal, NativeSpacing.xxxl)
+                        .padding(.bottom, NativeSpacing.xl)
+                        .opacity(usesInlineFullscreen ? 0 : 1)
+                        .offset(y: usesInlineFullscreen ? 24 : 0)
+                        .allowsHitTesting(!usesInlineFullscreen)
+                        .accessibilityHidden(usesInlineFullscreen)
                 }
-                .frame(width: geo.size.width, height: geo.size.height)
+                .zIndex(2)
 
                 if appState.isLoading {
                     ProgressView()
@@ -323,26 +334,29 @@ struct IOSContentView: View {
                         .zIndex(3)
                 }
 
-                if usesInlineFullscreen {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            glassIconButton("arrow.down.right.and.arrow.up.left") {
-                                withAnimation(.glassSpring) { appState.exitStageMaximized() }
-                            }
-                            .padding(NativeSpacing.md)
-                        }
+                VStack {
+                    HStack {
                         Spacer()
+                        glassIconButton("arrow.down.right.and.arrow.up.left") {
+                            withAnimation(.stageFullscreen) { appState.exitStageMaximized() }
+                        }
+                        .padding(NativeSpacing.md)
                     }
-                    .zIndex(4)
+                    Spacer()
                 }
+                .opacity(usesInlineFullscreen ? 1 : 0)
+                .offset(y: usesInlineFullscreen ? 0 : -10)
+                .allowsHitTesting(usesInlineFullscreen)
+                .accessibilityHidden(!usesInlineFullscreen)
+                .zIndex(4)
             }
         }
-        .ignoresSafeArea(.container, edges: usesInlineFullscreen ? .all : [])
-        .statusBarHidden(usesInlineFullscreen)
-        .toolbar(usesInlineFullscreen ? .hidden : .visible, for: .navigationBar)
-        .toolbar(usesInlineFullscreen ? .hidden : .visible, for: .tabBar)
-        .animation(.glassSpring, value: appState.isStageMaximized)
+        .ignoresSafeArea(.container, edges: hidesStageSystemChrome ? .all : [])
+        .statusBarHidden(hidesStageSystemChrome)
+        .toolbar(hidesStageSystemChrome ? .hidden : .visible, for: .navigationBar)
+        .toolbar(hidesStageSystemChrome ? .hidden : .visible, for: .tabBar)
+        .animation(.stageFullscreen, value: appState.isStageMaximized)
+        .animation(.easeInOut(duration: 0.2), value: hidesStageSystemChrome)
     }
 
     private var nowPlayingPanel: some View {
@@ -365,7 +379,7 @@ struct IOSContentView: View {
                     if let url = appState.currentFileURL { appState.toggleFavorite(for: url) }
                 }
                 glassIconButton("arrow.up.left.and.arrow.down.right") {
-                    withAnimation(.glassSpring) { appState.toggleStageMaximized() }
+                    withAnimation(.stageFullscreen) { appState.toggleStageMaximized() }
                 }
             }
 
@@ -391,6 +405,12 @@ struct IOSContentView: View {
 
     private func syncStageBackground() {
         appState.bridge?.setBackgroundColor(stageBackgroundARGB)
+    }
+
+    private func syncStageSystemChrome(for maximized: Bool) {
+        withAnimation(.stageFullscreen) {
+            hidesStageSystemChrome = maximized
+        }
     }
 }
 #endif

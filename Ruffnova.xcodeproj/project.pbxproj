@@ -53,6 +53,20 @@
 		A20003 /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20003 /* ImportService.swift */; };
 		A20004 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20004 /* PlayerViewModel.swift */; };
 		A20005 /* PlayerIssue.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20005 /* PlayerIssue.swift */; };
+		A20006 /* SearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20006 /* SearchService.swift */; };
+		A20007 /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20007 /* SearchViewModel.swift */; };
+		A20008 /* SWFMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20008 /* SWFMetadata.swift */; };
+		A20009 /* ThumbnailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20009 /* ThumbnailService.swift */; };
+		A20010 /* PlayerMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20010 /* PlayerMode.swift */; };
+		A20011 /* PlayerInputCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20011 /* PlayerInputCoordinator.swift */; };
+		A20012 /* PlayerModeMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20012 /* PlayerModeMenu.swift */; };
+		A20013 /* CompatibilityReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20013 /* CompatibilityReport.swift */; };
+		A20014 /* DiagnosticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20014 /* DiagnosticsService.swift */; };
+		A20015 /* DiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20015 /* DiagnosticsView.swift */; };
+		A20016 /* LibraryCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20016 /* LibraryCollection.swift */; };
+		A20017 /* CollectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20017 /* CollectionService.swift */; };
+		A20018 /* LibraryItemDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20018 /* LibraryItemDetailsView.swift */; };
+		A20019 /* SidebarCollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20019 /* SidebarCollectionsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -107,6 +121,20 @@
 		B20003 /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
 		B20004 /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
 		B20005 /* PlayerIssue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerIssue.swift; sourceTree = "<group>"; };
+		B20006 /* SearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchService.swift; sourceTree = "<group>"; };
+		B20007 /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
+		B20008 /* SWFMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SWFMetadata.swift; sourceTree = "<group>"; };
+		B20009 /* ThumbnailService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailService.swift; sourceTree = "<group>"; };
+		B20010 /* PlayerMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerMode.swift; sourceTree = "<group>"; };
+		B20011 /* PlayerInputCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerInputCoordinator.swift; sourceTree = "<group>"; };
+		B20012 /* PlayerModeMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerModeMenu.swift; sourceTree = "<group>"; };
+		B20013 /* CompatibilityReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibilityReport.swift; sourceTree = "<group>"; };
+		B20014 /* DiagnosticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsService.swift; sourceTree = "<group>"; };
+		B20015 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
+		B20016 /* LibraryCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCollection.swift; sourceTree = "<group>"; };
+		B20017 /* CollectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionService.swift; sourceTree = "<group>"; };
+		B20018 /* LibraryItemDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryItemDetailsView.swift; sourceTree = "<group>"; };
+		B20019 /* SidebarCollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarCollectionsView.swift; sourceTree = "<group>"; };
 		C10099 /* Ruffnova.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ruffnova.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -209,6 +237,7 @@
 				G20020 /* Import */,
 				G10210 /* Library */,
 				G10220 /* Player */,
+				G20050 /* Search */,
 				G10230 /* Settings */,
 			);
 			path = Features;
@@ -232,8 +261,10 @@
 				B10011 /* FavoritesGridView.swift */,
 				B10012 /* LibraryContentView.swift */,
 				B10013 /* LibraryFileCell.swift */,
+				B20018 /* LibraryItemDetailsView.swift */,
 				B10014 /* RecentFileRow.swift */,
 				B10015 /* RecentListView.swift */,
+				B20019 /* SidebarCollectionsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -242,7 +273,9 @@
 			isa = PBXGroup;
 			children = (
 				G10221 /* Controls */,
+				G20060 /* Models */,
 				G10222 /* Rendering */,
+				G20061 /* Services */,
 				G20040 /* ViewModels */,
 				G10223 /* Views */,
 			);
@@ -253,8 +286,17 @@
 			isa = PBXGroup;
 			children = (
 				B10016 /* PlayerControlBar.swift */,
+				B20012 /* PlayerModeMenu.swift */,
 			);
 			path = Controls;
+			sourceTree = "<group>";
+		};
+		G20060 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B20010 /* PlayerMode.swift */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 		G10222 /* Rendering */ = {
@@ -275,10 +317,20 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		G20061 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B20011 /* PlayerInputCoordinator.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
 		G20010 /* Models */ = {
 			isa = PBXGroup;
 			children = (
 				B20001 /* LibraryItem.swift */,
+				B20016 /* LibraryCollection.swift */,
+				B20008 /* SWFMetadata.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -286,7 +338,9 @@
 		G20011 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				B20017 /* CollectionService.swift */,
 				B20002 /* LibraryService.swift */,
+				B20009 /* ThumbnailService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -311,6 +365,8 @@
 			isa = PBXGroup;
 			children = (
 				G20031 /* Models */,
+				G20032 /* Services */,
+				G20033 /* Views */,
 			);
 			path = Diagnostics;
 			sourceTree = "<group>";
@@ -318,15 +374,57 @@
 		G20031 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				B20013 /* CompatibilityReport.swift */,
 				B20005 /* PlayerIssue.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		G20032 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B20014 /* DiagnosticsService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G20033 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B20015 /* DiagnosticsView.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 		G20040 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
 				B20004 /* PlayerViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		G20050 /* Search */ = {
+			isa = PBXGroup;
+			children = (
+				G20051 /* Services */,
+				G20052 /* ViewModels */,
+			);
+			path = Search;
+			sourceTree = "<group>";
+		};
+		G20051 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B20006 /* SearchService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G20052 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				B20007 /* SearchViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -623,6 +721,20 @@
 				A10043 /* MacInputProvider.swift in Sources */,
 				A10044 /* IOSFilePickerService.swift in Sources */,
 				A10045 /* IOSInputProvider.swift in Sources */,
+				A20006 /* SearchService.swift in Sources */,
+				A20007 /* SearchViewModel.swift in Sources */,
+				A20008 /* SWFMetadata.swift in Sources */,
+				A20009 /* ThumbnailService.swift in Sources */,
+				A20010 /* PlayerMode.swift in Sources */,
+				A20011 /* PlayerInputCoordinator.swift in Sources */,
+				A20012 /* PlayerModeMenu.swift in Sources */,
+				A20013 /* CompatibilityReport.swift in Sources */,
+				A20014 /* DiagnosticsService.swift in Sources */,
+				A20015 /* DiagnosticsView.swift in Sources */,
+				A20016 /* LibraryCollection.swift in Sources */,
+				A20017 /* CollectionService.swift in Sources */,
+				A20018 /* LibraryItemDetailsView.swift in Sources */,
+				A20019 /* SidebarCollectionsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

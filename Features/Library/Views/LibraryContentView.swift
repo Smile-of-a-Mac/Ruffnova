@@ -3,6 +3,8 @@ import SwiftUI
 struct LibraryContentView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @ObservedObject private var libraryService = LibraryService.shared
+    @ObservedObject private var collectionService = CollectionService.shared
     @Binding var isDropTargeted: Bool
     @State private var sortOrder = LibrarySortOrder.lastOpened
     @State private var filter = LibraryFilter.all
@@ -30,12 +32,19 @@ struct LibraryContentView: View {
 
     private var libraryView: some View {
         Group {
-            if appState.libraryItems.isEmpty {
+            if let collectionID = appState.selectedCollectionID {
+                LibraryGridView(
+                    sortOrder: $sortOrder,
+                    filter: $filter,
+                    collectionID: collectionID
+                )
+            } else if libraryService.items.isEmpty {
                 EmptyStateView(isDropTargeted: $isDropTargeted)
             } else {
                 LibraryGridView(
                     sortOrder: $sortOrder,
-                    filter: $filter
+                    filter: $filter,
+                    collectionID: nil
                 )
             }
         }
@@ -43,8 +52,8 @@ struct LibraryContentView: View {
 
     private var recentView: some View {
         Group {
-            if appState.libraryItems.isEmpty {
-                emptySection("clock", "library.noRecent", "library.noRecent.subtitle")
+            if libraryService.items.isEmpty {
+                LibrarySectionEmptyState(icon: "clock", titleKey: "library.noRecent", subtitleKey: "library.noRecent.subtitle")
             } else {
                 RecentListView()
             }
@@ -53,15 +62,29 @@ struct LibraryContentView: View {
 
     private var favoritesView: some View {
         Group {
-            if appState.libraryItems.filter({ $0.isFavorite }).isEmpty {
-                emptySection("star", "library.noFavorites", "library.noFavorites.subtitle")
+            if libraryService.items.filter({ $0.isFavorite }).isEmpty {
+                LibrarySectionEmptyState(icon: "star", titleKey: "library.noFavorites", subtitleKey: "library.noFavorites.subtitle")
             } else {
                 FavoritesGridView()
             }
         }
     }
+}
 
-    private func emptySection(_ icon: String, _ titleKey: String, _ subtitleKey: String) -> some View {
+struct LibrarySectionEmptyState: View {
+    @EnvironmentObject var locManager: LocalizationManager
+    let icon: String
+    let titleKey: String
+    let subtitleKey: String
+
+    var body: some View {
+        #if os(iOS)
+        ContentUnavailableView(
+            locManager.localized(titleKey),
+            systemImage: icon,
+            description: Text(locManager.localized(subtitleKey))
+        )
+        #else
         VStack(spacing: NativeSpacing.xxl) {
             Spacer()
             Image(systemName: icon)
@@ -78,19 +101,28 @@ struct LibraryContentView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #endif
     }
 }
 
 struct LibraryGridView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @ObservedObject private var libraryService = LibraryService.shared
+    @ObservedObject private var collectionService = CollectionService.shared
     @Binding var sortOrder: LibrarySortOrder
     @Binding var filter: LibraryFilter
+    var collectionID: UUID?
 
     private var displayedItems: [LibraryItem] {
-        let filtered = LibraryService.shared.filtered(by: filter)
-        return LibraryService.shared.sorted(by: sortOrder)
-            .filter { filter == .all || filtered.contains($0) }
+        if let collectionID {
+            return collectionService.items(in: collectionID, from: libraryService.items)
+        }
+        return libraryService.items(matching: filter, sortedBy: sortOrder)
+    }
+
+    private var selectedCollection: LibraryCollection? {
+        collectionService.collection(with: collectionID)
     }
 
     private var columns: [GridItem] {
@@ -110,29 +142,51 @@ struct LibraryGridView: View {
     }
 
     var body: some View {
+        content
+        #if os(iOS)
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    sortMenu
+                    filterMenu
+                }
+            }
+        #endif
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: NativeSpacing.md) {
-                Text(String(format: locManager.localized("library.fileCount"), displayedItems.count))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: NativeSpacing.xs) {
+                    if let selectedCollection {
+                        Text(selectedCollection.name)
+                            .font(.headline)
+                    }
+                    Text(String(format: locManager.localized("library.fileCount"), displayedItems.count))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
 
                 Spacer()
 
-                Picker(locManager.localized("library.sort"), selection: $sortOrder) {
-                    ForEach(LibrarySortOrder.allCases, id: \.self) { order in
-                        Text(locManager.localized(order.localizedKey)).tag(order)
+                if collectionID == nil {
+                    #if !os(iOS)
+                    Picker(locManager.localized("library.sort"), selection: $sortOrder) {
+                        ForEach(LibrarySortOrder.allCases, id: \.self) { order in
+                            Text(locManager.localized(order.localizedKey)).tag(order)
+                        }
                     }
-                }
-                .pickerStyle(.menu)
-                .controlSize(.small)
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
 
-                Picker(locManager.localized("library.filter"), selection: $filter) {
-                    ForEach(LibraryFilter.allCases, id: \.self) { f in
-                        Text(locManager.localized(f.localizedKey)).tag(f)
+                    Picker(locManager.localized("library.filter"), selection: $filter) {
+                        ForEach(LibraryFilter.allCases, id: \.self) { f in
+                            Text(locManager.localized(f.localizedKey)).tag(f)
+                        }
                     }
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    #endif
                 }
-                .pickerStyle(.menu)
-                .controlSize(.small)
             }
             .padding(.horizontal, gridHorizontalPadding)
             .padding(.top, NativeSpacing.section)
@@ -144,7 +198,7 @@ struct LibraryGridView: View {
                     Image(systemName: "tray")
                         .font(.system(size: 36, weight: .light))
                         .foregroundStyle(.quaternary)
-                    Text(locManager.localized("library.noFilterResults"))
+                    Text(locManager.localized(collectionID == nil ? "library.noFilterResults" : "library.emptyCollection"))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -164,4 +218,32 @@ struct LibraryGridView: View {
             }
         }
     }
+
+    #if os(iOS)
+    private var sortMenu: some View {
+        Menu {
+            Picker(locManager.localized("library.sort"), selection: $sortOrder) {
+                ForEach(LibrarySortOrder.allCases, id: \.self) { order in
+                    Text(locManager.localized(order.localizedKey)).tag(order)
+                }
+            }
+        } label: {
+            Label(locManager.localized("library.sort"), systemImage: "arrow.up.arrow.down")
+        }
+        .accessibilityLabel(locManager.localized("library.sort"))
+    }
+
+    private var filterMenu: some View {
+        Menu {
+            Picker(locManager.localized("library.filter"), selection: $filter) {
+                ForEach(LibraryFilter.allCases, id: \.self) { f in
+                    Text(locManager.localized(f.localizedKey)).tag(f)
+                }
+            }
+        } label: {
+            Label(locManager.localized("library.filter"), systemImage: "line.3.horizontal.decrease.circle")
+        }
+        .accessibilityLabel(locManager.localized("library.filter"))
+    }
+    #endif
 }

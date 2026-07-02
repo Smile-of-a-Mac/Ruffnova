@@ -236,18 +236,22 @@ final class RuffleBridge {
         #endif
     }
 
-    func loadURL(_ url: URL) {
+    @discardableResult
+    func loadURL(_ url: URL) -> Bool {
         #if RUST_FFI_AVAILABLE
-        guard recreatePlayer() else { return }
-        guard let player = playerPointer else { return }
+        guard recreatePlayer() else { return false }
+        guard let player = playerPointer else { return false }
         let result = url.absoluteString.withCString { ruffle_player_load_url(player, $0) }
         if result != RUFFLE_RESULT_OK {
             Logger.ruffle.error("loadURL failed: \(result) \(url.absoluteString)")
+            return false
         } else {
             Logger.ruffle.debug("loadURL ok url=\(url.absoluteString)")
+            return true
         }
         #else
-        print("[Mock] Load: \(url.lastPathComponent)")
+        Logger.ruffle.debug("mock loadURL url=\(url.absoluteString)")
+        return true
         #endif
     }
 

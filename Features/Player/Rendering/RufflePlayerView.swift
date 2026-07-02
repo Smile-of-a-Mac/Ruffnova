@@ -84,6 +84,7 @@ final class RuffleMetalViewMacOS: MTKView {
     var appState: AppState?
     private var bridgeInitialized = false
     private var trackingArea: NSTrackingArea?
+    private var focusObserver: NSObjectProtocol?
 
     var metalLayer: CAMetalLayer? { layer as? CAMetalLayer }
 
@@ -101,6 +102,20 @@ final class RuffleMetalViewMacOS: MTKView {
         RuffleMetalConfig.configure(self)
         layer?.contentsScale = NSScreen.main?.backingScaleFactor ?? 2.0
         wantsLayer = true
+        focusObserver = NotificationCenter.default.addObserver(
+            forName: .focusPlayerStage,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.window?.makeFirstResponder(self)
+        }
+    }
+
+    deinit {
+        if let focusObserver {
+            NotificationCenter.default.removeObserver(focusObserver)
+        }
     }
 
     func tryInitializeBridge() {
@@ -141,9 +156,11 @@ final class RuffleMetalViewMacOS: MTKView {
 
     func updateViewport() {
         guard let window = window else { return }
+        guard !window.isMiniaturized, bounds.width >= 16, bounds.height >= 16 else { return }
         let scaleFactor = Float(window.backingScaleFactor)
         let width = UInt32(bounds.width * CGFloat(scaleFactor))
         let height = UInt32(bounds.height * CGFloat(scaleFactor))
+        guard width >= 16, height >= 16 else { return }
         NotificationCenter.default.post(
             name: .viewportChanged, object: nil,
             userInfo: ["width": width, "height": height, "scaleFactor": scaleFactor]
@@ -153,6 +170,7 @@ final class RuffleMetalViewMacOS: MTKView {
     // MARK: Mouse Events
 
     override func mouseMoved(with event: NSEvent) {
+        appState?.handlePlayerPointerActivity()
         let (x, y) = mouseCoords(event)
         onMouseEvent?(RuffleMetalMouseEvent(x: x, y: y, type: 0, scrollDelta: 0))
     }
@@ -161,6 +179,9 @@ final class RuffleMetalViewMacOS: MTKView {
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
+        if event.clickCount >= 2 {
+            appState?.handleStageDoubleClick()
+        }
         let (x, y) = mouseCoords(event)
         onMouseEvent?(RuffleMetalMouseEvent(x: x, y: y, type: 1, scrollDelta: 0))
     }
@@ -318,6 +339,7 @@ final class RuffleMetalViewIOS: MTKView {
     var onReady: ((CAMetalLayer, UInt32, UInt32, Float) -> Void)?
     var appState: AppState?
     private var bridgeInitialized = false
+    private var focusObserver: NSObjectProtocol?
 
     var metalLayer: CAMetalLayer? { layer as? CAMetalLayer }
 
@@ -353,6 +375,19 @@ final class RuffleMetalViewIOS: MTKView {
         addGestureRecognizer(pan)
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         addGestureRecognizer(pinch)
+        focusObserver = NotificationCenter.default.addObserver(
+            forName: .focusPlayerStage,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.becomeFirstResponder()
+        }
+    }
+
+    deinit {
+        if let focusObserver {
+            NotificationCenter.default.removeObserver(focusObserver)
+        }
     }
 
     func tryInitializeBridge() {
@@ -390,12 +425,15 @@ final class RuffleMetalViewIOS: MTKView {
     }
 
     @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
+        becomeFirstResponder()
+        appState?.handlePlayerPointerActivity()
         let p = scaledLocation(from: gesture)
         onMouseEvent?(RuffleMetalMouseEvent(x: Float(p.x), y: Float(p.y), type: 1, scrollDelta: 0))
         onMouseEvent?(RuffleMetalMouseEvent(x: Float(p.x), y: Float(p.y), type: 2, scrollDelta: 0))
     }
 
     @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+        appState?.handleStageDoubleClick()
         handleTap(gesture)
         let p = scaledLocation(from: gesture)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
@@ -411,6 +449,7 @@ final class RuffleMetalViewIOS: MTKView {
     }
 
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        appState?.handlePlayerPointerActivity()
         let p = scaledLocation(from: gesture)
         switch gesture.state {
         case .began, .changed:

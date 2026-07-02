@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct AppToolbar: ToolbarContent {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    let refreshToken: Int
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
@@ -11,6 +12,7 @@ struct AppToolbar: ToolbarContent {
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
             sidebarButton
+                .id(refreshToken)
         }
 
         ToolbarItemGroup(placement: .primaryAction) {

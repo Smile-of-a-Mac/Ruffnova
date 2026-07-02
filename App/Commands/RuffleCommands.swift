@@ -123,10 +123,33 @@ struct RuffleCommands: Commands {
             }
             .keyboardShortcut("f", modifiers: [.control, .command])
             .disabled(appState.currentFileURL == nil)
+
+            Divider()
+
+            Button(loc.localized("menu.playerMode.normal")) {
+                appState.setPlayerMode(.normal)
+            }
+            .disabled(appState.currentFileURL == nil)
+
+            Button(loc.localized("menu.playerMode.cinema")) {
+                appState.setPlayerMode(.cinema)
+            }
+            .disabled(appState.currentFileURL == nil)
+
+            Button(loc.localized("menu.playerMode.game")) {
+                appState.setPlayerMode(.game)
+            }
+            .keyboardShortcut("g", modifiers: [.command, .shift])
+            .disabled(appState.currentFileURL == nil)
         }
 
         // MARK: - View Menu
         CommandGroup(before: .toolbar) {
+            Button(loc.localized("search.placeholder")) {
+                NotificationCenter.default.post(name: .focusSearch, object: nil)
+            }
+            .keyboardShortcut("f", modifiers: .command)
+
             Menu(loc.localized("menu.quality")) {
                 qualityButton(loc.localized("menu.quality.low"), .low)
                 qualityButton(loc.localized("menu.quality.medium"), .medium)

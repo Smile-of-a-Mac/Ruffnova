@@ -4,9 +4,13 @@ import UniformTypeIdentifiers
 struct LibraryFileCell: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @ObservedObject private var libraryService = LibraryService.shared
+    @ObservedObject private var collectionService = CollectionService.shared
+    private let thumbnailService = ThumbnailService.shared
     let file: LibraryItem
 
     @State private var isHovered = false
+    @State private var showingDetails = false
 
     var body: some View {
         Button { appState.openFile(file.url) } label: {
@@ -34,7 +38,7 @@ struct LibraryFileCell: View {
                     locateFile()
                 }
                 Button(locManager.localized("library.remove")) {
-                    LibraryService.shared.remove(file.id)
+                    libraryService.remove(file.id)
                 }
                 Divider()
             } else {
@@ -56,11 +60,33 @@ struct LibraryFileCell: View {
                     appState.toggleFavorite(for: file.url)
                 }
             }
+            if !collectionService.collections.isEmpty {
+                Menu(locManager.localized("collection.add")) {
+                    ForEach(collectionService.collections) { collection in
+                        Button(collectionMenuTitle(collection)) {
+                            collectionService.toggle(file.id, in: collection.id)
+                        }
+                    }
+                }
+            }
+            Button(locManager.localized("library.details.edit")) {
+                showingDetails = true
+            }
             Divider()
             Button(locManager.localized("library.remove")) {
-                LibraryService.shared.remove(file.id)
+                libraryService.remove(file.id)
             }
         }
+        .sheet(isPresented: $showingDetails) {
+            LibraryItemDetailsView(itemID: file.id)
+                .environmentObject(appState)
+                .environmentObject(locManager)
+        }
+    }
+
+    private func collectionMenuTitle(_ collection: LibraryCollection) -> String {
+        let marker = collectionService.contains(file.id, in: collection.id) ? "[x] " : ""
+        return marker + collection.name
     }
 
     private func locateFile() {
@@ -70,7 +96,7 @@ struct LibraryFileCell: View {
         panel.allowsMultipleSelection = false
         panel.message = locManager.localized("library.locateFile.message")
         if panel.runModal() == .OK, let url = panel.url {
-            LibraryService.shared.locateFile(for: file.id, newURL: url)
+            libraryService.locateFile(for: file.id, newURL: url)
         }
         #endif
     }
@@ -79,7 +105,7 @@ struct LibraryFileCell: View {
         ZStack {
             if file.availabilityStatus == .missing {
                 missingThumbnail
-            } else if let data = file.thumbnailData, let cgImage = thumbnailCGImage(from: data) {
+            } else if let data = thumbnailData, let cgImage = thumbnailCGImage(from: data) {
                 Image(decorative: cgImage, scale: 1.0)
                     .resizable()
                     .aspectRatio(4 / 3, contentMode: .fill)
@@ -120,6 +146,10 @@ struct LibraryFileCell: View {
                     .font(.system(size: 30, weight: .light))
                     .foregroundStyle(.tertiary)
             }
+    }
+
+    private var thumbnailData: Data? {
+        thumbnailService.data(for: file.thumbnailIdentifier) ?? file.thumbnailData
     }
 
     private func thumbnailCGImage(from data: Data) -> CGImage? {
@@ -163,7 +193,36 @@ struct LibraryFileCell: View {
                 }
             }
             .lineLimit(1)
+
+            if let metadataText {
+                Text(metadataText)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+
+            if !file.tags.isEmpty {
+                Text(file.tags.prefix(3).joined(separator: ", "))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var metadataText: String? {
+        guard let metadata = file.metadata else { return nil }
+        var parts: [String] = []
+        if metadata.hasStageSize {
+            parts.append("\(metadata.stageWidth) \u{00d7} \(metadata.stageHeight)")
+        }
+        if metadata.hasFrameRate {
+            parts.append(String(format: locManager.localized("metadata.fps"), metadata.frameRate))
+        }
+        if metadata.hasTotalFrames {
+            parts.append(String(format: locManager.localized("metadata.frames"), Int64(metadata.totalFrames)))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " \u{00B7} ")
     }
 }

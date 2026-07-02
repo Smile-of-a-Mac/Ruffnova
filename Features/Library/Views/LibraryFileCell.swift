@@ -1,9 +1,10 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct LibraryFileCell: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
-    let file: RecentFile
+    let file: LibraryItem
 
     @State private var isHovered = false
 
@@ -28,23 +29,57 @@ struct LibraryFileCell: View {
         .accessibilityLabel(file.name)
         .accessibilityValue(file.lastOpened.formatted())
         .contextMenu {
-            Button(locManager.localized("menu.open")) { appState.openFile(file.url) }
-            #if os(macOS)
-            Divider()
-            Button(locManager.localized("menu.showInFinder")) {
-                NSWorkspace.shared.activateFileViewerSelecting([file.url])
+            if file.availabilityStatus == .missing {
+                Button(locManager.localized("library.locateFile")) {
+                    locateFile()
+                }
+                Button(locManager.localized("library.remove")) {
+                    LibraryService.shared.remove(file.id)
+                }
+                Divider()
+            } else {
+                Button(locManager.localized("menu.open")) { appState.openFile(file.url) }
+                #if os(macOS)
+                Divider()
+                Button(locManager.localized("menu.showInFinder")) {
+                    NSWorkspace.shared.activateFileViewerSelecting([file.url])
+                }
+                #endif
             }
-            #endif
             Divider()
-            Button(locManager.localized("library.removeFromRecent")) {
-                appState.removeFromRecentlyOpened(file)
+            if file.isFavorite {
+                Button(locManager.localized("favorites.remove")) {
+                    appState.toggleFavorite(for: file.url)
+                }
+            } else {
+                Button(locManager.localized("favorites.add")) {
+                    appState.toggleFavorite(for: file.url)
+                }
+            }
+            Divider()
+            Button(locManager.localized("library.remove")) {
+                LibraryService.shared.remove(file.id)
             }
         }
     }
 
+    private func locateFile() {
+        #if os(macOS)
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "swf")].compactMap { $0 }
+        panel.allowsMultipleSelection = false
+        panel.message = locManager.localized("library.locateFile.message")
+        if panel.runModal() == .OK, let url = panel.url {
+            LibraryService.shared.locateFile(for: file.id, newURL: url)
+        }
+        #endif
+    }
+
     private var thumbnailPreview: some View {
         ZStack {
-            if let data = file.thumbnailData, let cgImage = thumbnailCGImage(from: data) {
+            if file.availabilityStatus == .missing {
+                missingThumbnail
+            } else if let data = file.thumbnailData, let cgImage = thumbnailCGImage(from: data) {
                 Image(decorative: cgImage, scale: 1.0)
                     .resizable()
                     .aspectRatio(4 / 3, contentMode: .fill)
@@ -52,42 +87,66 @@ struct LibraryFileCell: View {
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous))
             } else {
-                RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
-                    .fill(GlassMaterial.light)
-                    .aspectRatio(4 / 3, contentMode: .fit)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
-                            .strokeBorder(.quaternary.opacity(0.55), lineWidth: 0.5)
-                    }
-                    .shadow(color: .black.opacity(0.08), radius: 14, x: 0, y: 8)
-
-                Image(systemName: "play.rectangle")
-                    .font(.system(size: 30, weight: .light))
-                    .foregroundStyle(.tertiary)
+                placeholderThumbnail
             }
         }
         .aspectRatio(4 / 3, contentMode: .fit)
     }
 
+    private var missingThumbnail: some View {
+        RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
+            .fill(GlassMaterial.heavy)
+            .aspectRatio(4 / 3, contentMode: .fit)
+            .overlay {
+                RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
+                    .strokeBorder(.red.opacity(0.3), lineWidth: 0.5)
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 24, weight: .light))
+                    .foregroundStyle(.tertiary)
+            }
+    }
+
+    private var placeholderThumbnail: some View {
+        RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
+            .fill(GlassMaterial.light)
+            .aspectRatio(4 / 3, contentMode: .fit)
+            .overlay {
+                RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
+                    .strokeBorder(.quaternary.opacity(0.55), lineWidth: 0.5)
+            }
+            .shadow(color: .black.opacity(0.08), radius: 14, x: 0, y: 8)
+            .overlay {
+                Image(systemName: "play.rectangle")
+                    .font(.system(size: 30, weight: .light))
+                    .foregroundStyle(.tertiary)
+            }
+    }
+
     private func thumbnailCGImage(from data: Data) -> CGImage? {
-        #if os(macOS)
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
         return cgImage
-        #else
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
-        return cgImage
-        #endif
     }
 
     private var fileInfo: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(file.name)
-                .font(.callout)
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.middle)
+            HStack(spacing: NativeSpacing.xs) {
+                Text(file.name)
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if file.isFavorite {
+                    Image(systemName: "star.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.tint)
+                }
+                if file.availabilityStatus == .missing {
+                    Text(locManager.localized("library.missing"))
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                }
+            }
 
             HStack(spacing: NativeSpacing.xs) {
                 Text(file.lastOpened, style: .relative)

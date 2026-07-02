@@ -36,7 +36,7 @@ struct EmptyStateView: View {
             }
             .padding(.bottom, NativeSpacing.section)
 
-            if !appState.recentFiles.isEmpty {
+            if !LibraryService.shared.items.isEmpty {
                 recentFilesSection
                     .padding(.bottom, NativeSpacing.section)
             }
@@ -125,34 +125,40 @@ struct EmptyStateView: View {
 
     // MARK: - Recent Files
 
+    @ViewBuilder
     private var recentFilesSection: some View {
-        VStack(alignment: .leading, spacing: NativeSpacing.md) {
-            HStack(spacing: NativeSpacing.sm) {
-                Image(systemName: "clock")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                Text(locManager.localized("workspace.recent"))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-            }
-            .padding(.leading, NativeSpacing.xs)
-
-            ScrollView(.horizontal, showsIndicators: false) {
+        let recentLibraryItems = LibraryService.shared.sorted(by: .lastOpened)
+            .filter { $0.availabilityStatus == .available }
+            .prefix(6)
+        if !recentLibraryItems.isEmpty {
+            VStack(alignment: .leading, spacing: NativeSpacing.md) {
                 HStack(spacing: NativeSpacing.sm) {
-                    ForEach(Array(appState.recentFiles.prefix(6))) { file in
-                        recentFileItem(file)
+                    Image(systemName: "clock")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Text(locManager.localized("workspace.recent"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                }
+                .padding(.leading, NativeSpacing.xs)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: NativeSpacing.sm) {
+                        ForEach(Array(recentLibraryItems)) { item in
+                            recentFileItem(item)
+                        }
                     }
                 }
             }
+            .frame(maxWidth: 560)
+            .scaleEffect(appeared ? 1.0 : 0.95)
+            .opacity(appeared ? 1 : 0)
         }
-        .frame(maxWidth: 560)
-        .scaleEffect(appeared ? 1.0 : 0.95)
-        .opacity(appeared ? 1 : 0)
     }
 
-    private func recentFileItem(_ file: RecentFile) -> some View {
-        Button { appState.openFile(file.url) } label: {
+    private func recentFileItem(_ item: LibraryItem) -> some View {
+        Button { appState.openFile(item.url) } label: {
             VStack(alignment: .leading, spacing: NativeSpacing.sm) {
                 ZStack {
                     RoundedRectangle(cornerRadius: NativeRadius.lg, style: .continuous)
@@ -170,7 +176,7 @@ struct EmptyStateView: View {
                         .foregroundStyle(.quaternary)
                 }
 
-                Text(file.name)
+                Text(item.name)
                     .font(.caption)
                     .foregroundStyle(.primary)
                     .lineLimit(1)

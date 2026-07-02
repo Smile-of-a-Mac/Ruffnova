@@ -3,7 +3,7 @@ import SwiftUI
 struct RecentFileRow: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
-    let file: RecentFile
+    let file: LibraryItem
 
     var body: some View {
         Button { appState.openFile(file.url) } label: {
@@ -22,6 +22,11 @@ struct RecentFileRow: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                if file.isFavorite {
+                    Image(systemName: "star.fill")
+                        .font(.caption)
+                        .foregroundStyle(.tint)
+                }
             }
             .padding(.vertical, NativeSpacing.sm)
             .padding(.horizontal, NativeSpacing.md)
@@ -31,7 +36,7 @@ struct RecentFileRow: View {
         .accessibilityLabel(file.name)
         .contextMenu {
             Button(locManager.localized("library.removeFromRecent")) {
-                appState.removeFromRecentlyOpened(file)
+                LibraryService.shared.remove(file.id)
             }
         }
     }

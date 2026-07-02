@@ -86,8 +86,9 @@ struct AppSidebar: View {
 
                 Spacer()
 
-                if section == .recent && !appState.recentFiles.isEmpty {
-                    Text("\(appState.recentFiles.count)")
+                if section == .recent {
+                    let count = LibraryService.shared.sorted(by: .lastOpened).prefix(20).count
+                    Text("\(count)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, NativeSpacing.sm)

@@ -48,6 +48,11 @@
 		A10043 /* MacInputProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10046 /* MacInputProvider.swift */; };
 		A10044 /* IOSFilePickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10047 /* IOSFilePickerService.swift */; };
 		A10045 /* IOSInputProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10048 /* IOSInputProvider.swift */; };
+		A20001 /* LibraryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* LibraryItem.swift */; };
+		A20002 /* LibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002 /* LibraryService.swift */; };
+		A20003 /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20003 /* ImportService.swift */; };
+		A20004 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20004 /* PlayerViewModel.swift */; };
+		A20005 /* PlayerIssue.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20005 /* PlayerIssue.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -97,6 +102,11 @@
 		B10047 /* IOSFilePickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSFilePickerService.swift; sourceTree = "<group>"; };
 		B10048 /* IOSInputProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSInputProvider.swift; sourceTree = "<group>"; };
 		B10049 /* Info-iOS.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-iOS.plist"; sourceTree = "<group>"; };
+		B20001 /* LibraryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryItem.swift; sourceTree = "<group>"; };
+		B20002 /* LibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryService.swift; sourceTree = "<group>"; };
+		B20003 /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
+		B20004 /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
+		B20005 /* PlayerIssue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerIssue.swift; sourceTree = "<group>"; };
 		C10099 /* Ruffnova.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ruffnova.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -195,6 +205,8 @@
 		G10200 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				G20030 /* Diagnostics */,
+				G20020 /* Import */,
 				G10210 /* Library */,
 				G10220 /* Player */,
 				G10230 /* Settings */,
@@ -205,6 +217,8 @@
 		G10210 /* Library */ = {
 			isa = PBXGroup;
 			children = (
+				G20010 /* Models */,
+				G20011 /* Services */,
 				G10211 /* Views */,
 			);
 			path = Library;
@@ -229,6 +243,7 @@
 			children = (
 				G10221 /* Controls */,
 				G10222 /* Rendering */,
+				G20040 /* ViewModels */,
 				G10223 /* Views */,
 			);
 			path = Player;
@@ -258,6 +273,62 @@
 				B10020 /* TraceConsoleView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		G20010 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B20001 /* LibraryItem.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G20011 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B20002 /* LibraryService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G20020 /* Import */ = {
+			isa = PBXGroup;
+			children = (
+				G20021 /* Services */,
+			);
+			path = Import;
+			sourceTree = "<group>";
+		};
+		G20021 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B20003 /* ImportService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G20030 /* Diagnostics */ = {
+			isa = PBXGroup;
+			children = (
+				G20031 /* Models */,
+			);
+			path = Diagnostics;
+			sourceTree = "<group>";
+		};
+		G20031 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B20005 /* PlayerIssue.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G20040 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				B20004 /* PlayerViewModel.swift */,
+			);
+			path = ViewModels;
 			sourceTree = "<group>";
 		};
 		G10230 /* Settings */ = {
@@ -521,13 +592,18 @@
 				A10011 /* FavoritesGridView.swift in Sources */,
 				A10012 /* LibraryContentView.swift in Sources */,
 				A10013 /* LibraryFileCell.swift in Sources */,
+				A20001 /* LibraryItem.swift in Sources */,
+				A20002 /* LibraryService.swift in Sources */,
 				A10014 /* RecentFileRow.swift in Sources */,
 				A10015 /* RecentListView.swift in Sources */,
+				A20003 /* ImportService.swift in Sources */,
 				A10016 /* PlayerControlBar.swift in Sources */,
 				A10017 /* RufflePlayerView.swift in Sources */,
+				A20004 /* PlayerViewModel.swift in Sources */,
 				A10018 /* DebugOverlayView.swift in Sources */,
 				A10019 /* SWFInfoPanel.swift in Sources */,
 				A10020 /* TraceConsoleView.swift in Sources */,
+				A20005 /* PlayerIssue.swift in Sources */,
 				A10021 /* SettingsPersistence.swift in Sources */,
 				A10022 /* SettingsView.swift in Sources */,
 				A10023 /* RuffleBridge.swift in Sources */,

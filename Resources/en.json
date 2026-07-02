@@ -267,5 +267,26 @@
     "debug.render.placeholder": "Tick: --ms  Render: --ms",
     "debug.overlay.label": "Debug overlay",
 
-    "statusbar.appName": "Ruffle"
+    "statusbar.appName": "Ruffle",
+
+    "library.sort": "Sort",
+    "library.filter": "Filter",
+    "library.missing": "Missing",
+    "library.locateFile": "Locate File",
+    "library.locateFile.message": "Locate the SWF file",
+    "library.remove": "Remove from Library",
+    "library.noFilterResults": "No files match the current filter.",
+
+    "sort.name": "Name",
+    "sort.lastOpened": "Last Opened",
+    "sort.dateAdded": "Date Added",
+    "sort.fileSize": "File Size",
+
+    "filter.all": "All",
+    "filter.favorites": "Favorites",
+    "filter.recent": "Recent",
+    "filter.missing": "Missing Files",
+    "filter.compatibilityIssues": "Compatibility Issues",
+    "filter.animation": "Animation",
+    "filter.interactive": "Interactive"
 }

@@ -115,19 +115,19 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: NativeSpacing.sm) {
                 Text(locManager.localized("search.results"))
                     .font(.largeTitle)
-                Text(String(format: locManager.localized("search.results.count"), appState.searchResults.count))
+                Text(String(format: locManager.localized("search.results.count"), appState.librarySearchResults.count))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, NativeSpacing.section)
             .padding(.top, NativeSpacing.section)
 
-            if appState.searchResults.isEmpty {
+            if appState.librarySearchResults.isEmpty {
                 emptySearchState
             } else {
                 ScrollView {
                     LazyVStack(spacing: NativeSpacing.sm) {
-                        ForEach(appState.searchResults) { file in
+                        ForEach(appState.librarySearchResults) { file in
                             RecentFileRow(file: file)
                         }
                     }

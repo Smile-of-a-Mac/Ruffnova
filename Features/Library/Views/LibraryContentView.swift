@@ -1,13 +1,11 @@
-// LibraryContentView — Content browser.
-// Content floats above window glass.
-// Uses native typography and materials for hierarchy.
-
 import SwiftUI
 
 struct LibraryContentView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
     @Binding var isDropTargeted: Bool
+    @State private var sortOrder = LibrarySortOrder.lastOpened
+    @State private var filter = LibraryFilter.all
 
     var body: some View {
         switch appState.selectedSection {
@@ -30,23 +28,22 @@ struct LibraryContentView: View {
         }
     }
 
-    // MARK: - Library View
-
     private var libraryView: some View {
         Group {
-            if appState.recentFiles.isEmpty {
+            if appState.libraryItems.isEmpty {
                 EmptyStateView(isDropTargeted: $isDropTargeted)
             } else {
-                LibraryGridView()
+                LibraryGridView(
+                    sortOrder: $sortOrder,
+                    filter: $filter
+                )
             }
         }
     }
 
-    // MARK: - Recent View
-
     private var recentView: some View {
         Group {
-            if appState.recentFiles.isEmpty {
+            if appState.libraryItems.isEmpty {
                 emptySection("clock", "library.noRecent", "library.noRecent.subtitle")
             } else {
                 RecentListView()
@@ -54,19 +51,15 @@ struct LibraryContentView: View {
         }
     }
 
-    // MARK: - Favorites View
-
     private var favoritesView: some View {
         Group {
-            if appState.bookmarks.isEmpty {
+            if appState.libraryItems.filter({ $0.isFavorite }).isEmpty {
                 emptySection("star", "library.noFavorites", "library.noFavorites.subtitle")
             } else {
                 FavoritesGridView()
             }
         }
     }
-
-    // MARK: - Empty Section
 
     private func emptySection(_ icon: String, _ titleKey: String, _ subtitleKey: String) -> some View {
         VStack(spacing: NativeSpacing.xxl) {
@@ -88,11 +81,17 @@ struct LibraryContentView: View {
     }
 }
 
-// MARK: - Library Grid View
-
 struct LibraryGridView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @Binding var sortOrder: LibrarySortOrder
+    @Binding var filter: LibraryFilter
+
+    private var displayedItems: [LibraryItem] {
+        let filtered = LibraryService.shared.filtered(by: filter)
+        return LibraryService.shared.sorted(by: sortOrder)
+            .filter { filter == .all || filtered.contains($0) }
+    }
 
     private var columns: [GridItem] {
         #if os(iOS)
@@ -111,30 +110,58 @@ struct LibraryGridView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
-                Text(String(format: locManager.localized("library.fileCount"), appState.recentFiles.count))
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: NativeSpacing.md) {
+                Text(String(format: locManager.localized("library.fileCount"), displayedItems.count))
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, NativeSpacing.section)
-                    .padding(.top, NativeSpacing.section)
 
-                LazyVGrid(columns: columns, spacing: NativeSpacing.xl) {
-                    ForEach(appState.recentFiles) { file in
-                        LibraryFileCell(file: file)
+                Spacer()
+
+                Picker(locManager.localized("library.sort"), selection: $sortOrder) {
+                    ForEach(LibrarySortOrder.allCases, id: \.self) { order in
+                        Text(locManager.localized(order.localizedKey)).tag(order)
                     }
                 }
-                .padding(.horizontal, gridHorizontalPadding)
-                .padding(.bottom, NativeSpacing.section)
+                .pickerStyle(.menu)
+                .controlSize(.small)
+
+                Picker(locManager.localized("library.filter"), selection: $filter) {
+                    ForEach(LibraryFilter.allCases, id: \.self) { f in
+                        Text(locManager.localized(f.localizedKey)).tag(f)
+                    }
+                }
+                .pickerStyle(.menu)
+                .controlSize(.small)
+            }
+            .padding(.horizontal, gridHorizontalPadding)
+            .padding(.top, NativeSpacing.section)
+            .padding(.bottom, NativeSpacing.md)
+
+            if displayedItems.isEmpty {
+                VStack(spacing: NativeSpacing.md) {
+                    Spacer()
+                    Image(systemName: "tray")
+                        .font(.system(size: 36, weight: .light))
+                        .foregroundStyle(.quaternary)
+                    Text(locManager.localized("library.noFilterResults"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: NativeSpacing.xl) {
+                        ForEach(displayedItems) { item in
+                            LibraryFileCell(file: item)
+                        }
+                    }
+                    .padding(.horizontal, gridHorizontalPadding)
+                    .padding(.bottom, NativeSpacing.section)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-}
-
-#Preview("Library") {
-    LibraryContentView(isDropTargeted: .constant(false))
-        .environmentObject(AppState())
-        .environmentObject(LocalizationManager.shared)
-        .frame(width: 600, height: 500)
 }

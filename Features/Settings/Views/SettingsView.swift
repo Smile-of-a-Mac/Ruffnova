@@ -391,9 +391,11 @@ struct SettingsView: View {
         #endif
     }
 
+    #if os(iOS)
     private var isIPad: Bool {
         UIDevice.current.userInterfaceIdiom == .pad
     }
+    #endif
 }
 
 #if os(iOS)

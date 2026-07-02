@@ -90,6 +90,15 @@ final class AppState: ObservableObject {
         return recentFiles.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
 
+    var librarySearchResults: [LibraryItem] {
+        guard !searchText.isEmpty else { return [] }
+        return LibraryService.shared.items.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText) ||
+            $0.tags.contains { $0.localizedCaseInsensitiveContains(searchText) } ||
+            $0.notes.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
     @Published var librarySize: String = "--"
     @Published var swfCount: Int = 0
 
@@ -152,11 +161,17 @@ final class AppState: ObservableObject {
     private var playerSurfaceVisible = false
     #endif
 
+    var libraryItems: [LibraryItem] {
+        LibraryService.shared.items
+    }
+
     init() {
         setupNotifications()
         setupFullscreenObserver()
         restoreSettings()
         setupPersistence()
+        LibraryService.shared.migrateIfNeeded()
+        LibraryService.shared.resolveBookmarks()
         recentFiles = LibraryPersistence.shared.loadRecentFiles()
         bookmarks = bookmarkManager.bookmarks.map { $0.url }
         bookmarkManager.$bookmarks.sink { [weak self] newBookmarks in
@@ -292,6 +307,18 @@ final class AppState: ObservableObject {
             updated.lastOpened = Date()
             recentFiles.remove(at: idx)
             recentFiles.insert(updated, at: 0)
+        }
+
+        if LibraryService.shared.contains(url) {
+            LibraryService.shared.update(LibraryService.shared.item(for: url)!.id) {
+                $0.lastOpened = Date()
+            }
+        } else {
+            LibraryService.shared.add(LibraryItem(
+                url: url,
+                fileSize: Int64(resourceValues?.fileSize ?? 0),
+                lastOpened: Date()
+            ))
         }
 
         loadTimeoutTask = Task { @MainActor [weak self] in
@@ -595,6 +622,9 @@ final class AppState: ObservableObject {
         if let idx = recentFiles.firstIndex(where: { $0.url == currentFileURL }) {
             recentFiles[idx].thumbnailData = png
         }
+        if let item = LibraryService.shared.items.first(where: { $0.url == currentFileURL }) {
+            LibraryService.shared.update(item.id) { $0.thumbnailData = png }
+        }
         #endif
     }
 
@@ -722,14 +752,7 @@ final class AppState: ObservableObject {
             }
         }
         #endif
-        guard let contents = try? FileManager.default.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey],
-            options: .skipsHiddenFiles
-        ) else { return }
-
-        let swfFiles = contents.filter { $0.pathExtension.lowercased() == "swf" }
-        swfCount += swfFiles.count
+        guard let swfFiles = try? ImportService.shared.scanForSWFFiles(in: url) else { return }
 
         for fileURL in swfFiles {
             let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
@@ -743,16 +766,24 @@ final class AppState: ObservableObject {
             if !recentFiles.contains(where: { $0.url == fileURL }) {
                 recentFiles.append(recent)
             }
+            if !LibraryService.shared.contains(fileURL) {
+                LibraryService.shared.add(LibraryItem(
+                    url: fileURL,
+                    fileSize: Int64(resourceValues?.fileSize ?? 0),
+                    lastOpened: resourceValues?.contentModificationDate ?? Date()
+                ))
+            }
         }
         updateLibraryStats()
     }
 
     func updateLibraryStats() {
-        let totalSize = recentFiles.reduce(0) { $0 + $1.fileSize }
+        let allItems = LibraryService.shared.items
+        let totalSize = allItems.reduce(0) { $0 + $1.fileSize }
         let formatter = ByteCountFormatter()
         formatter.countStyle = .file
         librarySize = formatter.string(fromByteCount: totalSize)
-        swfCount = recentFiles.count
+        swfCount = allItems.count
     }
 
     func toggleFavorite(for url: URL) {
@@ -764,6 +795,9 @@ final class AppState: ObservableObject {
             bookmarkManager.add(url: url, frame: currentFrame)
         }
         bookmarks = bookmarkManager.bookmarks.map { $0.url }
+        if let item = LibraryService.shared.items.first(where: { $0.url == url }) {
+            LibraryService.shared.update(item.id) { $0.isFavorite.toggle() }
+        }
     }
 
     var isFavorite: Bool {

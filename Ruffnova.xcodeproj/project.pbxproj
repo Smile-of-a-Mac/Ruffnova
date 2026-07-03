@@ -842,11 +842,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = B8NH9LK6K6;
 				ENABLE_DEBUG_DYLIB = NO;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				INFOPLIST_FILE = Info.plist;
 				"INFOPLIST_FILE[sdk=iphoneos*]" = "Info-iOS.plist";
+				"INFOPLIST_FILE[sdk=iphonesimulator*]" = "Info-iOS.plist";
 				"INFOPLIST_FILE[sdk=macosx*]" = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Ruffnova;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
@@ -857,12 +859,21 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/CRuffleFFI";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/CRuffleFFI/ios";
+				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/CRuffleFFI/ios-sim";
 				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = "$(SRCROOT)/CRuffleFFI/macos";
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.1.1;
 				OTHER_LDFLAGS = "$(inherited)";
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"$(SRCROOT)/CRuffleFFI/ios/libruffle_ffi.a",
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					CoreAudio,
+				);
+				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(SRCROOT)/CRuffleFFI/ios-sim/libruffle_ffi.a",
 					"-framework",
 					AudioToolbox,
 					"-framework",
@@ -883,7 +894,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -DRUST_FFI_AVAILABLE";
 				PRODUCT_BUNDLE_IDENTIFIER = app.ruffnova.native;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPPORTED_PLATFORMS = "iphoneos macosx";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/CRuffleFFI";
 				SWIFT_OBJC_BRIDGING_HEADER = RuffleBridgingHeader.h;
@@ -898,10 +909,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = B8NH9LK6K6;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				INFOPLIST_FILE = Info.plist;
 				"INFOPLIST_FILE[sdk=iphoneos*]" = "Info-iOS.plist";
+				"INFOPLIST_FILE[sdk=iphonesimulator*]" = "Info-iOS.plist";
 				"INFOPLIST_FILE[sdk=macosx*]" = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Ruffnova;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
@@ -912,12 +925,21 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/CRuffleFFI";
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/CRuffleFFI/ios";
+				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/CRuffleFFI/ios-sim";
 				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = "$(SRCROOT)/CRuffleFFI/macos";
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.1.1;
 				OTHER_LDFLAGS = "$(inherited)";
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"$(SRCROOT)/CRuffleFFI/ios/libruffle_ffi.a",
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					CoreAudio,
+				);
+				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"$(SRCROOT)/CRuffleFFI/ios-sim/libruffle_ffi.a",
 					"-framework",
 					AudioToolbox,
 					"-framework",
@@ -938,7 +960,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -DRUST_FFI_AVAILABLE";
 				PRODUCT_BUNDLE_IDENTIFIER = app.ruffnova.native;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPPORTED_PLATFORMS = "iphoneos macosx";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/CRuffleFFI";
 				SWIFT_OBJC_BRIDGING_HEADER = RuffleBridgingHeader.h;

@@ -4,6 +4,7 @@ struct SidebarCollectionsView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
     @ObservedObject private var collectionService = CollectionService.shared
+    var onSelectCollection: (LibraryCollection) -> Void = { _ in }
 
     @State private var showingNewCollectionAlert = false
     @State private var collectionNameDraft = ""
@@ -69,6 +70,7 @@ struct SidebarCollectionsView: View {
             withAnimation(.default) {
                 appState.selectCollection(collection.id)
             }
+            onSelectCollection(collection)
         } label: {
             HStack(spacing: NativeSpacing.md) {
                 Image(systemName: "folder")
@@ -124,6 +126,7 @@ struct SidebarCollectionsView: View {
     private func createCollection() {
         if let collection = collectionService.create(name: collectionNameDraft) {
             appState.selectCollection(collection.id)
+            onSelectCollection(collection)
         }
         clearDraft()
     }

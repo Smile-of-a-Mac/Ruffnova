@@ -33,11 +33,23 @@ struct AboutView: View {
                 AboutRow(label: locManager.localized("about.version"), value: appVersion)
                 AboutRow(label: locManager.localized("about.build"), value: buildNumber)
                 AboutRow(label: locManager.localized("about.ruffleVersion"), value: "0.3.0")
-                AboutRow(label: locManager.localized("about.author"), value: "Smile of a Mac")
             }
 
             Divider()
                 .frame(width: 200)
+
+            footer
+        }
+        .padding(40)
+        .frame(width: 360, height: 420)
+    }
+
+    private var footer: some View {
+        VStack(spacing: NativeSpacing.xs) {
+            Text(locManager.localized("about.copyright"))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
             if let ruffleSourceURL {
                 Link(locManager.localized("about.sourceLink"), destination: ruffleSourceURL)
@@ -49,8 +61,7 @@ struct AboutView: View {
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
         }
-        .padding(40)
-        .frame(width: 360, height: 420)
+        .frame(maxWidth: 260)
     }
 }
 

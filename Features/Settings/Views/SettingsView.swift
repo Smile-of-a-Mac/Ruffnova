@@ -519,7 +519,6 @@ struct AboutSettingsView: View {
             LabeledContent(locManager.localized("about.version"), value: appVersion)
             LabeledContent(locManager.localized("about.build"), value: buildNumber)
             LabeledContent(locManager.localized("about.ruffleVersion"), value: "0.3.0")
-            LabeledContent(locManager.localized("about.author"), value: "Smile of a Mac")
         } header: {
             Label(locManager.localized("about.title"), systemImage: "info.circle")
         } footer: {
@@ -530,7 +529,10 @@ struct AboutSettingsView: View {
             Section {
                 Link(locManager.localized("about.sourceLink"), destination: ruffleSourceURL)
             } footer: {
-                Text(locManager.localized("about.license"))
+                VStack(alignment: .leading, spacing: NativeSpacing.xs) {
+                    Text(locManager.localized("about.copyright"))
+                    Text(locManager.localized("about.license"))
+                }
             }
         }
     }
@@ -594,7 +596,10 @@ struct IOSSettingsRootView: View {
                 }
             }
         }
+        .listStyle(.insetGrouped)
         .navigationTitle(locManager.localized("sidebar.settings"))
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.visible, for: .navigationBar)
     }
 }
 
@@ -605,6 +610,8 @@ struct SettingsCategoryDetailView: View {
     var body: some View {
         SettingsForm(category: category)
             .navigationTitle(locManager.localized(category.titleKey))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .navigationBar)
     }
 }
 #endif

@@ -371,6 +371,12 @@
     "library.clearAll": "Clear All",
     "library.createFirst": "Create your first collection",
     "library.emptyCollection": "Drag files here or use the context menu to add them",
+    "library.menu.actions": "Actions",
+    "library.menu.sortBy": "Sort By",
+    "library.menu.filterBy": "Filter By",
+    "library.selection.select": "Select",
+    "library.selection.done": "Done",
+    "library.selection.count": "%lld selected",
 
     "collection.new": "New Collection",
     "collection.name.placeholder": "Collection Name",
@@ -428,6 +434,7 @@
     "about.renderer": "Renderer",
     "about.ruffleVersion": "Ruffle Version",
     "about.author": "Author",
+    "about.copyright": "Copyright © 2026 Smile of a Mac. All rights reserved.",
     "about.sourceLink": "github.com/ruffle-rs/ruffle",
     "about.license": "Ruffle is dual-licensed under MIT and Apache 2.0.",
 

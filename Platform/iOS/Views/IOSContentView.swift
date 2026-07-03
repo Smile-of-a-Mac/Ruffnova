@@ -15,8 +15,9 @@ struct IOSContentView: View {
     @State private var selectedIPadSection: AppState.Section? = .library
     @State private var iPadColumnVisibility: NavigationSplitViewVisibility = .all
     @State private var hidesStageSystemChrome = false
+    @State private var showingCollectionsSheet = false
 
-    private let iPadSections: [AppState.Section] = [.player, .library, .recent, .favorites, .settings]
+    private let iPadSections: [AppState.Section] = [.recent, .library, .player, .favorites, .settings]
 
     var body: some View {
         Group {
@@ -37,6 +38,9 @@ struct IOSContentView: View {
         .onChange(of: appState.isStageMaximized) { _, maximized in
             syncStageSystemChrome(for: maximized)
         }
+        .sheet(isPresented: $showingCollectionsSheet) {
+            collectionsSheet
+        }
         .statusBarHidden(hidesStageSystemChrome)
     }
 
@@ -44,32 +48,21 @@ struct IOSContentView: View {
 
     private var iPadLayout: some View {
         NavigationSplitView(columnVisibility: $iPadColumnVisibility) {
-            List(iPadSections, id: \.self, selection: $selectedIPadSection) { section in
-                NavigationLink(value: section) {
-                    Label(locManager.localized("sidebar.\(section.rawValue)"), systemImage: section.icon)
-                }
-            }
-            .listStyle(.sidebar)
-            .navigationTitle(locManager.localized("app.name"))
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    addContentMenu
-                }
-            }
+            iPadSidebar
         } detail: {
             iPadDetailContent(for: appState.selectedSection)
                 .id(appState.selectedSection)
         }
         .onAppear {
-            selectedIPadSection = appState.selectedSection
+            selectedIPadSection = appState.selectedCollectionID == nil ? appState.selectedSection : nil
             iPadColumnVisibility = appState.isStageMaximized ? .detailOnly : .all
         }
         .onChange(of: selectedIPadSection) { _, section in
             guard let section else { return }
-            appState.selectedSection = section
+            appState.selectSection(section)
         }
         .onChange(of: appState.selectedSection) { _, newSection in
-            if selectedIPadSection != newSection {
+            if appState.selectedCollectionID == nil, selectedIPadSection != newSection {
                 selectedIPadSection = newSection
             }
             if newSection == .player {
@@ -80,6 +73,9 @@ struct IOSContentView: View {
                 appState.pausePlaybackForNavigation()
             }
         }
+        .onChange(of: appState.selectedCollectionID) { _, collectionID in
+            selectedIPadSection = collectionID == nil ? appState.selectedSection : nil
+        }
         .onChange(of: appState.isStageMaximized) { _, maximized in
             withAnimation(.stageFullscreen) {
                 iPadColumnVisibility = maximized ? .detailOnly : .all
@@ -87,6 +83,30 @@ struct IOSContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSWFFile)) { n in
             if let url = n.userInfo?["url"] as? URL { appState.openFile(url) }
+        }
+    }
+
+    private var iPadSidebar: some View {
+        VStack(alignment: .leading, spacing: NativeSpacing.md) {
+            List(iPadSections, id: \.self, selection: $selectedIPadSection) { section in
+                NavigationLink(value: section) {
+                    Label(locManager.localized("sidebar.\(section.rawValue)"), systemImage: section.icon)
+                }
+            }
+            .listStyle(.sidebar)
+            .frame(minHeight: 240, idealHeight: 280, maxHeight: 320)
+
+            SidebarCollectionsView()
+                .environmentObject(appState)
+                .environmentObject(locManager)
+
+            Spacer(minLength: 0)
+        }
+        .navigationTitle(locManager.localized("app.name"))
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                addContentMenu
+            }
         }
     }
 
@@ -103,20 +123,20 @@ struct IOSContentView: View {
             .tag(AppState.Section.library)
 
             NavigationStack {
-                playerTab
-            }
-            .tabItem {
-                Label(locManager.localized("sidebar.player"), systemImage: "play.circle")
-            }
-            .tag(AppState.Section.player)
-
-            NavigationStack {
                 recentTab
             }
             .tabItem {
                 Label(locManager.localized("sidebar.recent"), systemImage: "clock")
             }
             .tag(AppState.Section.recent)
+
+            NavigationStack {
+                playerTab
+            }
+            .tabItem {
+                Label(locManager.localized("sidebar.player"), systemImage: "play.circle")
+            }
+            .tag(AppState.Section.player)
 
             NavigationStack {
                 favoritesTab
@@ -151,21 +171,14 @@ struct IOSContentView: View {
     // MARK: - Tab Content
 
     private var libraryTab: some View {
-        LibraryContentView(isDropTargeted: .constant(false))
+        LibraryContentView(isDropTargeted: .constant(false)) {
+            showingCollectionsSheet = true
+        }
             .environmentObject(appState)
             .environmentObject(locManager)
             .navigationTitle(locManager.localized("sidebar.library"))
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button {
-                        AppCommandRouter.openFile(appState: appState, loc: locManager)
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .keyboardShortcut("o", modifiers: .command)
-                    .accessibilityLabel(locManager.localized("toolbar.openSwf"))
-                }
-            }
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar(.visible, for: .navigationBar)
     }
 
     private var addContentMenu: some View {
@@ -188,6 +201,29 @@ struct IOSContentView: View {
         .accessibilityLabel(locManager.localized("toolbar.importHelp"))
     }
 
+    private var collectionsSheet: some View {
+        NavigationStack {
+            ScrollView {
+                SidebarCollectionsView { _ in
+                    showingCollectionsSheet = false
+                }
+                .environmentObject(appState)
+                .environmentObject(locManager)
+                .padding(.horizontal, NativeSpacing.lg)
+                .padding(.top, NativeSpacing.md)
+            }
+            .navigationTitle(locManager.localized("sidebar.collections"))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(locManager.localized("menu.close")) {
+                        showingCollectionsSheet = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
     private var playerTab: some View {
         Group {
             if appState.isPlayerVisible {
@@ -198,6 +234,8 @@ struct IOSContentView: View {
             }
         }
         .navigationTitle(locManager.localized("sidebar.player"))
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(appState.isStageMaximized ? .hidden : .visible, for: .navigationBar)
     }
 
     private var recentTab: some View {
@@ -205,6 +243,8 @@ struct IOSContentView: View {
             .environmentObject(appState)
             .environmentObject(locManager)
             .navigationTitle(locManager.localized("sidebar.recent"))
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar(.visible, for: .navigationBar)
     }
 
     private var favoritesTab: some View {
@@ -212,13 +252,14 @@ struct IOSContentView: View {
             .environmentObject(appState)
             .environmentObject(locManager)
             .navigationTitle(locManager.localized("sidebar.favorites"))
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar(.visible, for: .navigationBar)
     }
 
     private var settingsTab: some View {
         SettingsView(settingsActions: SettingsActions(appState: appState))
             .environmentObject(appState)
             .environmentObject(locManager)
-            .navigationTitle(locManager.localized("sidebar.settings"))
     }
 
     // MARK: - Detail Content (iPad)
@@ -436,4 +477,5 @@ struct IOSContentView: View {
         }
     }
 }
+
 #endif

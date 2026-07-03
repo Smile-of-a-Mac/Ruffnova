@@ -371,6 +371,12 @@
     "library.clearAll": "全部清除",
     "library.createFirst": "创建你的第一个合集",
     "library.emptyCollection": "将文件拖放到此处，或使用上下文菜单添加",
+    "library.menu.actions": "操作",
+    "library.menu.sortBy": "排序方式",
+    "library.menu.filterBy": "筛选方式",
+    "library.selection.select": "选择",
+    "library.selection.done": "完成",
+    "library.selection.count": "已选择 %lld 项",
 
     "collection.new": "新建合集",
     "collection.name.placeholder": "合集名称",
@@ -428,6 +434,7 @@
     "about.renderer": "渲染器",
     "about.ruffleVersion": "Ruffle 版本",
     "about.author": "作者",
+    "about.copyright": "Copyright © 2026 Smile of a Mac. All rights reserved.",
     "about.sourceLink": "github.com/ruffle-rs/ruffle",
     "about.license": "Ruffle 采用 MIT 和 Apache 2.0 双许可证。",
 

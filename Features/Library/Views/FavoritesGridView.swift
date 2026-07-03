@@ -4,10 +4,19 @@ import UniformTypeIdentifiers
 struct FavoritesGridView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject private var libraryService = LibraryService.shared
 
     private var favoriteItems: [LibraryItem] {
         libraryService.filtered(by: .favorites)
+    }
+
+    private var contentInsets: EdgeInsets {
+        #if os(iOS)
+        EdgeInsets(top: NativeSpacing.md, leading: NativeSpacing.section, bottom: NativeSpacing.section, trailing: NativeSpacing.section)
+        #else
+        EdgeInsets(top: NativeSpacing.section, leading: NativeSpacing.section, bottom: NativeSpacing.section, trailing: NativeSpacing.section)
+        #endif
     }
 
     private let columns = [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: NativeSpacing.xxxl)]
@@ -68,7 +77,7 @@ struct FavoritesGridView: View {
                             }
                         }
                     }
-                    .padding(NativeSpacing.section)
+                    .padding(contentInsets)
                 }
             }
         }

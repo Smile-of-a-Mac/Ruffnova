@@ -1,72 +1,65 @@
 #!/bin/bash
 set -euo pipefail
 
-# build_app.sh — Build Ruffnova as a proper macOS .app bundle.
+# build_app.sh — Build Ruffnova .app and package into .dmg.
 # Usage: ./build_app.sh [--release]
 
-CONFIG="debug"
+CONFIG="Debug"
 if [[ "${1:-}" == "--release" ]]; then
-    CONFIG="release"
+    CONFIG="Release"
 fi
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="${PROJECT_DIR}/.build"
-BINARY="${BUILD_DIR}/${CONFIG}/Ruffnova"
-APP="${BUILD_DIR}/Ruffnova.app"
+DERIVED_DATA="${HOME}/Library/Developer/Xcode/DerivedData"
+SCHEME="Ruffnova"
 
-echo "Building Ruffnova (${CONFIG})..."
+echo "Building Ruffnova (${CONFIG}) via xcodebuild..."
 
-swift build -c "${CONFIG}" --package-path "${PROJECT_DIR}"
+xcodebuild -project "${PROJECT_DIR}/Ruffnova.xcodeproj" \
+           -scheme "${SCHEME}" \
+           -configuration "${CONFIG}" \
+           -sdk macosx \
+           build 2>&1 | tail -1
 
-if [[ ! -f "${BINARY}" ]]; then
-    echo "Error: Binary not found at ${BINARY}" >&2
+# Locate the built .app
+APP_SRC=$(find "${DERIVED_DATA}" -name "Ruffnova.app" -path "*/Products/${CONFIG}/*" -type d 2>/dev/null | head -1)
+if [[ -z "${APP_SRC}" ]]; then
+    echo "Error: Built .app not found in DerivedData" >&2
     exit 1
 fi
 
+APP="${BUILD_DIR}/Ruffnova.app"
+DMG="${BUILD_DIR}/Ruffnova.dmg"
+STAGING="${BUILD_DIR}/dmg-staging"
+
 echo "Assembling .app bundle..."
-
-# Clean previous bundle
 rm -rf "${APP}"
-mkdir -p "${APP}/Contents/MacOS"
-mkdir -p "${APP}/Contents/Resources"
+cp -R "${APP_SRC}" "${APP}"
 
-# Copy binary
-cp "${BINARY}" "${APP}/Contents/MacOS/Ruffnova"
-
-# Copy Info.plist
-cp "${PROJECT_DIR}/Info.plist" "${APP}/Contents/Info.plist"
-
-# Copy asset catalog
-if [[ -d "${PROJECT_DIR}/Assets.xcassets" ]]; then
-    cp -R "${PROJECT_DIR}/Assets.xcassets" "${APP}/Contents/Resources/Assets.xcassets"
-fi
-
-# Generate macOS .icns app icon for Finder/Dock.
+# Generate AppIcon.icns if missing and iconutil is available
 ICON_SOURCE="${PROJECT_DIR}/Assets.xcassets/AppIcon.appiconset"
 ICONSET="${BUILD_DIR}/AppIcon.iconset"
 if [[ -d "${ICON_SOURCE}" ]] && command -v iconutil >/dev/null 2>&1; then
     rm -rf "${ICONSET}"
     mkdir -p "${ICONSET}"
-    cp "${ICON_SOURCE}/icon_16x16.png" "${ICONSET}/icon_16x16.png"
-    cp "${ICON_SOURCE}/icon_16x16@2x.png" "${ICONSET}/icon_16x16@2x.png"
-    cp "${ICON_SOURCE}/icon_32x32.png" "${ICONSET}/icon_32x32.png"
-    cp "${ICON_SOURCE}/icon_32x32@2x.png" "${ICONSET}/icon_32x32@2x.png"
-    cp "${ICON_SOURCE}/icon_128x128.png" "${ICONSET}/icon_128x128.png"
-    cp "${ICON_SOURCE}/icon_128x128@2x.png" "${ICONSET}/icon_128x128@2x.png"
-    cp "${ICON_SOURCE}/icon_256x256.png" "${ICONSET}/icon_256x256.png"
-    cp "${ICON_SOURCE}/icon_256x256@2x.png" "${ICONSET}/icon_256x256@2x.png"
-    cp "${ICON_SOURCE}/icon_512x512.png" "${ICONSET}/icon_512x512.png"
-    cp "${ICON_SOURCE}/icon_512x512@2x.png" "${ICONSET}/icon_512x512@2x.png"
-    iconutil -c icns "${ICONSET}" -o "${APP}/Contents/Resources/AppIcon.icns"
+    for size in 16 32 128 256 512; do
+        if [[ -f "${ICON_SOURCE}/icon_${size}x${size}.png" ]]; then
+            cp "${ICON_SOURCE}/icon_${size}x${size}.png" "${ICONSET}/icon_${size}x${size}.png"
+        fi
+        if [[ -f "${ICON_SOURCE}/icon_${size}x${size}@2x.png" ]]; then
+            cp "${ICON_SOURCE}/icon_${size}x${size}@2x.png" "${ICONSET}/icon_${size}x${size}@2x.png"
+        fi
+    done
+    iconutil -c icns "${ICONSET}" -o "${APP}/Contents/Resources/AppIcon.icns" 2>/dev/null || true
 fi
 
-# Copy any additional resources
-if [[ -d "${PROJECT_DIR}/Resources" ]]; then
-    cp -R "${PROJECT_DIR}/Resources" "${APP}/Contents/Resources/"
-fi
+echo "Creating DMG..."
+rm -rf "${STAGING}" "${DMG}"
+mkdir -p "${STAGING}"
+cp -R "${APP}" "${STAGING}/"
 
-# Generate PkgInfo
-echo -n "APPL????" > "${APP}/Contents/PkgInfo"
+hdiutil create -volname "Ruffnova" -srcfolder "${STAGING}" -ov -format UDZO "${DMG}" 2>&1 | tail -1
+rm -rf "${STAGING}"
 
-echo "Done: ${APP}"
-echo "Run: open \"${APP}\""
+echo "Done: ${DMG}"

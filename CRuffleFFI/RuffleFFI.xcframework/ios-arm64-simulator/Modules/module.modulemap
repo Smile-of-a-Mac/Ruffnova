@@ -1,4 +1,0 @@
-module CRuffleFFI {
-    header "ruffle_ffi.h"
-    export *
-}

@@ -1,5 +1,8 @@
 .build/
 engine/target/
+CRuffleFFI/**/*.a
+CRuffleFFI/*.a
+CRuffleFFI/RuffleFFI.xcframework/
 xcuserdata/
 .vscode/
 .DS_Store

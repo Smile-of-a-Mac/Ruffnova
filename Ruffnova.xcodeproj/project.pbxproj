@@ -862,7 +862,7 @@
 				OTHER_LDFLAGS = "$(inherited)";
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
-					"-lruffle_ffi",
+					"$(SRCROOT)/CRuffleFFI/ios/libruffle_ffi.a",
 					"-framework",
 					AudioToolbox,
 					"-framework",
@@ -870,7 +870,7 @@
 				);
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
 					"$(inherited)",
-					"-lruffle_ffi",
+					"$(SRCROOT)/CRuffleFFI/macos/libruffle_ffi.a",
 					"-framework",
 					AudioToolbox,
 					"-framework",
@@ -917,7 +917,7 @@
 				OTHER_LDFLAGS = "$(inherited)";
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
-					"-lruffle_ffi",
+					"$(SRCROOT)/CRuffleFFI/ios/libruffle_ffi.a",
 					"-framework",
 					AudioToolbox,
 					"-framework",
@@ -925,7 +925,7 @@
 				);
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
 					"$(inherited)",
-					"-lruffle_ffi",
+					"$(SRCROOT)/CRuffleFFI/macos/libruffle_ffi.a",
 					"-framework",
 					AudioToolbox,
 					"-framework",

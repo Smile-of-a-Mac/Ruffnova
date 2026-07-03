@@ -2,6 +2,7 @@
 // NavigationSplitView handles glass separation automatically.
 // No decorative elements — pure navigation structure.
 
+import Combine
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -123,7 +124,7 @@ struct AppSidebar: View {
         .padding(.vertical, NativeSpacing.sm)
         .toolbarGlassCapsule(material: GlassMaterial.light)
         .accessibilityLabel(locManager.localized("toolbar.searchLibrary"))
-        .onChange(of: appState.searchFocusRequest) { _ in
+        .onReceive(appState.$searchFocusRequest.dropFirst()) { _ in
             handlePendingSearchFocusRequest()
         }
     }

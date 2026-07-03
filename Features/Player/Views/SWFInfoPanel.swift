@@ -3,12 +3,24 @@ import SwiftUI
 struct SWFInfoPanel: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @Environment(\.dismiss) private var dismiss
     @State private var metadata: SWFMetadata?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(locManager.localized("swfInfo.title"))
-                .font(.headline)
+            HStack {
+                Text(locManager.localized("swfInfo.title"))
+                    .font(.headline)
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(locManager.localized("menu.close"))
+            }
 
             Divider()
 

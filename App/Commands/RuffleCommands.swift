@@ -1,29 +1,52 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct RuffleCommands: Commands {
     @ObservedObject var appState: AppState
+    @ObservedObject private var locManager = LocalizationManager.shared
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
 
-    private var loc: LocalizationManager { LocalizationManager.shared }
+    private var loc: LocalizationManager { locManager }
 
     var body: some Commands {
         // MARK: - File Menu
         CommandGroup(replacing: .newItem) {
             Button(loc.localized("menu.open")) {
-                showOpenPanel()
+                AppCommandRouter.openFile(appState: appState, loc: loc)
             }
             .keyboardShortcut("o", modifiers: .command)
 
+            Button(loc.localized("toolbar.importFolder")) {
+                AppCommandRouter.importFolder(appState: appState, loc: loc)
+            }
+
             Divider()
 
+            Button(loc.localized("menu.reload")) {
+                AppCommandRouter.reloadCurrentFile(appState: appState)
+            }
+            .keyboardShortcut("r", modifiers: .command)
+            .disabled(appState.currentFileURL == nil)
+
             Button(loc.localized("menu.close")) {
-                appState.closeFile()
+                AppCommandRouter.closeCurrentFile(appState: appState)
             }
             .keyboardShortcut("w", modifiers: .command)
             .disabled(appState.currentFileURL == nil)
+
+            Button(appState.isFavorite ? loc.localized("favorites.remove") : loc.localized("favorites.add")) {
+                AppCommandRouter.toggleFavorite(appState: appState)
+            }
+            .keyboardShortcut("d", modifiers: .command)
+            .disabled(appState.currentFileURL == nil)
+
+            #if os(macOS)
+            Button(loc.localized("menu.showInFinder")) {
+                AppCommandRouter.showCurrentFileInFinder(appState: appState)
+            }
+            .disabled(appState.currentFileURL == nil)
+            #endif
 
             Divider()
 
@@ -111,10 +134,18 @@ struct RuffleCommands: Commands {
             Divider()
 
             Button(loc.localized("menu.saveScreenshot")) {
-                appState.saveScreenshot()
+                AppCommandRouter.saveScreenshot(appState: appState)
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
             .disabled(appState.currentFileURL == nil)
+
+            #if os(macOS)
+            Button(loc.localized("menu.copyScreenshot")) {
+                AppCommandRouter.copyScreenshot(appState: appState)
+            }
+            .keyboardShortcut("c", modifiers: [.command, .option])
+            .disabled(appState.currentFileURL == nil)
+            #endif
 
             Divider()
 
@@ -137,18 +168,31 @@ struct RuffleCommands: Commands {
             .disabled(appState.currentFileURL == nil)
 
             Button(loc.localized("menu.playerMode.game")) {
-                appState.setPlayerMode(.game)
+                AppCommandRouter.enterGameMode(appState: appState)
             }
             .keyboardShortcut("g", modifiers: [.command, .shift])
             .disabled(appState.currentFileURL == nil)
+
+            Button(loc.localized("menu.exitGameMode")) {
+                AppCommandRouter.exitGameMode(appState: appState)
+            }
+            .keyboardShortcut(.escape, modifiers: .command)
+            .disabled(appState.currentFileURL == nil || appState.playerMode != .game)
         }
 
         // MARK: - View Menu
         CommandGroup(before: .toolbar) {
+            Button(appState.sidebarCollapsed ? loc.localized("toolbar.showSidebar") : loc.localized("toolbar.hideSidebar")) {
+                appState.toggleSidebar()
+            }
+            .keyboardShortcut("s", modifiers: [.command, .control])
+
             Button(loc.localized("search.placeholder")) {
-                NotificationCenter.default.post(name: .focusSearch, object: nil)
+                AppCommandRouter.focusSearch(appState: appState)
             }
             .keyboardShortcut("f", modifiers: .command)
+
+            Divider()
 
             Menu(loc.localized("menu.quality")) {
                 qualityButton(loc.localized("menu.quality.low"), .low)
@@ -169,12 +213,18 @@ struct RuffleCommands: Commands {
             Divider()
 
             Button(loc.localized("menu.swfInfo")) {
-                NotificationCenter.default.post(name: .toggleSWFInfo, object: nil)
+                AppCommandRouter.showSWFInfo(appState: appState)
             }
             .disabled(appState.currentFileURL == nil)
 
+            Button(loc.localized("diagnostics.title")) {
+                AppCommandRouter.showDiagnostics(appState: appState)
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
+            .disabled(appState.currentFileURL == nil)
+
             Button(loc.localized("menu.traceConsole")) {
-                NotificationCenter.default.post(name: .toggleTraceConsole, object: nil)
+                AppCommandRouter.toggleTraceConsole(appState: appState)
             }
         }
 
@@ -189,37 +239,17 @@ struct RuffleCommands: Commands {
         // MARK: - Help Menu
         CommandGroup(replacing: .help) {
             Button(loc.localized("menu.about")) {
-                #if os(macOS)
-                let window = NSWindow(
-                    contentRect: NSRect(x: 0, y: 0, width: 360, height: 420),
-                    styleMask: [.titled, .closable],
-                    backing: .buffered, defer: false
-                )
-                window.title = loc.localized("menu.about")
-                window.contentView = NSHostingView(rootView: AboutView().environmentObject(LocalizationManager.shared))
-                window.center()
-                window.isReleasedWhenClosed = false
-                window.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
-                #endif
+                AppCommandRouter.showAbout(loc: loc)
             }
 
             Divider()
 
             Button(loc.localized("menu.help")) {
-                #if os(macOS)
-                if let url = URL(string: "https://ruffle.rs") {
-                    NSWorkspace.shared.open(url)
-                }
-                #endif
+                AppCommandRouter.openHelp()
             }
 
             Button(loc.localized("menu.reportIssue")) {
-                #if os(macOS)
-                if let url = URL(string: "https://github.com/ruffle-rs/ruffle/issues") {
-                    NSWorkspace.shared.open(url)
-                }
-                #endif
+                AppCommandRouter.reportIssue()
             }
         }
     }
@@ -238,21 +268,5 @@ struct RuffleCommands: Commands {
                 appState.quality = quality
             }
         }
-    }
-
-    private func showOpenPanel() {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "swf")].compactMap { $0 }
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.title = loc.localized("workspace.openPanel.title")
-        panel.message = loc.localized("workspace.openPanel.message")
-
-        if panel.runModal() == .OK, let url = panel.url {
-            appState.openFile(url)
-        }
-        #endif
     }
 }

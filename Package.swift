@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "Ruffnova",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v13),
         .iOS(.v17),
@@ -40,6 +41,9 @@ let package = Package(
                 "docs",
                 "CRuffleFFI",
                 "README.md",
+                "LICENSE",
+                "LICENSE-MIT",
+                "LICENSE-APACHE",
                 "RELEASE_AUDIT.md",
                 "AGENT.md",
                 "build_app.sh",

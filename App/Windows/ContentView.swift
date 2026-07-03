@@ -2,6 +2,7 @@
 // Window glass is the foundation. Sidebar blends in. Content floats above.
 // Toolbar is invisible. Only floating controls exist.
 
+import Combine
 import SwiftUI
 import UniformTypeIdentifiers
 #if os(macOS)
@@ -15,6 +16,13 @@ struct ContentView: View {
     @EnvironmentObject var locManager: LocalizationManager
     @State private var isDropTargeted = false
 
+    private enum PresentedSheet: String, Identifiable {
+        case swfInfo
+        case traceConsole
+        case diagnostics
+
+        var id: String { rawValue }
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -67,7 +75,7 @@ struct ContentView: View {
                   let dn = i["isDown"] as? Bool, let mod = i["modifiers"] as? UInt else { return }
             appState.bridge?.sendKeyEvent(keyCode: kc, charCode: cc, isDown: dn, modifiers: UInt32(mod))
         }
-        .onChange(of: appState.selectedSection) { newSection in
+        .onReceive(appState.$selectedSection.dropFirst()) { newSection in
             if newSection == .player {
                 appState.resumePlaybackForNavigation()
             } else if appState.currentFileURL != nil {
@@ -97,20 +105,89 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .focusSearch)) { _ in
             appState.requestSearchFocus()
         }
-        .sheet(isPresented: $appState.showSWFInfoPanel) {
-            SWFInfoPanel()
-                .environmentObject(appState)
-                .frame(width: 280, height: 300)
+        .sheet(item: presentedSheet) { sheet in
+            switch sheet {
+            case .swfInfo:
+                SWFInfoPanel()
+                    .environmentObject(appState)
+                    .frame(width: 280, height: 300)
+            case .traceConsole:
+                TraceConsoleView()
+                    .environmentObject(locManager)
+                    .frame(width: 500, height: 400)
+            case .diagnostics:
+                DiagnosticsView()
+                    .environmentObject(appState)
+                    .environmentObject(locManager)
+                    .frame(width: 560, height: 560)
+            }
         }
-        .sheet(isPresented: $appState.showTraceConsole) {
-            TraceConsoleView()
-                .frame(width: 500, height: 400)
+        .alert(permissionPromptTitle, isPresented: permissionPromptPresented) {
+            Button(locManager.localized("permission.allowOnce")) {
+                appState.resolvePendingPermission(with: .allowOnce)
+            }
+            Button(locManager.localized("permission.allowForFile")) {
+                appState.resolvePendingPermission(with: .allowForFile)
+            }
+            Button(locManager.localized("permission.denyForFile"), role: .destructive) {
+                appState.resolvePendingPermission(with: .denyForFile)
+            }
+            Button(locManager.localized("collection.cancel"), role: .cancel) {
+                appState.pendingPermissionRequest = nil
+            }
+        } message: {
+            Text(permissionPromptMessage)
         }
-        .sheet(isPresented: $appState.showDiagnostics) {
-            DiagnosticsView()
-                .environmentObject(appState)
-                .environmentObject(locManager)
-                .frame(width: 560, height: 560)
+    }
+
+    private var presentedSheet: Binding<PresentedSheet?> {
+        Binding(
+            get: {
+                if appState.showDiagnostics { return .diagnostics }
+                if appState.showTraceConsole { return .traceConsole }
+                if appState.showSWFInfoPanel { return .swfInfo }
+                return nil
+            },
+            set: { newValue in
+                appState.showSWFInfoPanel = newValue == .swfInfo
+                appState.showTraceConsole = newValue == .traceConsole
+                appState.showDiagnostics = newValue == .diagnostics
+            }
+        )
+    }
+
+    private var permissionPromptPresented: Binding<Bool> {
+        Binding(
+            get: { appState.pendingPermissionRequest != nil },
+            set: { isPresented in
+                if !isPresented {
+                    appState.pendingPermissionRequest = nil
+                }
+            }
+        )
+    }
+
+    private var permissionPromptTitle: String {
+        guard let request = appState.pendingPermissionRequest else {
+            return locManager.localized("permission.prompt.title")
+        }
+        switch request.scope {
+        case .network:
+            return locManager.localized("permission.prompt.network.title")
+        case .filesystem:
+            return locManager.localized("permission.prompt.filesystem.title")
+        }
+    }
+
+    private var permissionPromptMessage: String {
+        guard let request = appState.pendingPermissionRequest else { return "" }
+        let fileName = request.fileURL?.lastPathComponent ?? locManager.localized("diagnostics.unavailable")
+        let resource = request.requestedResource ?? locManager.localized("permission.prompt.resource.unspecified")
+        switch request.scope {
+        case .network:
+            return String(format: locManager.localized("permission.prompt.network.message"), fileName, resource)
+        case .filesystem:
+            return String(format: locManager.localized("permission.prompt.filesystem.message"), fileName, resource)
         }
     }
 

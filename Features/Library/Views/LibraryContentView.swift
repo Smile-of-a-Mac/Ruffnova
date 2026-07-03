@@ -23,7 +23,7 @@ struct LibraryContentView: View {
             #if os(macOS)
             libraryView
             #else
-            SettingsView()
+            SettingsView(settingsActions: SettingsActions(appState: appState))
                 .environmentObject(appState)
                 .environmentObject(locManager)
             #endif

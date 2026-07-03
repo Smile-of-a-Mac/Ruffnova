@@ -42,6 +42,7 @@ final class LocalizationManager: ObservableObject {
     private func reload() {
         load(language: selectedLanguage, into: &translations)
         objectWillChange.send()
+        NotificationCenter.default.post(name: .localizationChanged, object: nil)
     }
 
     private func load(language: Language, into dict: inout [String: String]) {

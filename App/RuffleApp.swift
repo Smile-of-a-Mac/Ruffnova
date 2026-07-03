@@ -44,10 +44,11 @@ struct RuffleApp: App {
             InlineSettingsView()
                 .environmentObject(appState)
                 .environmentObject(locManager)
+                .environment(\.settingsActions, SettingsActions(appState: appState))
         }
         .windowStyle(.titleBar)
         .windowResizability(.contentMinSize)
-        .defaultSize(width: 580, height: 480)
+        .defaultSize(width: 680, height: 560)
         #endif
     }
 }

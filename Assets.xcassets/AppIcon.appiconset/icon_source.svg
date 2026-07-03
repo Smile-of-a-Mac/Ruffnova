@@ -1,61 +1,64 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="shell" x1="240" y1="104" x2="800" y2="928" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#F8FAFC"/>
-      <stop offset="0.42" stop-color="#D8E3EF"/>
-      <stop offset="1" stop-color="#8EA2B8"/>
-    </linearGradient>
-    <linearGradient id="glass" x1="252" y1="174" x2="756" y2="846" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.96"/>
-      <stop offset="0.48" stop-color="#EAF1F7" stop-opacity="0.88"/>
-      <stop offset="1" stop-color="#C9D7E6" stop-opacity="0.92"/>
-    </linearGradient>
-    <linearGradient id="stage" x1="294" y1="236" x2="760" y2="752" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#223248"/>
-      <stop offset="0.55" stop-color="#152137"/>
-      <stop offset="1" stop-color="#0D1424"/>
-    </linearGradient>
-    <linearGradient id="cardA" x1="352" y1="298" x2="680" y2="654" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#7EC8FF"/>
-      <stop offset="1" stop-color="#5B7FD7"/>
-    </linearGradient>
-    <linearGradient id="cardB" x1="280" y1="354" x2="604" y2="720" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#F7D88E"/>
-      <stop offset="1" stop-color="#D99B56"/>
-    </linearGradient>
-    <linearGradient id="play" x1="444" y1="388" x2="646" y2="612" gradientUnits="userSpaceOnUse">
+    <radialGradient id="paperGlow" cx="50%" cy="44%" r="70%">
       <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#DCE7F2"/>
+      <stop offset="0.62" stop-color="#FBFCFE"/>
+      <stop offset="1" stop-color="#F1F4F8"/>
+    </radialGradient>
+    <linearGradient id="blueCard" x1="300" y1="350" x2="820" y2="840" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8EC5FF"/>
+      <stop offset="0.48" stop-color="#5FA4FF"/>
+      <stop offset="1" stop-color="#4F83E6"/>
     </linearGradient>
-    <filter id="drop" x="-18%" y="-15%" width="136%" height="140%">
-      <feDropShadow dx="0" dy="30" stdDeviation="32" flood-color="#1A2738" flood-opacity="0.26"/>
+    <linearGradient id="goldCard" x1="286" y1="238" x2="800" y2="682" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFC642"/>
+      <stop offset="0.56" stop-color="#FFB832"/>
+      <stop offset="1" stop-color="#F49B22"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="238" y1="318" x2="772" y2="752" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#202B4E"/>
+      <stop offset="0.55" stop-color="#182344"/>
+      <stop offset="1" stop-color="#121C36"/>
+    </linearGradient>
+    <linearGradient id="play" x1="438" y1="428" x2="604" y2="626" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.7" stop-color="#FCFCFD"/>
+      <stop offset="1" stop-color="#ECEFF5"/>
+    </linearGradient>
+    <linearGradient id="blueSpark" x1="668" y1="172" x2="710" y2="242" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7BB2FF"/>
+      <stop offset="1" stop-color="#4F87EA"/>
+    </linearGradient>
+    <linearGradient id="goldSpark" x1="790" y1="300" x2="820" y2="350" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFC84D"/>
+      <stop offset="1" stop-color="#F19B1E"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="26" stdDeviation="30" flood-color="#11182C" flood-opacity="0.20"/>
     </filter>
-    <filter id="smallShadow" x="-20%" y="-20%" width="140%" height="150%">
-      <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#07101D" flood-opacity="0.24"/>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#17203A" flood-opacity="0.20"/>
+    </filter>
+    <filter id="playShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#081024" flood-opacity="0.22"/>
     </filter>
   </defs>
 
-  <rect width="1024" height="1024" fill="none"/>
-  <g filter="url(#drop)">
-    <rect x="96" y="72" width="832" height="880" rx="196" fill="url(#shell)"/>
-    <rect x="132" y="112" width="760" height="792" rx="166" fill="url(#glass)"/>
-    <path d="M198 222C296 134 652 116 800 246" fill="none" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round" opacity="0.54"/>
-    <path d="M172 704C270 846 656 888 820 716" fill="none" stroke="#6E8298" stroke-width="24" stroke-linecap="round" opacity="0.16"/>
+  <rect width="1024" height="1024" rx="220" fill="url(#paperGlow)"/>
 
-    <rect x="236" y="222" width="552" height="596" rx="92" fill="url(#stage)"/>
-    <rect x="262" y="252" width="500" height="536" rx="68" fill="none" stroke="#FFFFFF" stroke-width="10" opacity="0.10"/>
+  <path d="M180 214L194 254L236 268L194 282L180 322L166 282L124 268L166 254Z" fill="#C8CDE1" opacity="0.78"/>
+  <path d="M690 156L704 202L748 216L704 230L690 276L676 230L632 216L676 202Z" fill="url(#blueSpark)"/>
+  <path d="M816 306L826 342L858 352L826 362L816 398L806 362L774 352L806 342Z" fill="url(#goldSpark)"/>
+  <path d="M200 766L210 802L242 812L210 822L200 858L190 822L158 812L190 802Z" fill="url(#goldSpark)"/>
 
-    <g filter="url(#smallShadow)">
-      <rect x="292" y="402" width="294" height="220" rx="34" fill="url(#cardB)" transform="rotate(-10 439 512)"/>
-      <rect x="438" y="304" width="294" height="220" rx="34" fill="url(#cardA)" transform="rotate(9 585 414)"/>
-      <rect x="344" y="344" width="336" height="260" rx="40" fill="#FDFEFF"/>
-      <rect x="372" y="374" width="280" height="200" rx="26" fill="#24364D"/>
-      <path d="M476 422L584 474C608 486 608 520 584 532L476 584C454 594 430 578 430 554V452C430 428 454 412 476 422Z" fill="url(#play)"/>
-    </g>
+  <g filter="url(#softShadow)">
+    <rect x="394" y="402" width="404" height="404" rx="40" fill="url(#blueCard)" transform="rotate(14 596 604)"/>
+    <rect x="292" y="278" width="560" height="404" rx="40" fill="url(#goldCard)" transform="rotate(10 572 480)"/>
+  </g>
 
-    <circle cx="318" cy="290" r="18" fill="#FFFFFF" opacity="0.72"/>
-    <circle cx="722" cy="710" r="12" fill="#FFFFFF" opacity="0.50"/>
-    <path d="M728 206L744 250L790 266L744 282L728 326L712 282L666 266L712 250Z" fill="#FFFFFF" opacity="0.64"/>
-    <path d="M262 714C390 760 570 766 742 704" fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round" opacity="0.12"/>
+  <g filter="url(#cardShadow)">
+    <rect x="222" y="346" width="580" height="404" rx="42" fill="url(#panel)"/>
+    <rect x="222" y="346" width="580" height="404" rx="42" fill="none" stroke="#FFFFFF" stroke-width="1.5" opacity="0.18"/>
+    <path d="M449 459C449 442 468 432 482 441L589 512C611 527 611 559 589 574L482 645C468 654 449 644 449 627Z" fill="url(#play)" filter="url(#playShadow)"/>
   </g>
 </svg>

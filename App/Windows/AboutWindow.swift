@@ -3,6 +3,8 @@ import SwiftUI
 struct AboutView: View {
     @EnvironmentObject var locManager: LocalizationManager
 
+    private let ruffleSourceURL = URL(string: "https://github.com/ruffle-rs/ruffle")
+
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
     }
@@ -15,6 +17,7 @@ struct AboutView: View {
             Image(systemName: "sparkles.tv")
                 .font(.system(size: 56, weight: .ultraLight))
                 .foregroundStyle(.tint)
+                .accessibilityHidden(true)
 
             Text(locManager.localized("about.title"))
                 .font(.largeTitle.weight(.semibold))
@@ -29,15 +32,17 @@ struct AboutView: View {
             VStack(spacing: NativeSpacing.md) {
                 AboutRow(label: locManager.localized("about.version"), value: appVersion)
                 AboutRow(label: locManager.localized("about.build"), value: buildNumber)
-                AboutRow(label: locManager.localized("about.renderer"), value: "Metal (wgpu)")
+                AboutRow(label: locManager.localized("about.ruffleVersion"), value: "0.3.0")
+                AboutRow(label: locManager.localized("about.author"), value: "Smile of a Mac")
             }
 
             Divider()
                 .frame(width: 200)
 
-            Link(locManager.localized("about.sourceLink"),
-                 destination: URL(string: "https://github.com/ruffle-rs/ruffle")!)
-                .font(.caption)
+            if let ruffleSourceURL {
+                Link(locManager.localized("about.sourceLink"), destination: ruffleSourceURL)
+                    .font(.caption)
+            }
 
             Text(locManager.localized("about.license"))
                 .font(.caption2)

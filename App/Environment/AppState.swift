@@ -32,6 +32,31 @@ enum SwfContentType: String {
     case interactive
 }
 
+enum ThumbnailCapturePolicy {
+    static let coverAspectRatio: CGFloat = 4.0 / 3.0
+    static let coverMaxPixelSize: CGFloat = 640
+
+    static func shouldAttempt(thumbnailIdentifier: String?) -> Bool {
+        guard let thumbnailIdentifier else { return true }
+        return thumbnailIdentifier.isEmpty
+    }
+
+    static func centeredCoverCrop(imageSize: CGSize, aspectRatio: CGFloat) -> CGRect {
+        let width = imageSize.width
+        let height = imageSize.height
+        guard width > 0, height > 0, aspectRatio > 0 else { return .null }
+
+        let sourceAspectRatio = width / height
+        if sourceAspectRatio > aspectRatio {
+            let cropWidth = height * aspectRatio
+            return CGRect(x: (width - cropWidth) / 2, y: 0, width: cropWidth, height: height)
+        }
+
+        let cropHeight = width / aspectRatio
+        return CGRect(x: 0, y: (height - cropHeight) / 2, width: width, height: cropHeight)
+    }
+}
+
 @MainActor
 final class AppState: ObservableObject {
     enum Section: String, CaseIterable, Equatable {
@@ -110,10 +135,29 @@ final class AppState: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var sidebarCollapsed: Bool = false
-    @Published var showSWFInfoPanel: Bool = false
-    @Published var showTraceConsole: Bool = false
-    @Published var showDiagnostics: Bool = false
+    @Published var showSWFInfoPanel: Bool = false {
+        didSet {
+            guard showSWFInfoPanel else { return }
+            showTraceConsole = false
+            showDiagnostics = false
+        }
+    }
+    @Published var showTraceConsole: Bool = false {
+        didSet {
+            guard showTraceConsole else { return }
+            showSWFInfoPanel = false
+            showDiagnostics = false
+        }
+    }
+    @Published var showDiagnostics: Bool = false {
+        didSet {
+            guard showDiagnostics else { return }
+            showSWFInfoPanel = false
+            showTraceConsole = false
+        }
+    }
     @Published var playerIssues: [PlayerIssue] = []
+    @Published var pendingPermissionRequest: PermissionRequestContext?
     private var pausedForNavigation = false
     private let playerInputCoordinator = PlayerInputCoordinator()
     private var isRestoringPlaybackPreferences = false
@@ -180,7 +224,10 @@ final class AppState: ObservableObject {
         setupFullscreenObserver()
         restoreSettings()
         setupPersistence()
-        LibraryService.shared.migrateIfNeeded()
+        let migrationReport = LibraryService.shared.migrateIfNeeded()
+        if migrationReport.requiresUserAction {
+            playerIssues = [.libraryMigrationFailed]
+        }
         LibraryService.shared.resolveBookmarks()
         recentFiles = LibraryPersistence.shared.loadRecentFiles()
         bookmarks = bookmarkManager.bookmarks.map { $0.url }
@@ -199,6 +246,7 @@ final class AppState: ObservableObject {
         showDebugUI = settings.showDebugUI
         showToolbar = settings.showToolbar
         maxExecutionDuration = settings.maxExecutionDuration
+        playerMode = settings.defaultPlayerMode
     }
 
     private func setupPersistence() {
@@ -406,10 +454,21 @@ final class AppState: ObservableObject {
             self?.loadTimeoutTask?.cancel()
             NotificationCenter.default.post(name: .swfLoaded, object: nil)
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.captureThumbnail()
-        }
+        scheduleThumbnailCapture(for: currentFileURL)
         scheduleControlBarHide()
+    }
+
+    private func scheduleThumbnailCapture(for url: URL?) {
+        guard let url else { return }
+        let delays: [TimeInterval] = [0.45, 0.9, 1.6, 2.8]
+
+        for (index, delay) in delays.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.currentFileURL == url else { return }
+                let isFinalAttempt = index == delays.indices.last
+                _ = self.captureThumbnail(markFailure: isFinalAttempt)
+            }
+        }
     }
 
     private func restoreLastPlaybackFrame() {
@@ -491,7 +550,7 @@ final class AppState: ObservableObject {
             switch issue {
             case .fileMissing:
                 $0.availabilityStatus = .missing
-            case .fileDamaged, .ruffleLoadFailure, .unsupportedAPI, .scriptTimeout:
+            case .fileDamaged, .ruffleLoadFailure, .unsupportedAPI, .scriptTimeout, .networkBlocked, .filesystemBlocked:
                 $0.compatibilityStatus = .unsupported
             default:
                 break
@@ -509,10 +568,97 @@ final class AppState: ObservableObject {
             metadata: metadata,
             currentFrame: currentFrame,
             issues: playerIssues,
-            permissionPolicy: LocalizationManager.shared.localized("diagnostics.permissionPolicy.default"),
+            permissionPolicy: permissionPolicySummary(),
             traceMessages: traceMessages,
             engineVersion: engineVersion
         )
+    }
+
+    func requestPermission(scope: PermissionScope, requestedResource: String? = nil) -> Bool {
+        let fileURL = currentFileURL
+        switch PermissionPolicyService.shared.evaluation(for: fileURL, scope: scope) {
+        case .allowed:
+            return true
+        case .denied:
+            recordBlockedPermission(scope)
+            return false
+        case .requiresPrompt:
+            pendingPermissionRequest = PermissionRequestContext(
+                fileURL: fileURL,
+                scope: scope,
+                requestedResource: requestedResource
+            )
+            return false
+        }
+    }
+
+    func resolvePendingPermission(with decision: PermissionDecision) {
+        guard let request = pendingPermissionRequest else { return }
+        pendingPermissionRequest = nil
+        let result = PermissionPolicyService.shared.apply(decision, for: request.fileURL, scope: request.scope)
+        if result == .denied {
+            recordBlockedPermission(request.scope)
+        }
+    }
+
+    private func recordBlockedPermission(_ scope: PermissionScope) {
+        switch scope {
+        case .network:
+            presentPlayerIssue(.networkBlocked)
+        case .filesystem:
+            presentPlayerIssue(.filesystemBlocked)
+        }
+    }
+
+    private func permissionPolicySummary() -> String {
+        PermissionPolicyService.shared.policySummary(for: currentFileURL)
+            .map { localizedPermissionPolicyLine($0) }
+            .joined(separator: "; ")
+    }
+
+    private func localizedPermissionPolicyLine(_ rawLine: String) -> String {
+        let parts = rawLine.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+        guard parts.count == 2 else { return rawLine }
+        return "\(localizedPermissionScope(parts[0])): \(localizedPermissionDecision(parts[1]))"
+    }
+
+    private func localizedPermissionScope(_ rawValue: String) -> String {
+        switch PermissionScope(rawValue: rawValue) {
+        case .network:
+            return LocalizationManager.shared.localized("permission.scope.network")
+        case .filesystem:
+            return LocalizationManager.shared.localized("permission.scope.filesystem")
+        case nil:
+            return rawValue
+        }
+    }
+
+    private func localizedPermissionDecision(_ rawValue: String) -> String {
+        if let globalDefault = PermissionGlobalDefault(rawValue: rawValue) {
+            switch globalDefault {
+            case .alwaysAsk:
+                return LocalizationManager.shared.localized("permission.global.alwaysAsk")
+            case .allow:
+                return LocalizationManager.shared.localized("permission.global.allow")
+            case .deny:
+                return LocalizationManager.shared.localized("permission.global.deny")
+            }
+        }
+
+        switch PermissionDecision(rawValue: rawValue) {
+        case .allowForFile:
+            return LocalizationManager.shared.localized("permission.decision.allowForFile")
+        case .denyForFile:
+            return LocalizationManager.shared.localized("permission.decision.denyForFile")
+        case .allowOnce:
+            return LocalizationManager.shared.localized("permission.decision.allowOnce")
+        case .alwaysAsk:
+            return LocalizationManager.shared.localized("permission.decision.alwaysAsk")
+        case .useGlobalDefault:
+            return LocalizationManager.shared.localized("permission.decision.useGlobalDefault")
+        case nil:
+            return rawValue
+        }
     }
 
     private func currentMetadataForDiagnostics() -> SWFMetadata? {
@@ -632,7 +778,7 @@ final class AppState: ObservableObject {
             isLooping: settings.isLooping,
             speed: settings.speed,
             lastPlaybackFrame: item.lastPlaybackFrame,
-            preferredMode: .normal
+            preferredMode: settings.defaultPlayerMode
         )
 
         isRestoringPlaybackPreferences = true
@@ -925,6 +1071,10 @@ final class AppState: ObservableObject {
     }
 
     func requestSearchFocus() {
+        if isStageMaximized {
+            exitStageMaximized(restoreWorkspaceChrome: false)
+        }
+        selectedSection = .library
         sidebarCollapsed = false
         searchFocusRequest += 1
     }
@@ -973,30 +1123,30 @@ final class AppState: ObservableObject {
         recentFiles.removeAll()
     }
 
-    func captureThumbnail() {
+    @discardableResult
+    func captureThumbnail(markFailure: Bool = true) -> Bool {
         #if os(macOS) || os(iOS)
         guard let url = currentFileURL,
               let item = LibraryService.shared.item(for: url),
               shouldAttemptThumbnail(for: item)
-        else { return }
+        else { return false }
 
-        guard let metalView = findPlayerMetalView(),
-              let cgImage = currentDrawableImage(from: metalView)
+        guard let cgImage = currentStageImage()
         else {
-            markThumbnailFailure(for: item.id)
-            return
+            if markFailure { markThumbnailFailure(for: item.id) }
+            return false
         }
 
         let w = cgImage.width
         let h = cgImage.height
         guard w > 0, h > 0 else {
-            markThumbnailFailure(for: item.id)
-            return
+            if markFailure { markThumbnailFailure(for: item.id) }
+            return false
         }
 
-        guard let png = pngThumbnailData(from: cgImage, maxPixelSize: 320) else {
-            markThumbnailFailure(for: item.id)
-            return
+        guard let png = pngThumbnailData(from: cgImage, maxPixelSize: ThumbnailCapturePolicy.coverMaxPixelSize) else {
+            if markFailure { markThumbnailFailure(for: item.id) }
+            return false
         }
 
         if let idx = recentFiles.firstIndex(where: { $0.url == currentFileURL }) {
@@ -1004,8 +1154,8 @@ final class AppState: ObservableObject {
         }
 
         guard let identifier = ThumbnailService.shared.store(png, for: item.id) else {
-            markThumbnailFailure(for: item.id)
-            return
+            if markFailure { markThumbnailFailure(for: item.id) }
+            return false
         }
 
         LibraryService.shared.update(item.id) {
@@ -1013,13 +1163,14 @@ final class AppState: ObservableObject {
             $0.thumbnailData = nil
             $0.thumbnailGenerationFailedAt = nil
         }
+        return true
+        #else
+        return false
         #endif
     }
 
     private func shouldAttemptThumbnail(for item: LibraryItem) -> Bool {
-        if item.thumbnailIdentifier != nil { return false }
-        guard let failedAt = item.thumbnailGenerationFailedAt else { return true }
-        return Date().timeIntervalSince(failedAt) > 86_400
+        ThumbnailCapturePolicy.shouldAttempt(thumbnailIdentifier: item.thumbnailIdentifier)
     }
 
     private func markThumbnailFailure(for id: UUID) {
@@ -1032,6 +1183,14 @@ final class AppState: ObservableObject {
     private func currentDrawableImage(from metalView: MTKView) -> CGImage? {
         guard let texture = metalView.currentDrawable?.texture else { return nil }
         return image(from: texture)
+    }
+
+    private func currentStageImage() -> CGImage? {
+        guard let metalView = findPlayerMetalView() else { return nil }
+        if let image = currentDrawableImage(from: metalView) {
+            return image
+        }
+        return snapshotImage(of: metalView)
     }
 
     private func image(from texture: MTLTexture) -> CGImage? {
@@ -1071,7 +1230,9 @@ final class AppState: ObservableObject {
     }
 
     private func pngThumbnailData(from image: CGImage, maxPixelSize: CGFloat) -> Data? {
-        guard let scaled = scaledImage(image, maxPixelSize: maxPixelSize) else { return nil }
+        guard let coverImage = centerCroppedImage(image, aspectRatio: ThumbnailCapturePolicy.coverAspectRatio),
+              let scaled = scaledImage(coverImage, maxPixelSize: maxPixelSize)
+        else { return nil }
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
             data,
@@ -1083,6 +1244,16 @@ final class AppState: ObservableObject {
         CGImageDestinationAddImage(destination, scaled, nil)
         guard CGImageDestinationFinalize(destination) else { return nil }
         return data as Data
+    }
+
+    private func centerCroppedImage(_ image: CGImage, aspectRatio: CGFloat) -> CGImage? {
+        let cropRect = ThumbnailCapturePolicy.centeredCoverCrop(
+            imageSize: CGSize(width: image.width, height: image.height),
+            aspectRatio: aspectRatio
+        )
+        guard !cropRect.isNull, cropRect.width > 0, cropRect.height > 0 else { return nil }
+
+        return image.cropping(to: cropRect.integral)
     }
 
     private func scaledImage(_ image: CGImage, maxPixelSize: CGFloat) -> CGImage? {
@@ -1122,6 +1293,49 @@ final class AppState: ObservableObject {
             .first
         #endif
     }
+
+    #if os(macOS)
+    private func snapshotImage(of view: MTKView) -> CGImage? {
+        guard let window = view.window,
+              let contentView = window.contentView,
+              let windowImage = CGWindowListCreateImage(
+                .null,
+                .optionIncludingWindow,
+                CGWindowID(window.windowNumber),
+                [.boundsIgnoreFraming, .bestResolution]
+              )
+        else { return nil }
+
+        let scale = CGFloat(windowImage.width) / max(window.frame.width, 1)
+        let frameInWindow = view.convert(view.bounds, to: nil)
+        let contentHeight = contentView.bounds.height
+        let contentHeightPixels = contentHeight * scale
+        let topInsetPixels = max(0, CGFloat(windowImage.height) - contentHeightPixels)
+
+        let cropRect = CGRect(
+            x: frameInWindow.minX * scale,
+            y: topInsetPixels + (contentHeight - frameInWindow.maxY) * scale,
+            width: frameInWindow.width * scale,
+            height: frameInWindow.height * scale
+        ).integral.intersection(CGRect(x: 0, y: 0, width: windowImage.width, height: windowImage.height))
+
+        guard cropRect.width > 0, cropRect.height > 0 else { return nil }
+        return windowImage.cropping(to: cropRect)
+    }
+    #endif
+
+    #if os(iOS)
+    private func snapshotImage(of view: MTKView) -> CGImage? {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = view.window?.screen.scale ?? UIScreen.main.scale
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(bounds: view.bounds, format: format)
+        let image = renderer.image { _ in
+            view.drawHierarchy(in: view.bounds, afterScreenUpdates: false)
+        }
+        return image.cgImage
+    }
+    #endif
     #endif
 
     #if os(macOS)
@@ -1152,45 +1366,16 @@ final class AppState: ObservableObject {
 
     func saveScreenshot() {
         #if os(macOS)
-        guard let metalView = findPlayerFrameView() as? MTKView,
-              let drawable = metalView.currentDrawable else {
+        guard let cgImage = currentStageImage() else {
             errorMessage = LocalizationManager.shared.localized("error.screenshotFailed")
             return
         }
 
-        let texture = drawable.texture
-        let width = Int(texture.width)
-        let height = Int(texture.height)
-        guard width > 0, height > 0, !texture.isFramebufferOnly else {
-            errorMessage = LocalizationManager.shared.localized("error.screenshotFailed")
-            return
-        }
-        let bytesPerRow = width * 4
-        var pixelData = [UInt8](repeating: 0, count: height * bytesPerRow)
-
-        texture.getBytes(&pixelData, bytesPerRow: bytesPerRow,
-                         from: MTLRegionMake2D(0, 0, width, height),
-                         mipmapLevel: 0)
-
-        for i in stride(from: 0, to: pixelData.count, by: 4) {
-            let b = pixelData[i]
-            pixelData[i] = pixelData[i + 2]
-            pixelData[i + 2] = b
-        }
-
-        guard let provider = CGDataProvider(data: Data(pixelData) as CFData),
-              let cgImage = CGImage(
-                width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
-                bytesPerRow: bytesPerRow, space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
-        else { return }
-
-        let image = NSImage(cgImage: cgImage, size: NSSize(width: width, height: height))
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width), height: CGFloat(cgImage.height)))
 
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.png]
-        savePanel.nameFieldStringValue = "screenshot.png"
+        savePanel.nameFieldStringValue = screenshotFileName()
         savePanel.begin { response in
             if response == .OK, let url = savePanel.url,
                let tiff = image.tiffRepresentation,
@@ -1203,6 +1388,28 @@ final class AppState: ObservableObject {
         errorMessage = LocalizationManager.shared.localized("error.screenshotFailed")
         #endif
     }
+
+    func copyScreenshot() {
+        #if os(macOS)
+        guard let cgImage = currentStageImage() else {
+            errorMessage = LocalizationManager.shared.localized("error.screenshotFailed")
+            return
+        }
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width), height: CGFloat(cgImage.height)))
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.writeObjects([image])
+        #else
+        errorMessage = LocalizationManager.shared.localized("error.screenshotFailed")
+        #endif
+    }
+
+    #if os(macOS)
+    private func screenshotFileName() -> String {
+        let baseName = currentFileURL?.deletingPathExtension().lastPathComponent ?? "ruffnova"
+        let safeName = baseName.replacingOccurrences(of: ":", with: "-")
+        return "\(safeName)-screenshot.png"
+    }
+    #endif
 
     func startTimelinePolling() {
         timelinePollTimer?.invalidate()

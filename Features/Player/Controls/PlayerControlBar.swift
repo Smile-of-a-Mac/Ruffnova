@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlayerControlBar: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject private var locManager: LocalizationManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
@@ -42,6 +43,7 @@ struct PlayerControlBar: View {
                     .background(.ultraThinMaterial, in: Circle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(locManager.localized(appState.isMuted ? "player.unmute" : "player.mute"))
 
             Slider(value: Binding(
                 get: { Double(appState.volume) },
@@ -63,21 +65,21 @@ struct PlayerControlBar: View {
             iosTimeline
 
             HStack(alignment: .center, spacing: NativeSpacing.sm) {
-                iosTransportButton("backward.end.fill", size: 14) {
+                iosTransportButton("backward.end.fill", labelKey: "menu.rewind", size: 14) {
                     appState.rewind()
                 }
 
-                iosTransportButton("backward.frame.fill", size: 14) {
+                iosTransportButton("backward.frame.fill", labelKey: "menu.stepBackward", size: 14) {
                     appState.stepBackward()
                 }
 
                 iosPlayButton(size: 46, iconSize: 18)
 
-                iosTransportButton("forward.frame.fill", size: 14) {
+                iosTransportButton("forward.frame.fill", labelKey: "menu.stepForward", size: 14) {
                     appState.stepForward()
                 }
 
-                iosTransportButton("forward.end.fill", size: 14) {
+                iosTransportButton("forward.end.fill", labelKey: "player.seekToEnd", size: 14) {
                     appState.seekToEnd()
                 }
 
@@ -108,6 +110,7 @@ struct PlayerControlBar: View {
                 .shadow(color: Color.accentColor.opacity(0.28), radius: 10, x: 0, y: 5)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(locManager.localized(appState.isPlaying ? "menu.pause" : "menu.play"))
     }
 
     private var iosTimeline: some View {
@@ -129,7 +132,7 @@ struct PlayerControlBar: View {
         .foregroundStyle(.secondary)
     }
 
-    private func iosTransportButton(_ systemName: String, size: CGFloat, action: @escaping () -> Void) -> some View {
+    private func iosTransportButton(_ systemName: String, labelKey: String, size: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: size, weight: .semibold))
@@ -138,6 +141,7 @@ struct PlayerControlBar: View {
                 .background(.ultraThinMaterial, in: Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(locManager.localized(labelKey))
     }
 
     private var iosLoopButton: some View {
@@ -149,6 +153,8 @@ struct PlayerControlBar: View {
         }
         .buttonStyle(.plain)
         .background(.ultraThinMaterial, in: Circle())
+        .accessibilityLabel(locManager.localized("menu.loop"))
+        .accessibilityValue(locManager.localized(appState.isLooping ? "player.loop.on" : "player.loop.off"))
     }
 
     private var iosSpeedMenu: some View {
@@ -163,6 +169,8 @@ struct PlayerControlBar: View {
                 .frame(width: 46, height: 30)
                 .background(.ultraThinMaterial, in: Capsule())
         }
+        .accessibilityLabel(locManager.localized("menu.speed"))
+        .accessibilityValue(String(format: "%.2fx", appState.playbackSpeed))
     }
 
     private var iosMuteButton: some View {
@@ -174,6 +182,7 @@ struct PlayerControlBar: View {
                 .background(.ultraThinMaterial, in: Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(locManager.localized(appState.isMuted ? "player.unmute" : "player.mute"))
     }
     #endif
 
@@ -189,6 +198,7 @@ struct PlayerControlBar: View {
                 .shadow(color: Color.accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(locManager.localized(appState.isPlaying ? "menu.pause" : "menu.play"))
     }
 
     // MARK: - Interactive: Native controls
@@ -204,6 +214,7 @@ struct PlayerControlBar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(locManager.localized(appState.isMuted ? "player.unmute" : "player.mute"))
 
                 Slider(value: Binding(
                     get: { Double(appState.volume) },
@@ -228,6 +239,7 @@ struct PlayerControlBar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(locManager.localized(appState.isMuted ? "player.unmute" : "player.mute"))
 
                 Slider(value: Binding(
                     get: { Double(appState.volume) },
@@ -285,14 +297,18 @@ struct PlayerControlBar: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(width: 32, height: 32)
-            }.buttonStyle(.plain)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(locManager.localized("menu.stepBackward"))
 
             Button(action: { appState.stepForward() }) {
                 Image(systemName: "goforward.5")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(width: 32, height: 32)
-            }.buttonStyle(.plain)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(locManager.localized("menu.stepForward"))
         }
     }
 
@@ -318,6 +334,8 @@ struct PlayerControlBar: View {
                 .frame(width: 28, height: 28)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(locManager.localized("menu.loop"))
+        .accessibilityValue(locManager.localized(appState.isLooping ? "player.loop.on" : "player.loop.off"))
     }
 
     private var modernSpeedButton: some View {
@@ -332,6 +350,8 @@ struct PlayerControlBar: View {
                 .frame(width: 40)
         }
         .menuStyle(.borderlessButton)
+        .accessibilityLabel(locManager.localized("menu.speed"))
+        .accessibilityValue(String(format: "%.2fx", appState.playbackSpeed))
     }
 
     private var modernVolumeControl: some View {
@@ -343,6 +363,7 @@ struct PlayerControlBar: View {
                     .frame(width: 24, height: 24)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(locManager.localized(appState.isMuted ? "player.unmute" : "player.mute"))
 
             Slider(value: Binding(
                 get: { Double(appState.volume) },

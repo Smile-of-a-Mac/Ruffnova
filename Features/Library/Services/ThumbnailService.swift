@@ -10,11 +10,15 @@ final class ThumbnailService {
     private let fileManager = FileManager.default
     private let logger = Logger(subsystem: "com.ruffnova", category: "thumbnails")
 
-    private init() {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        cacheDirectory = appSupport
+    convenience init() {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        self.init(cacheDirectory: appSupport
             .appendingPathComponent("RuffleFlashPlayer")
-            .appendingPathComponent("Thumbnails")
+            .appendingPathComponent("Thumbnails"))
+    }
+
+    init(cacheDirectory: URL) {
+        self.cacheDirectory = cacheDirectory
         try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
     }
 

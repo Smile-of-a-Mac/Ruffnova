@@ -30,4 +30,7 @@ extension Notification.Name {
 
     /// Posted to move keyboard focus to the player stage.
     static let focusPlayerStage = Notification.Name("focusPlayerStage")
+
+    /// Posted after the app language changes.
+    static let localizationChanged = Notification.Name("localizationChanged")
 }

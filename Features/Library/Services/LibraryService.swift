@@ -4,22 +4,35 @@ import OSLog
 @MainActor
 final class LibraryService: ObservableObject {
     static let shared = LibraryService()
+    static let currentSchemaVersion = 2
 
     @Published private(set) var items: [LibraryItem] = []
+    @Published private(set) var migrationFailures: [PersistenceMigrationFailure] = []
 
+    private let directoryURL: URL
     private let storageURL: URL
     private let versionURL: URL
-    private let schemaVersion = 1
+    private let schemaVersion = LibraryService.currentSchemaVersion
     private let logger = Logger(subsystem: "com.ruffnova", category: "library")
     private let fileManager = FileManager.default
-    private let thumbnailService = ThumbnailService.shared
+    private let thumbnailService: ThumbnailService
 
-    private init() {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+    convenience init() {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dir = appSupport.appendingPathComponent("RuffleFlashPlayer")
-        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
-        storageURL = dir.appendingPathComponent("library.json")
-        versionURL = dir.appendingPathComponent("library.version")
+        self.init(directory: dir, thumbnailService: .shared)
+    }
+
+    convenience init(directory: URL) {
+        self.init(directory: directory, thumbnailService: .shared)
+    }
+
+    init(directory: URL, thumbnailService: ThumbnailService) {
+        self.directoryURL = directory
+        self.storageURL = directory.appendingPathComponent("library.json")
+        self.versionURL = directory.appendingPathComponent("library.version")
+        self.thumbnailService = thumbnailService
+        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         load()
     }
 
@@ -186,38 +199,54 @@ final class LibraryService: ObservableObject {
 
     // MARK: - Migration
 
-    func migrateIfNeeded() {
+    @discardableResult
+    func migrateIfNeeded() -> PersistenceMigrationReport {
+        var report = PersistenceMigrationReport(failures: migrationFailures)
         let currentVersion = readSchemaVersion()
-        guard currentVersion < schemaVersion else { return }
+        guard currentVersion < schemaVersion else { return report }
         logger.info("Starting library migration (schema \(currentVersion) -> \(self.schemaVersion))")
 
-        migrateFromRecentFiles()
-        migrateFromBookmarks()
+        migrateFromRecentFiles(into: &report)
+        migrateFromBookmarks(into: &report)
+        if migrateLegacyThumbnails(in: &items, report: &report) {
+            save(into: &report)
+        } else if !items.isEmpty || fileManager.fileExists(atPath: storageURL.path) {
+            save(into: &report)
+        }
 
-        writeSchemaVersion(schemaVersion)
-        logger.info("Library migration complete")
+        if writeSchemaVersion(schemaVersion, into: &report) {
+            logger.info("Library migration complete")
+        }
+        migrationFailures = report.failures
+        return report
     }
 
-    private func migrateFromRecentFiles() {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("RuffleFlashPlayer")
-        let recentURL = dir.appendingPathComponent("recentFiles.json")
+    private func migrateFromRecentFiles(into report: inout PersistenceMigrationReport) {
+        let recentURL = directoryURL.appendingPathComponent("recentFiles.json")
 
-        guard let data = try? Data(contentsOf: recentURL),
-              let persisted = try? JSONDecoder().decode([PersistedRecentFile].self, from: data)
-        else { return }
+        guard fileManager.fileExists(atPath: recentURL.path) else { return }
+        let persisted: [PersistedRecentFile]
+        do {
+            let data = try Data(contentsOf: recentURL)
+            persisted = try JSONDecoder().decode([PersistedRecentFile].self, from: data)
+        } catch {
+            recordFailure(store: "recentFiles.json", error: error, requiresUserAction: false, into: &report)
+            return
+        }
 
         for persistedFile in persisted {
             var isStale = false
             let url: URL
-            if let resolved = try? URL(
-                resolvingBookmarkData: persistedFile.bookmarkData,
-                options: .withoutUI,
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            ) {
+            do {
+                let resolved = try URL(
+                    resolvingBookmarkData: persistedFile.bookmarkData,
+                    options: .withoutUI,
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
                 url = resolved
-            } else {
+            } catch {
+                recordFailure(store: "recentFiles.json", error: error, requiresUserAction: false, into: &report)
                 continue
             }
 
@@ -239,19 +268,26 @@ final class LibraryService: ObservableObject {
         logger.info("Migrated \(persisted.count) recent files")
     }
 
-    private func migrateFromBookmarks() {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("RuffleFlashPlayer")
-        let bookmarksURL = dir.appendingPathComponent("bookmarks.json")
+    private func migrateFromBookmarks(into report: inout PersistenceMigrationReport) {
+        let bookmarksURL = directoryURL.appendingPathComponent("bookmarks.json")
 
-        guard let data = try? Data(contentsOf: bookmarksURL),
-              let bookmarks = try? JSONDecoder().decode([LegacyBookmark].self, from: data)
-        else { return }
+        guard fileManager.fileExists(atPath: bookmarksURL.path) else { return }
+        let bookmarks: [LegacyBookmark]
+        do {
+            let data = try Data(contentsOf: bookmarksURL)
+            bookmarks = try JSONDecoder().decode([LegacyBookmark].self, from: data)
+        } catch {
+            recordFailure(store: "bookmarks.json", error: error, requiresUserAction: false, into: &report)
+            return
+        }
 
         for bookmark in bookmarks {
-            if let index = items.firstIndex(where: { $0.url == bookmark.url }) {
+            if let index = items.firstIndex(where: { urlsMatch($0.url, bookmark.url) }) {
                 objectWillChange.send()
                 items[index].isFavorite = true
+                if items[index].lastPlaybackFrame == nil {
+                    items[index].lastPlaybackFrame = bookmark.frame
+                }
             } else {
                 let item = LibraryItem(
                     url: bookmark.url,
@@ -276,9 +312,16 @@ final class LibraryService: ObservableObject {
         return version
     }
 
-    private func writeSchemaVersion(_ version: Int) {
-        guard let data = try? JSONEncoder().encode(version) else { return }
-        try? data.write(to: versionURL, options: .atomic)
+    @discardableResult
+    private func writeSchemaVersion(_ version: Int, into report: inout PersistenceMigrationReport) -> Bool {
+        do {
+            let data = try JSONEncoder().encode(version)
+            try data.write(to: versionURL, options: .atomic)
+            return true
+        } catch {
+            recordFailure(store: "library.version", error: error, requiresUserAction: false, into: &report)
+            return false
+        }
     }
 
     // MARK: - Persistence
@@ -286,25 +329,50 @@ final class LibraryService: ObservableObject {
     private func load() {
         guard let data = try? Data(contentsOf: storageURL) else { return }
         do {
-            var decoded = try JSONDecoder().decode([LibraryItem].self, from: data)
-            let migratedThumbnails = migrateLegacyThumbnails(in: &decoded)
+            var report = PersistenceMigrationReport()
+            var decoded = try decodeLibraryItems(from: data)
+            let migratedThumbnails = migrateLegacyThumbnails(in: &decoded, report: &report)
             items = decoded
-            if migratedThumbnails {
-                save()
+            if migratedThumbnails || legacyArrayStoreExists(in: data) {
+                save(into: &report)
             }
+            migrationFailures = report.failures
             logger.info("Loaded \(decoded.count) library items")
         } catch {
-            logger.error("Failed to load library: \(error.localizedDescription)")
+            var report = PersistenceMigrationReport()
+            recordFailure(store: "library.json", error: error, requiresUserAction: true, into: &report)
+            migrationFailures = report.failures
+            items = []
         }
     }
 
-    private func migrateLegacyThumbnails(in decoded: inout [LibraryItem]) -> Bool {
+    private func decodeLibraryItems(from data: Data) throws -> [LibraryItem] {
+        if let store = try? JSONDecoder().decode(LibraryStore.self, from: data) {
+            return store.items
+        }
+        return try JSONDecoder().decode([LibraryItem].self, from: data)
+    }
+
+    private func legacyArrayStoreExists(in data: Data) -> Bool {
+        (try? JSONDecoder().decode(LibraryStore.self, from: data)) == nil
+    }
+
+    private func migrateLegacyThumbnails(in decoded: inout [LibraryItem], report: inout PersistenceMigrationReport) -> Bool {
         var didMigrate = false
         for index in decoded.indices {
             guard decoded[index].thumbnailIdentifier == nil,
-                  let thumbnailData = decoded[index].thumbnailData,
-                  let identifier = thumbnailService.store(thumbnailData, for: decoded[index].id)
+                  let thumbnailData = decoded[index].thumbnailData
             else { continue }
+
+            guard let identifier = thumbnailService.store(thumbnailData, for: decoded[index].id) else {
+                recordFailure(
+                    store: "library.json",
+                    message: "Failed to migrate thumbnail for \(decoded[index].name)",
+                    requiresUserAction: false,
+                    into: &report
+                )
+                continue
+            }
 
             decoded[index].thumbnailIdentifier = identifier
             decoded[index].thumbnailData = nil
@@ -314,11 +382,17 @@ final class LibraryService: ObservableObject {
     }
 
     private func save() {
+        var report = PersistenceMigrationReport()
+        save(into: &report)
+        migrationFailures.append(contentsOf: report.failures)
+    }
+
+    private func save(into report: inout PersistenceMigrationReport) {
         do {
-            let data = try JSONEncoder().encode(items)
+            let data = try JSONEncoder().encode(LibraryStore(schemaVersion: schemaVersion, items: items))
             try data.write(to: storageURL, options: .atomic)
         } catch {
-            logger.error("Failed to save library: \(error.localizedDescription)")
+            recordFailure(store: "library.json", error: error, requiresUserAction: false, into: &report)
         }
     }
 
@@ -329,6 +403,58 @@ final class LibraryService: ObservableObject {
             relativeTo: nil
         )
     }
+
+    private func urlsMatch(_ lhs: URL, _ rhs: URL) -> Bool {
+        lhs.standardizedFileURL.resolvingSymlinksInPath() == rhs.standardizedFileURL.resolvingSymlinksInPath()
+    }
+
+    private func recordFailure(
+        store: String,
+        error: Error,
+        requiresUserAction: Bool,
+        into report: inout PersistenceMigrationReport
+    ) {
+        recordFailure(
+            store: store,
+            message: error.localizedDescription,
+            requiresUserAction: requiresUserAction,
+            into: &report
+        )
+    }
+
+    private func recordFailure(
+        store: String,
+        message: String,
+        requiresUserAction: Bool,
+        into report: inout PersistenceMigrationReport
+    ) {
+        logger.error("Migration failure in \(store): \(message)")
+        report.failures.append(PersistenceMigrationFailure(
+            store: store,
+            message: message,
+            requiresUserAction: requiresUserAction
+        ))
+    }
+}
+
+struct PersistenceMigrationReport: Equatable {
+    var failures: [PersistenceMigrationFailure] = []
+
+    var requiresUserAction: Bool {
+        failures.contains { $0.requiresUserAction }
+    }
+}
+
+struct PersistenceMigrationFailure: Identifiable, Equatable {
+    let id = UUID()
+    var store: String
+    var message: String
+    var requiresUserAction: Bool
+}
+
+struct LibraryStore: Codable {
+    var schemaVersion: Int
+    var items: [LibraryItem]
 }
 
 // MARK: - Legacy Bookmark Type (for migration)

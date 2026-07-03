@@ -1,8 +1,10 @@
+import Combine
 import SwiftUI
 
 struct DiagnosticsView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @Environment(\.dismiss) private var dismiss
     @State private var report: CompatibilityReport?
     @State private var didCopy = false
 
@@ -29,7 +31,7 @@ struct DiagnosticsView: View {
         }
         .frame(minWidth: 520, minHeight: 520)
         .onAppear(perform: refresh)
-        .onChange(of: appState.playerIssues) { _ in refresh() }
+        .onReceive(appState.$playerIssues.dropFirst()) { _ in refresh() }
     }
 
     private var header: some View {
@@ -44,6 +46,14 @@ struct DiagnosticsView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(locManager.localized("menu.close"))
         }
         .padding(.horizontal, NativeSpacing.xl)
         .padding(.vertical, NativeSpacing.md)

@@ -12,11 +12,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         configureOpenWindows()
+        DispatchQueue.main.async {
+            Task { @MainActor in
+                MacMenuLocalizationService.apply()
+            }
+        }
 
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(windowDidBecomeMain(_:)),
             name: NSWindow.didBecomeMainNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(localizationDidChange),
+            name: .localizationChanged,
             object: nil
         )
     }
@@ -53,6 +64,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func windowDidBecomeMain(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
         configure(window)
+        Task { @MainActor in
+            MacMenuLocalizationService.apply()
+        }
+    }
+
+    @objc private func localizationDidChange() {
+        Task { @MainActor in
+            MacMenuLocalizationService.apply()
+        }
     }
 
     private func configureOpenWindows() {

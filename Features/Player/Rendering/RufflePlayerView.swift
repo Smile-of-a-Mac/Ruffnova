@@ -219,32 +219,39 @@ final class RuffleMetalViewMacOS: MTKView {
     // MARK: Context Menu
 
     override func menu(for event: NSEvent) -> NSMenu? {
+        let loc = LocalizationManager.shared
         let menu = NSMenu()
         let playItem = NSMenuItem(
-            title: appState?.isPlaying == true ? "Pause" : "Play",
+            title: appState?.isPlaying == true ? loc.localized("menu.pause") : loc.localized("menu.play"),
             action: #selector(contextMenuPlayPause), keyEquivalent: ""
         )
         playItem.target = self
         menu.addItem(playItem)
         menu.addItem(.separator())
-        let rewindItem = NSMenuItem(title: "Rewind", action: #selector(contextMenuRewind), keyEquivalent: "")
+        let rewindItem = NSMenuItem(title: loc.localized("menu.rewind"), action: #selector(contextMenuRewind), keyEquivalent: "")
         rewindItem.target = self
         menu.addItem(rewindItem)
-        let stepItem = NSMenuItem(title: "Step Forward", action: #selector(contextMenuStepForward), keyEquivalent: "")
+        let stepItem = NSMenuItem(title: loc.localized("menu.stepForward"), action: #selector(contextMenuStepForward), keyEquivalent: "")
         stepItem.target = self
         menu.addItem(stepItem)
         menu.addItem(.separator())
         let qualityMenu = NSMenu()
-        for q in [("Low", 0), ("Medium", 1), ("High", 2), ("Best", 3)] {
+        let qualityItems = [
+            (loc.localized("menu.quality.low"), 0),
+            (loc.localized("menu.quality.medium"), 1),
+            (loc.localized("menu.quality.high"), 2),
+            (loc.localized("menu.quality.best"), 3),
+        ]
+        for q in qualityItems {
             let item = NSMenuItem(title: q.0, action: #selector(contextMenuSetQuality(_:)), keyEquivalent: "")
             item.tag = q.1; item.target = self
             qualityMenu.addItem(item)
         }
-        let qualityItem = NSMenuItem(title: "Quality", action: nil, keyEquivalent: "")
+        let qualityItem = NSMenuItem(title: loc.localized("menu.quality"), action: nil, keyEquivalent: "")
         qualityItem.submenu = qualityMenu
         menu.addItem(qualityItem)
         menu.addItem(.separator())
-        let ssItem = NSMenuItem(title: "Save Screenshot", action: #selector(contextMenuScreenshot), keyEquivalent: "")
+        let ssItem = NSMenuItem(title: loc.localized("menu.saveScreenshot"), action: #selector(contextMenuScreenshot), keyEquivalent: "")
         ssItem.keyEquivalentModifierMask = [.command, .shift]
         ssItem.keyEquivalent = "s"; ssItem.target = self
         menu.addItem(ssItem)
@@ -264,6 +271,10 @@ final class RuffleMetalViewMacOS: MTKView {
     override var acceptsFirstResponder: Bool { true }
 
     override func keyDown(with event: NSEvent) {
+        guard shouldForwardToPlayer(event) else {
+            super.keyDown(with: event)
+            return
+        }
         let (kc, cc) = keyMap(event)
         NotificationCenter.default.post(
             name: .keyEvent, object: nil,
@@ -273,12 +284,21 @@ final class RuffleMetalViewMacOS: MTKView {
     }
 
     override func keyUp(with event: NSEvent) {
+        guard shouldForwardToPlayer(event) else { return }
         let (kc, cc) = keyMap(event)
         NotificationCenter.default.post(
             name: .keyEvent, object: nil,
             userInfo: ["keyCode": kc, "charCode": cc, "isDown": false,
                        "modifiers": event.modifierFlags.deviceIndependentModifierFlagsMask.rawValue]
         )
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        appState?.handlePlayerEscape()
+    }
+
+    private func shouldForwardToPlayer(_ event: NSEvent) -> Bool {
+        !event.modifierFlags.deviceIndependentModifierFlagsMask.contains(.command)
     }
 
     private func keyMap(_ event: NSEvent) -> (UInt32, UInt32) {

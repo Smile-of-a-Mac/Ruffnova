@@ -1,57 +1,121 @@
 import SwiftUI
 
+struct SettingsActions {
+    var setLooping: @MainActor (Bool) -> Void = { _ in }
+    var setQuality: @MainActor (RuffleQuality) -> Void = { _ in }
+    var setSpeed: @MainActor (Float) -> Void = { _ in }
+    var setMaxExecutionDuration: @MainActor (Double) -> Void = { _ in }
+    var setAVM2OptimizerEnabled: @MainActor (Bool) -> Void = { _ in }
+    var setShowDebugUI: @MainActor (Bool) -> Void = { _ in }
+    var showTraceConsole: @MainActor () -> Void = {}
+    var showDiagnostics: @MainActor () -> Void = {}
+    var hasCurrentFile: @MainActor () -> Bool = { false }
+    var avm2OptimizerEnabled: @MainActor () -> Bool = { true }
+    var resetRuntimeSettings: @MainActor () -> Void = {}
+
+    init() {}
+
+    @MainActor
+    init(appState: AppState) {
+        setLooping = { [weak appState] value in appState?.isLooping = value }
+        setQuality = { [weak appState] value in appState?.quality = value }
+        setSpeed = { [weak appState] value in appState?.setSpeed(value) }
+        setMaxExecutionDuration = { [weak appState] value in appState?.maxExecutionDuration = value }
+        setAVM2OptimizerEnabled = { [weak appState] value in appState?.avm2OptimizerEnabled = value }
+        setShowDebugUI = { [weak appState] value in appState?.showDebugUI = value }
+        showTraceConsole = { [weak appState] in appState?.showTraceConsole = true }
+        showDiagnostics = { [weak appState] in appState?.showDiagnostics = true }
+        hasCurrentFile = { [weak appState] in appState?.currentFileURL != nil }
+        avm2OptimizerEnabled = { [weak appState] in appState?.avm2OptimizerEnabled ?? true }
+        resetRuntimeSettings = { [weak appState] in
+            appState?.quality = .high
+            appState?.isLooping = false
+            appState?.setSpeed(1.0)
+            appState?.maxExecutionDuration = SettingsPersistence.shared.maxExecutionDuration
+            appState?.playerMode = .normal
+            appState?.avm2OptimizerEnabled = true
+            appState?.showDebugUI = false
+        }
+    }
+}
+
+private struct SettingsActionsKey: EnvironmentKey {
+    static let defaultValue = SettingsActions()
+}
+
+extension EnvironmentValues {
+    var settingsActions: SettingsActions {
+        get { self[SettingsActionsKey.self] }
+        set { self[SettingsActionsKey.self] = newValue }
+    }
+}
+
 struct InlineSettingsView: View {
     @EnvironmentObject private var locManager: LocalizationManager
     @State private var selectedCategory: SettingsCategory = .general
-    var centerContent = false
+    var centerContent = true
+
+    private var categoryPickerWidth: CGFloat {
+        #if os(macOS)
+        480
+        #else
+        460
+        #endif
+    }
+
+    private var formWidth: CGFloat {
+        #if os(macOS)
+        560
+        #else
+        680
+        #endif
+    }
+
+    private var horizontalPadding: CGFloat {
+        #if os(macOS)
+        NativeSpacing.xxl
+        #else
+        NativeSpacing.section
+        #endif
+    }
 
     private var platformBackground: Color {
         #if os(macOS)
         Color(nsColor: .windowBackgroundColor)
         #else
-        Color(.systemBackground)
+        Color(.systemGroupedBackground)
         #endif
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: centerContent ? .center : .leading, spacing: NativeSpacing.xxxl) {
-                settingsHeader
-
-                SettingsPane(category: selectedCategory)
-            }
-            .frame(maxWidth: 760)
-            .frame(maxWidth: .infinity, alignment: centerContent ? .center : .leading)
-            .padding(.horizontal, NativeSpacing.section)
-            .padding(.top, NativeSpacing.section)
-            .padding(.bottom, NativeSpacing.section)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(platformBackground)
-        .animation(.glassSmooth, value: selectedCategory)
-    }
-
-    private var settingsHeader: some View {
-        VStack(alignment: centerContent ? .center : .leading, spacing: NativeSpacing.lg) {
+        VStack(alignment: centerContent ? .center : .leading, spacing: NativeSpacing.xl) {
             Picker("", selection: $selectedCategory) {
                 ForEach(SettingsCategory.allCases) { category in
-                    Text(locManager.localized(category.titleKey))
-                        .tag(category)
+                    Text(locManager.localized(category.titleKey)).tag(category)
                 }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(maxWidth: 420)
-            .frame(maxWidth: centerContent ? .infinity : nil, alignment: centerContent ? .center : .leading)
+            .frame(width: categoryPickerWidth)
+            .accessibilityLabel(locManager.localized("settings.category"))
+
+            SettingsForm(category: selectedCategory)
+                .frame(width: formWidth, alignment: .center)
+                .frame(maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: centerContent ? .top : .topLeading)
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, NativeSpacing.section)
+        .background(platformBackground)
+        .animation(.glassSmooth, value: selectedCategory)
     }
 }
 
-private struct SettingsPane: View {
+private struct SettingsForm: View {
     let category: SettingsCategory
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
+        Form {
             switch category {
             case .general:
                 GeneralSettingsView()
@@ -61,169 +125,324 @@ private struct SettingsPane: View {
                 PrivacySettingsView()
             case .advanced:
                 AdvancedSettingsView()
+            case .about:
+                AboutSettingsView()
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .scrollContentBackground(.hidden)
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
     }
 }
 
 struct GeneralSettingsView: View {
     @EnvironmentObject private var locManager: LocalizationManager
+    @Environment(\.settingsActions) private var settingsActions
     @AppStorage("autoplay") private var autoplay = true
     @AppStorage("letterbox") private var letterbox = "fullscreen"
+    @AppStorage("defaultPlayerMode") private var defaultPlayerMode = PlayerMode.normal.rawValue
+    @AppStorage("loop") private var isLooping = false
+    @AppStorage("quality") private var qualityRawValue = Int(RuffleQuality.high.rawValue)
+    @AppStorage("speed") private var playbackSpeed = 1.0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
-            SettingsSection(
-                title: locManager.localized("settings.general.playback"),
-                subtitle: locManager.localized("settings.general.playback.subtitle")
-            ) {
-                SettingsToggleRow(title: locManager.localized("settings.general.playback.autoplay"), isOn: $autoplay)
-                SettingsPickerRow(title: locManager.localized("settings.general.playback.letterbox"), selection: $letterbox) {
-                    Text(locManager.localized("settings.general.playback.letterbox.fullscreen")).tag("fullscreen")
-                    Text(locManager.localized("settings.general.playback.letterbox.on")).tag("on")
-                    Text(locManager.localized("settings.general.playback.letterbox.off")).tag("off")
+        Section {
+            Toggle(locManager.localized("settings.general.playback.autoplay"), isOn: $autoplay)
+            Picker(locManager.localized("settings.general.playback.letterbox"), selection: $letterbox) {
+                Text(locManager.localized("settings.general.playback.letterbox.fullscreen")).tag("fullscreen")
+                Text(locManager.localized("settings.general.playback.letterbox.on")).tag("on")
+                Text(locManager.localized("settings.general.playback.letterbox.off")).tag("off")
+            }
+            Picker(locManager.localized("settings.general.playback.defaultMode"), selection: defaultPlayerModeBinding) {
+                ForEach(PlayerMode.allCases) { mode in
+                    Text(locManager.localized(mode.localizedKey)).tag(mode.rawValue)
                 }
             }
-
-            SettingsSection(
-                title: locManager.localized("settings.inline.language"),
-                subtitle: locManager.localized("settings.general.language.subtitle")
-            ) {
-                SettingsPickerRow(title: locManager.localized("settings.general.language"), selection: Binding(
-                    get: { locManager.selectedLanguage },
-                    set: { locManager.setLanguage($0) }
-                )) {
-                    ForEach(Language.allCases, id: \.self) { language in
-                        Text(language.displayName).tag(language)
-                    }
-                }
+            Toggle(locManager.localized("settings.general.playback.loop"), isOn: loopingBinding)
+            Picker(locManager.localized("settings.rendering.quality.stageQuality"), selection: qualityBinding) {
+                Text(locManager.localized("settings.rendering.quality.low")).tag(RuffleQuality.low)
+                Text(locManager.localized("settings.rendering.quality.medium")).tag(RuffleQuality.medium)
+                Text(locManager.localized("settings.rendering.quality.high")).tag(RuffleQuality.high)
+                Text(locManager.localized("settings.rendering.quality.best")).tag(RuffleQuality.best)
             }
+            LabeledContent(locManager.localized("settings.general.playback.speed")) {
+                HStack(spacing: NativeSpacing.md) {
+                    Slider(value: speedBinding, in: 0.25...4.0, step: 0.25)
+                        .frame(minWidth: 160)
+                    Text(String(format: "%.2fx", effectivePlaybackSpeed))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .frame(width: 56, alignment: .trailing)
+                }
+                .settingsControlColumn()
+            }
+        } header: {
+            Label(locManager.localized("settings.general.playback"), systemImage: "play.circle")
         }
+
+        Section {
+            Picker(locManager.localized("settings.general.language"), selection: languageBinding) {
+                ForEach(Language.allCases, id: \.self) { language in
+                    Text(language.displayName).tag(language)
+                }
+            }
+        } header: {
+            Label(locManager.localized("settings.inline.language"), systemImage: "globe")
+        }
+    }
+
+    private var defaultPlayerModeBinding: Binding<String> {
+        Binding(
+            get: { defaultPlayerMode },
+            set: { newValue in
+                defaultPlayerMode = newValue
+                SettingsPersistence.shared.defaultPlayerMode = PlayerMode(rawValue: newValue) ?? .normal
+            }
+        )
+    }
+
+    private var loopingBinding: Binding<Bool> {
+        Binding(
+            get: { isLooping },
+            set: { newValue in
+                isLooping = newValue
+                settingsActions.setLooping(newValue)
+            }
+        )
+    }
+
+    private var qualityBinding: Binding<RuffleQuality> {
+        Binding(
+            get: { RuffleQuality(rawValue: Int32(qualityRawValue)) ?? .high },
+            set: { newValue in
+                qualityRawValue = Int(newValue.rawValue)
+                settingsActions.setQuality(newValue)
+            }
+        )
+    }
+
+    private var effectivePlaybackSpeed: Double {
+        playbackSpeed == 0 ? 1.0 : playbackSpeed
+    }
+
+    private var speedBinding: Binding<Double> {
+        Binding(
+            get: { effectivePlaybackSpeed },
+            set: { newValue in
+                playbackSpeed = newValue
+                settingsActions.setSpeed(Float(newValue))
+            }
+        )
+    }
+
+    private var languageBinding: Binding<Language> {
+        Binding(
+            get: { locManager.selectedLanguage },
+            set: { locManager.setLanguage($0) }
+        )
     }
 }
 
 struct RenderingSettingsView: View {
-    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var locManager: LocalizationManager
     @AppStorage("graphicsBackend") private var graphicsBackend = "auto"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
-            SettingsSection(
-                title: locManager.localized("settings.rendering.quality"),
-                subtitle: locManager.localized("settings.rendering.quality.subtitle")
-            ) {
-                SettingsPickerRow(title: locManager.localized("settings.rendering.quality.stageQuality"), selection: $appState.quality) {
-                    Text(locManager.localized("settings.rendering.quality.low")).tag(RuffleQuality.low)
-                    Text(locManager.localized("settings.rendering.quality.medium")).tag(RuffleQuality.medium)
-                    Text(locManager.localized("settings.rendering.quality.high")).tag(RuffleQuality.high)
-                    Text(locManager.localized("settings.rendering.quality.best")).tag(RuffleQuality.best)
-                }
+        Section {
+            Picker(locManager.localized("settings.rendering.graphics.backend"), selection: $graphicsBackend) {
+                Text(locManager.localized("settings.rendering.graphics.auto")).tag("auto")
+                Text(locManager.localized("settings.rendering.graphics.metal")).tag("metal")
             }
-
-            SettingsSection(
-                title: locManager.localized("settings.rendering.graphics"),
-                subtitle: locManager.localized("settings.rendering.graphics.subtitle")
-            ) {
-                SettingsPickerRow(title: locManager.localized("settings.rendering.graphics.backend"), selection: $graphicsBackend) {
-                    Text(locManager.localized("settings.rendering.graphics.auto")).tag("auto")
-                    Text(locManager.localized("settings.rendering.graphics.metal")).tag("metal")
-                    Text(locManager.localized("settings.rendering.graphics.vulkan")).tag("vulkan")
-                }
-                let osName: String = {
-                    #if os(macOS)
-                    "macOS"
-                    #else
-                    "iOS"
-                    #endif
-                }()
-                SettingsFootnote(text: String(format: locManager.localized("settings.rendering.graphics.metal.recommended"), osName), systemImage: "info.circle.fill")
+            LabeledContent(locManager.localized("settings.rendering.graphics.unavailable")) {
+                Text(locManager.localized("settings.rendering.graphics.vulkan.unavailable"))
+                    .foregroundStyle(.secondary)
             }
-
+        } header: {
+            Label(locManager.localized("settings.rendering.graphics"), systemImage: "display")
+        } footer: {
+            Text(String(format: locManager.localized("settings.rendering.graphics.metal.recommended"), platformName))
         }
+        .onAppear {
+            if graphicsBackend == "vulkan" {
+                graphicsBackend = "auto"
+            }
+        }
+    }
+
+    private var platformName: String {
+        #if os(macOS)
+        "macOS"
+        #else
+        "iOS"
+        #endif
     }
 }
 
 struct PrivacySettingsView: View {
     @EnvironmentObject private var locManager: LocalizationManager
-    @AppStorage("networkAccess") private var networkAccess = "prompt"
-    @AppStorage("filesystemAccess") private var filesystemAccess = "prompt"
+    @ObservedObject private var permissionPolicy = PermissionPolicyService.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
-            SettingsSection(
-                title: locManager.localized("settings.privacy.network"),
-                subtitle: locManager.localized("settings.privacy.network.subtitle")
-            ) {
-                SettingsPickerRow(title: locManager.localized("settings.privacy.network.prompt"), selection: $networkAccess) {
-                    Text(locManager.localized("settings.privacy.network.alwaysAsk")).tag("prompt")
-                    Text(locManager.localized("settings.privacy.network.allow")).tag("allow")
-                    Text(locManager.localized("settings.privacy.network.deny")).tag("deny")
+        Section {
+            Picker(locManager.localized("settings.privacy.network.prompt"), selection: globalDefaultBinding(for: .network)) {
+                Text(locManager.localized("permission.global.alwaysAsk")).tag(PermissionGlobalDefault.alwaysAsk)
+                Text(locManager.localized("permission.global.allow")).tag(PermissionGlobalDefault.allow)
+                Text(locManager.localized("permission.global.deny")).tag(PermissionGlobalDefault.deny)
+            }
+            Picker(locManager.localized("settings.privacy.filesystem.prompt"), selection: globalDefaultBinding(for: .filesystem)) {
+                Text(locManager.localized("permission.global.alwaysAsk")).tag(PermissionGlobalDefault.alwaysAsk)
+                Text(locManager.localized("permission.global.allow")).tag(PermissionGlobalDefault.allow)
+                Text(locManager.localized("permission.global.deny")).tag(PermissionGlobalDefault.deny)
+            }
+        } header: {
+            Label(locManager.localized("settings.privacy"), systemImage: "hand.raised")
+        } footer: {
+            Text(locManager.localized("settings.privacy.defaults.footer"))
+        }
+
+        Section {
+            PermissionOverridesListView()
+        } header: {
+            Label(locManager.localized("settings.privacy.overrides"), systemImage: "doc.badge.gearshape")
+        } footer: {
+            Text(locManager.localized("settings.privacy.overrides.subtitle"))
+        }
+
+        Section {
+            LabeledContent(locManager.localized("settings.privacy.data.usageStats")) {
+                Text(locManager.localized("settings.privacy.data.disabled"))
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Label(locManager.localized("settings.privacy.data"), systemImage: "checkmark.shield")
+        } footer: {
+            Text(locManager.localized("settings.privacy.data.noCollection"))
+        }
+    }
+
+    private func globalDefaultBinding(for scope: PermissionScope) -> Binding<PermissionGlobalDefault> {
+        Binding(
+            get: { permissionPolicy.globalDefault(for: scope) },
+            set: { permissionPolicy.setGlobalDefault($0, for: scope) }
+        )
+    }
+}
+
+private struct PermissionOverridesListView: View {
+    @EnvironmentObject private var locManager: LocalizationManager
+    @ObservedObject private var permissionPolicy = PermissionPolicyService.shared
+
+    var body: some View {
+        if permissionPolicy.overrides.isEmpty {
+            LabeledContent(locManager.localized("settings.privacy.overrides.empty")) {
+                Text(locManager.localized("settings.privacy.overrides.none"))
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            ForEach(permissionPolicy.overrides) { override in
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: NativeSpacing.xs) {
+                        Text(override.fileName)
+                        Text("\(localizedScope(override.scope)) - \(localizedDecision(override.decision))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(role: .destructive) {
+                        permissionPolicy.clearOverride(override.id)
+                    } label: {
+                        Label(locManager.localized("settings.privacy.overrides.clear"), systemImage: "trash")
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
                 }
-                SettingsFootnote(text: locManager.localized("settings.privacy.network.sandboxed"), systemImage: "lock.fill")
             }
 
-            SettingsSection(
-                title: locManager.localized("settings.privacy.filesystem"),
-                subtitle: locManager.localized("settings.privacy.filesystem.subtitle")
-            ) {
-                SettingsPickerRow(title: locManager.localized("settings.privacy.filesystem.prompt"), selection: $filesystemAccess) {
-                    Text(locManager.localized("settings.inline.alwaysAsk")).tag("prompt")
-                    Text(locManager.localized("settings.inline.allow")).tag("allow")
-                    Text(locManager.localized("settings.inline.deny")).tag("deny")
-                }
-                SettingsFootnote(text: locManager.localized("settings.privacy.filesystem.restricted"), systemImage: "shield.fill")
+            Button(role: .destructive) {
+                permissionPolicy.clearAllOverrides()
+            } label: {
+                Label(locManager.localized("settings.privacy.overrides.clearAll"), systemImage: "trash")
             }
+        }
+    }
 
-            SettingsSection(
-                title: locManager.localized("settings.privacy.data"),
-                subtitle: locManager.localized("settings.privacy.data.subtitle")
-            ) {
-                SettingsValueRow(
-                    title: locManager.localized("settings.privacy.data.usageStats"),
-                    value: locManager.localized("settings.privacy.data.disabled")
-                )
-                SettingsFootnote(text: locManager.localized("settings.privacy.data.noCollection"), systemImage: "checkmark.shield.fill")
-            }
+    private func localizedScope(_ scope: PermissionScope) -> String {
+        switch scope {
+        case .network:
+            return locManager.localized("permission.scope.network")
+        case .filesystem:
+            return locManager.localized("permission.scope.filesystem")
+        }
+    }
+
+    private func localizedDecision(_ decision: PermissionDecision) -> String {
+        switch decision {
+        case .alwaysAsk:
+            return locManager.localized("permission.decision.alwaysAsk")
+        case .allowOnce:
+            return locManager.localized("permission.decision.allowOnce")
+        case .allowForFile:
+            return locManager.localized("permission.decision.allowForFile")
+        case .denyForFile:
+            return locManager.localized("permission.decision.denyForFile")
+        case .useGlobalDefault:
+            return locManager.localized("permission.decision.useGlobalDefault")
         }
     }
 }
 
 struct AdvancedSettingsView: View {
-    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var locManager: LocalizationManager
+    @Environment(\.settingsActions) private var settingsActions
     @AppStorage("maxExecutionDuration") private var maxExecutionDuration = 15.0
+    @AppStorage("showDebugUI") private var showDebugUI = false
+    @State private var avm2OptimizerEnabled = true
     @State private var showResetAlert = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
-            SettingsSection(
-                title: locManager.localized("settings.advanced.actionscript"),
-                subtitle: locManager.localized("settings.advanced.actionscript.subtitle")
-            ) {
-                SettingsToggleRow(title: locManager.localized("settings.advanced.actionscript.avm2Optimizer"), isOn: $appState.avm2OptimizerEnabled)
-                SettingsDurationRow(
-                    title: locManager.localized("settings.advanced.actionscript.maxDuration"),
-                    value: $maxExecutionDuration,
-                    unit: locManager.localized("settings.advanced.actionscript.seconds")
-                )
+        Section {
+            Toggle(locManager.localized("settings.advanced.actionscript.avm2Optimizer"), isOn: avm2OptimizerBinding)
+            LabeledContent(locManager.localized("settings.advanced.actionscript.maxDuration")) {
+                HStack(spacing: NativeSpacing.md) {
+                    Slider(value: maxExecutionDurationBinding, in: 5...60, step: 1)
+                        .frame(minWidth: 160)
+                    Text(String(format: locManager.localized("settings.advanced.actionscript.secondsFormat"), Int(effectiveMaxExecutionDuration)))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .frame(width: 92, alignment: .trailing)
+                }
+                .settingsControlColumn()
             }
+        } header: {
+            Label(locManager.localized("settings.advanced.actionscript"), systemImage: "curlybraces")
+        }
 
-            SettingsSection(
-                title: locManager.localized("settings.advanced.debug"),
-                subtitle: locManager.localized("settings.advanced.debug.subtitle")
-            ) {
-                SettingsToggleRow(title: locManager.localized("settings.advanced.debug.showUI"), isOn: $appState.showDebugUI)
-                SettingsFootnote(text: locManager.localized("settings.advanced.debug.warning"), systemImage: "exclamationmark.triangle.fill")
+        Section {
+            Toggle(locManager.localized("settings.advanced.debug.showUI"), isOn: showDebugUIBinding)
+            Button {
+                settingsActions.showTraceConsole()
+            } label: {
+                Label(locManager.localized("menu.traceConsole"), systemImage: "terminal")
             }
+            Button {
+                settingsActions.showDiagnostics()
+            } label: {
+                Label(locManager.localized("diagnostics.title"), systemImage: "stethoscope")
+            }
+            .disabled(!settingsActions.hasCurrentFile())
+        } header: {
+            Label(locManager.localized("settings.advanced.debug"), systemImage: "ladybug")
+        } footer: {
+            Text(locManager.localized("settings.advanced.debug.warning"))
+        }
 
+        Section {
             Button(role: .destructive) {
                 showResetAlert = true
             } label: {
                 Label(locManager.localized("settings.advanced.reset"), systemImage: "arrow.counterclockwise")
             }
-            .buttonStyle(.bordered)
         }
         .alert(locManager.localized("settings.advanced.reset.title"), isPresented: $showResetAlert) {
             Button(locManager.localized("settings.advanced.reset.actionLabel"), role: .destructive, action: resetSettings)
@@ -231,163 +450,126 @@ struct AdvancedSettingsView: View {
         } message: {
             Text(locManager.localized("settings.advanced.reset.message"))
         }
+        .onAppear {
+            avm2OptimizerEnabled = settingsActions.avm2OptimizerEnabled()
+        }
+    }
+
+    private var avm2OptimizerBinding: Binding<Bool> {
+        Binding(
+            get: { avm2OptimizerEnabled },
+            set: { newValue in
+                avm2OptimizerEnabled = newValue
+                settingsActions.setAVM2OptimizerEnabled(newValue)
+            }
+        )
+    }
+
+    private var effectiveMaxExecutionDuration: Double {
+        maxExecutionDuration == 0 ? 15.0 : maxExecutionDuration
+    }
+
+    private var maxExecutionDurationBinding: Binding<Double> {
+        Binding(
+            get: { effectiveMaxExecutionDuration },
+            set: { newValue in
+                maxExecutionDuration = newValue
+                settingsActions.setMaxExecutionDuration(newValue)
+            }
+        )
+    }
+
+    private var showDebugUIBinding: Binding<Bool> {
+        Binding(
+            get: { showDebugUI },
+            set: { newValue in
+                showDebugUI = newValue
+                settingsActions.setShowDebugUI(newValue)
+            }
+        )
     }
 
     private func resetSettings() {
-        let defaults = UserDefaults.standard
-        defaults.set(true, forKey: "autoplay")
-        defaults.set("fullscreen", forKey: "letterbox")
-        defaults.set("auto", forKey: "graphicsBackend")
-        defaults.set("prompt", forKey: "networkAccess")
-        defaults.set("prompt", forKey: "filesystemAccess")
-        defaults.set(15.0, forKey: "maxExecutionDuration")
-        appState.quality = .high
-        appState.avm2OptimizerEnabled = true
-        appState.showDebugUI = false
+        SettingsPersistence.shared.resetAll()
+        PermissionPolicyService.shared.setGlobalDefault(.alwaysAsk, for: .network)
+        PermissionPolicyService.shared.setGlobalDefault(.alwaysAsk, for: .filesystem)
+        PermissionPolicyService.shared.clearAllOverrides()
+        maxExecutionDuration = SettingsPersistence.shared.maxExecutionDuration
+        showDebugUI = false
+        avm2OptimizerEnabled = true
+        settingsActions.resetRuntimeSettings()
     }
 }
 
-private struct SettingsSection<Content: View>: View {
-    let title: String
-    let subtitle: String
-    @ViewBuilder var content: Content
+struct AboutSettingsView: View {
+    @EnvironmentObject private var locManager: LocalizationManager
+
+    private let ruffleSourceURL = URL(string: "https://github.com/ruffle-rs/ruffle")
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+    }
+
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NativeSpacing.md) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.headline)
-                Text(subtitle)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(spacing: 0) {
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        Section {
+            LabeledContent(locManager.localized("about.version"), value: appVersion)
+            LabeledContent(locManager.localized("about.build"), value: buildNumber)
+            LabeledContent(locManager.localized("about.ruffleVersion"), value: "0.3.0")
+            LabeledContent(locManager.localized("about.author"), value: "Smile of a Mac")
+        } header: {
+            Label(locManager.localized("about.title"), systemImage: "info.circle")
+        } footer: {
+            Text(locManager.localized("about.subtitle"))
         }
-    }
-}
 
-private struct SettingsToggleRow: View {
-    let title: String
-    @Binding var isOn: Bool
-
-    var body: some View {
-        SettingsRow(title: title) {
-            Toggle(title, isOn: $isOn)
-                .toggleStyle(.switch)
-                .labelsHidden()
-        }
-    }
-}
-
-private struct SettingsPickerRow<Selection: Hashable, Content: View>: View {
-    let title: String
-    @Binding var selection: Selection
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        SettingsRow(title: title) {
-            Picker(title, selection: $selection) {
-                content
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .frame(minWidth: 180, alignment: .trailing)
-        }
-    }
-}
-
-private struct SettingsValueRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        SettingsRow(title: title) {
-            Text(value)
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
-private struct SettingsDurationRow: View {
-    let title: String
-    @Binding var value: Double
-    let unit: String
-
-    var body: some View {
-        SettingsRow(title: title) {
-            HStack(spacing: NativeSpacing.sm) {
-                TextField(title, value: $value, format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 80)
-                Text(unit)
-                    .foregroundStyle(.secondary)
+        if let ruffleSourceURL {
+            Section {
+                Link(locManager.localized("about.sourceLink"), destination: ruffleSourceURL)
+            } footer: {
+                Text(locManager.localized("about.license"))
             }
         }
     }
 }
 
-private struct SettingsFootnote: View {
-    let text: String
-    let systemImage: String
-
-    var body: some View {
-        Label(text, systemImage: systemImage)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.top, NativeSpacing.xs)
-            .padding(.bottom, NativeSpacing.sm)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-}
-
-private struct SettingsRow<Control: View>: View {
-    let title: String
-    @ViewBuilder var control: Control
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: NativeSpacing.xxl) {
-                Text(title)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                control
-                    .frame(minWidth: 180, alignment: .trailing)
-            }
-            .frame(minHeight: 44)
-            .padding(.vertical, NativeSpacing.sm)
-
-            Divider()
-        }
+private extension View {
+    @ViewBuilder
+    func settingsControlColumn() -> some View {
+        #if os(macOS)
+        self.frame(width: 280, alignment: .trailing)
+        #else
+        self
+        #endif
     }
 }
 
 struct SettingsView: View {
-    @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    let settingsActions: SettingsActions
+
+    init(settingsActions: SettingsActions = SettingsActions()) {
+        self.settingsActions = settingsActions
+    }
 
     var body: some View {
         #if os(iOS)
         if isIPad {
-            InlineSettingsView(centerContent: true)
-                .environmentObject(appState)
+            InlineSettingsView()
                 .environmentObject(locManager)
+                .environment(\.settingsActions, settingsActions)
         } else {
             IOSSettingsRootView()
-                .environmentObject(appState)
                 .environmentObject(locManager)
+                .environment(\.settingsActions, settingsActions)
         }
         #else
         InlineSettingsView()
-            .environmentObject(appState)
             .environmentObject(locManager)
+            .environment(\.settingsActions, settingsActions)
         #endif
     }
 
@@ -408,8 +590,7 @@ struct IOSSettingsRootView: View {
                 NavigationLink {
                     SettingsCategoryDetailView(category: category)
                 } label: {
-                    Label(locManager.localized(category.titleKey),
-                          systemImage: category.icon)
+                    Label(locManager.localized(category.titleKey), systemImage: category.icon)
                 }
             }
         }
@@ -418,28 +599,12 @@ struct IOSSettingsRootView: View {
 }
 
 struct SettingsCategoryDetailView: View {
+    @EnvironmentObject private var locManager: LocalizationManager
     let category: SettingsCategory
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
-                switch category {
-                case .general:
-                    GeneralSettingsView()
-                case .rendering:
-                    RenderingSettingsView()
-                case .privacy:
-                    PrivacySettingsView()
-                case .advanced:
-                    AdvancedSettingsView()
-                }
-            }
-            .padding(NativeSpacing.section)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        #if os(iOS)
-        .background(Color(.systemBackground))
-        #endif
+        SettingsForm(category: category)
+            .navigationTitle(locManager.localized(category.titleKey))
     }
 }
 #endif
@@ -449,19 +614,19 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     case rendering
     case privacy
     case advanced
+    case about
 
     var id: Self { self }
 
-    #if os(iOS)
     var icon: String {
         switch self {
         case .general: return "gearshape"
         case .rendering: return "display"
         case .privacy: return "hand.raised"
         case .advanced: return "wrench.and.screwdriver"
+        case .about: return "info.circle"
         }
     }
-    #endif
 
     var titleKey: String {
         switch self {
@@ -469,6 +634,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .rendering: return "settings.rendering"
         case .privacy: return "settings.privacy"
         case .advanced: return "settings.advanced"
+        case .about: return "settings.about"
         }
     }
 }

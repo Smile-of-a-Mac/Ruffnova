@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct AppToolbar: ToolbarContent {
     @EnvironmentObject var appState: AppState
@@ -34,15 +33,14 @@ struct AppToolbar: ToolbarContent {
         .help(appState.sidebarCollapsed
               ? locManager.localized("toolbar.showSidebar")
               : locManager.localized("toolbar.hideSidebar"))
-        .keyboardShortcut("s", modifiers: [.command, .control])
     }
 
     private var importMenu: some View {
         Menu {
-            Button { showOpenPanel() } label: {
+            Button { AppCommandRouter.openFile(appState: appState, loc: locManager) } label: {
                 Label(locManager.localized("toolbar.openSwf"), systemImage: "doc")
             }
-            Button { showImportFolderPanel() } label: {
+            Button { AppCommandRouter.importFolder(appState: appState, loc: locManager) } label: {
                 Label(locManager.localized("toolbar.importFolder"), systemImage: "folder")
             }
         } label: {
@@ -64,36 +62,8 @@ struct AppToolbar: ToolbarContent {
             Label(locManager.localized("toolbar.settings"), systemImage: "gearshape")
         }
         .help(locManager.localized("toolbar.settings"))
-        .keyboardShortcut(",", modifiers: .command)
     }
 
-    // MARK: - Panel Helpers
-
-    private func showOpenPanel() {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "swf")].compactMap { $0 }
-        panel.allowsMultipleSelection = false
-        panel.message = locManager.localized("workspace.openPanel.message")
-        panel.canChooseDirectories = false
-        if panel.runModal() == .OK, let url = panel.url {
-            appState.openFile(url)
-        }
-        #endif
-    }
-
-    private func showImportFolderPanel() {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.message = locManager.localized("library.chooseFolder.message")
-        if panel.runModal() == .OK, let url = panel.url {
-            appState.browseDirectory(url)
-        }
-        #endif
-    }
 }
 
 #Preview("Toolbar") {

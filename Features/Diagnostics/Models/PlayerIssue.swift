@@ -8,6 +8,7 @@ enum PlayerIssue: Error, Equatable, Identifiable {
     case unsupportedAPI
     case networkBlocked
     case filesystemBlocked
+    case libraryMigrationFailed
     case renderInitFailure
     case scriptTimeout
     case unknown(String)
@@ -28,6 +29,8 @@ enum PlayerIssue: Error, Equatable, Identifiable {
             return "networkBlocked"
         case .filesystemBlocked:
             return "filesystemBlocked"
+        case .libraryMigrationFailed:
+            return "libraryMigrationFailed"
         case .renderInitFailure:
             return "renderInitFailure"
         case .scriptTimeout:
@@ -53,6 +56,8 @@ enum PlayerIssue: Error, Equatable, Identifiable {
             return "diagnostics.issue.networkBlocked"
         case .filesystemBlocked:
             return "diagnostics.issue.filesystemBlocked"
+        case .libraryMigrationFailed:
+            return "diagnostics.issue.libraryMigrationFailed"
         case .renderInitFailure:
             return "diagnostics.issue.renderInitFailure"
         case .scriptTimeout:
@@ -88,6 +93,8 @@ enum PlayerIssue: Error, Equatable, Identifiable {
             return "diagnostics.recovery.networkBlocked"
         case .filesystemBlocked:
             return "diagnostics.recovery.filesystemBlocked"
+        case .libraryMigrationFailed:
+            return "diagnostics.recovery.libraryMigrationFailed"
         case .renderInitFailure:
             return "diagnostics.recovery.renderInitFailure"
         case .scriptTimeout:

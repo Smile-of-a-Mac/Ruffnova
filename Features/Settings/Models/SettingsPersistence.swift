@@ -9,7 +9,10 @@ final class SettingsPersistence {
 
     // Keys match @AppStorage keys used in settings views
     var quality: Int32 {
-        get { Int32(defaults.integer(forKey: "quality")) }
+        get {
+            guard defaults.object(forKey: "quality") != nil else { return RuffleQuality.high.rawValue }
+            return Int32(defaults.integer(forKey: "quality"))
+        }
         set { defaults.set(Int(newValue), forKey: "quality") }
     }
     var volume: Float {
@@ -57,12 +60,20 @@ final class SettingsPersistence {
         }
         set { defaults.set(newValue, forKey: "autoplay") }
     }
+    var defaultPlayerMode: PlayerMode {
+        get {
+            guard let rawValue = defaults.string(forKey: "defaultPlayerMode") else { return .normal }
+            return PlayerMode(rawValue: rawValue) ?? .normal
+        }
+        set { defaults.set(newValue.rawValue, forKey: "defaultPlayerMode") }
+    }
 
     func resetAll() {
         for key in ["quality", "volume", "isMuted", "loop",
-                     "speed", "showDebugUI", "showToolbar",
-                     "maxExecutionDuration", "letterbox", "autoplay",
-                     "graphicsBackend", "networkAccess", "filesystemAccess"] {
+                      "speed", "showDebugUI", "showToolbar",
+                      "maxExecutionDuration", "letterbox", "autoplay",
+                      "graphicsBackend", "networkAccess", "filesystemAccess",
+                      "defaultPlayerMode"] {
             defaults.removeObject(forKey: key)
         }
     }

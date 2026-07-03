@@ -158,10 +158,12 @@ struct IOSContentView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
-                        appState.showFilePicker()
+                        AppCommandRouter.openFile(appState: appState, loc: locManager)
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .keyboardShortcut("o", modifiers: .command)
+                    .accessibilityLabel(locManager.localized("toolbar.openSwf"))
                 }
             }
     }
@@ -169,13 +171,14 @@ struct IOSContentView: View {
     private var addContentMenu: some View {
         Menu {
             Button {
-                appState.showFilePicker()
+                AppCommandRouter.openFile(appState: appState, loc: locManager)
             } label: {
                 Label(locManager.localized("toolbar.openSwf"), systemImage: "doc")
             }
+            .keyboardShortcut("o", modifiers: .command)
 
             Button {
-                appState.showFolderPicker()
+                AppCommandRouter.importFolder(appState: appState, loc: locManager)
             } label: {
                 Label(locManager.localized("toolbar.importFolder"), systemImage: "folder")
             }
@@ -191,22 +194,7 @@ struct IOSContentView: View {
                 playerView
                     .navigationBarHidden(appState.isStageMaximized)
             } else {
-                ZStack {
-                    Color.clear
-                        .background(.regularMaterial)
-
-                    VStack(spacing: 20) {
-                        Image(systemName: "play.circle")
-                            .font(.system(size: 56, weight: .light))
-                            .foregroundStyle(.tertiary)
-                        Text(locManager.localized("player.nowPlaying"))
-                            .font(.largeTitle)
-                    Text(locManager.localized("workspace.openIOSMessage"))
-                        .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                }
+                playerEmptyState
             }
         }
         .navigationTitle(locManager.localized("sidebar.player"))
@@ -227,7 +215,7 @@ struct IOSContentView: View {
     }
 
     private var settingsTab: some View {
-        SettingsView()
+        SettingsView(settingsActions: SettingsActions(appState: appState))
             .environmentObject(appState)
             .environmentObject(locManager)
             .navigationTitle(locManager.localized("sidebar.settings"))
@@ -244,11 +232,13 @@ struct IOSContentView: View {
     private func iPadDetailContent(for section: AppState.Section) -> some View {
         switch section {
         case .settings:
-            SettingsView()
+            SettingsView(settingsActions: SettingsActions(appState: appState))
                 .environmentObject(appState)
                 .environmentObject(locManager)
         case .player where appState.isPlayerVisible:
             playerView
+        case .player:
+            playerEmptyState
         case .library where appState.recentFiles.isEmpty:
             EmptyStateView(isDropTargeted: .constant(false))
                 .environmentObject(appState)
@@ -261,6 +251,22 @@ struct IOSContentView: View {
     }
 
     // MARK: - Player View
+
+    private var playerEmptyState: some View {
+        ContentUnavailableView {
+            Label(locManager.localized("player.noMedia.title"), systemImage: "play.circle")
+        } description: {
+            Text(locManager.localized("player.noMedia.subtitle"))
+        } actions: {
+            Button {
+                AppCommandRouter.openFile(appState: appState, loc: locManager)
+            } label: {
+                Label(locManager.localized("empty.openSwf"), systemImage: "doc.badge.plus")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .background(Color(.systemGroupedBackground))
+    }
 
     private var stageBackgroundARGB: UInt32 {
         appState.isStageMaximized ? 0xFF000000 : (colorScheme == .dark ? 0xFF000000 : 0xFFFFFFFF)
@@ -293,7 +299,7 @@ struct IOSContentView: View {
         GeometryReader { geo in
             let stageWidth = usesInlineFullscreen ? geo.size.width : max(0, geo.size.width - NativeSpacing.xxxl)
             let stageHeight = usesInlineFullscreen ? geo.size.height : max(220, geo.size.height * 0.58)
-            let normalPanelReserve = NativeSpacing.section + 132
+            let normalPanelReserve = NativeSpacing.xxl + 132
             let normalStageCenterMinY = stageHeight / 2 + NativeSpacing.md
             let normalStageCenterMaxY = max(normalStageCenterMinY, geo.size.height - stageHeight / 2 - NativeSpacing.md)
             let normalStageCenterY = min(
@@ -319,8 +325,8 @@ struct IOSContentView: View {
                 VStack {
                     Spacer()
                     nowPlayingPanel
-                        .padding(.horizontal, NativeSpacing.xxxl)
-                        .padding(.bottom, NativeSpacing.xl)
+                        .padding(.horizontal, NativeSpacing.md)
+                        .padding(.bottom, NativeSpacing.md)
                         .opacity(usesInlineFullscreen ? 0 : 1)
                         .offset(y: usesInlineFullscreen ? 24 : 0)
                         .allowsHitTesting(!usesInlineFullscreen)
@@ -337,10 +343,14 @@ struct IOSContentView: View {
                 VStack {
                     HStack {
                         Spacer()
-                        glassIconButton("arrow.down.right.and.arrow.up.left") {
+                        glassIconButton(
+                            "arrow.down.right.and.arrow.up.left",
+                            accessibilityLabel: locManager.localized("menu.exitFullscreen")
+                        ) {
                             withAnimation(.stageFullscreen) { appState.exitStageMaximized() }
                         }
-                        .padding(NativeSpacing.md)
+                        .padding(.top, max(geo.safeAreaInsets.top, NativeSpacing.md))
+                        .padding(.trailing, max(geo.safeAreaInsets.trailing, NativeSpacing.md))
                     }
                     Spacer()
                 }
@@ -375,11 +385,23 @@ struct IOSContentView: View {
 
                 Spacer()
 
-                glassIconButton(appState.isFavorite ? "star.fill" : "star") {
+                glassIconButton(
+                    appState.isFavorite ? "star.fill" : "star",
+                    accessibilityLabel: locManager.localized(appState.isFavorite ? "favorites.remove" : "favorites.add")
+                ) {
                     if let url = appState.currentFileURL { appState.toggleFavorite(for: url) }
                 }
-                glassIconButton("arrow.up.left.and.arrow.down.right") {
+                glassIconButton(
+                    "arrow.up.left.and.arrow.down.right",
+                    accessibilityLabel: locManager.localized("menu.enterFullscreen")
+                ) {
                     withAnimation(.stageFullscreen) { appState.toggleStageMaximized() }
+                }
+                glassIconButton(
+                    "xmark",
+                    accessibilityLabel: locManager.localized("menu.close")
+                ) {
+                    appState.closeFile()
                 }
             }
 
@@ -391,7 +413,7 @@ struct IOSContentView: View {
         .liquidGlassRounded(cornerRadius: NativeRadius.xl, material: GlassMaterial.light)
     }
 
-    private func glassIconButton(_ systemName: String, action: @escaping () -> Void) -> some View {
+    private func glassIconButton(_ systemName: String, accessibilityLabel: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 18, weight: .semibold))
@@ -401,6 +423,7 @@ struct IOSContentView: View {
         }
         .buttonStyle(.plain)
         .modifier(LiquidGlassModifier(shape: Circle(), material: GlassMaterial.ultraLight))
+        .accessibilityLabel(accessibilityLabel)
     }
 
     private func syncStageBackground() {

@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 final class TraceConsole: ObservableObject {
@@ -21,6 +22,7 @@ final class TraceConsole: ObservableObject {
 
 struct TraceConsoleView: View {
     @EnvironmentObject var locManager: LocalizationManager
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var console = TraceConsole.shared
 
     var body: some View {
@@ -34,6 +36,15 @@ struct TraceConsoleView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.tint)
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(locManager.localized("menu.close"))
             }
             .padding(.horizontal, NativeSpacing.xl)
             .padding(.vertical, NativeSpacing.md)
@@ -51,7 +62,7 @@ struct TraceConsoleView: View {
                     }
                     .padding(NativeSpacing.sm)
                 }
-                .onChange(of: console.messages.count) { _ in
+                .onReceive(console.$messages.dropFirst()) { _ in
                     if let last = console.messages.last {
                         proxy.scrollTo(last.id, anchor: .bottom)
                     }

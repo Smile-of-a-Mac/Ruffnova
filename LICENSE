@@ -1,7 +1,35 @@
-Ruffnova is dual-licensed under the MIT and Apache 2.0 licenses, at your option.
+Ruffnova Non-Commercial License Notice
 
-See LICENSE-MIT and LICENSE-APACHE for the full license texts.
+Copyright (c) Ruffnova contributors.
+
+The original Ruffnova application code, user interface, assets, documentation,
+and project-specific integration code are made available for personal,
+educational, research, and other non-commercial use only.
+
+You may read, copy, modify, and distribute the original Ruffnova code for
+non-commercial purposes, provided that this notice is preserved.
+
+You may not use the original Ruffnova code, name, user interface, assets, or
+project-specific integration code for commercial purposes without prior written
+permission from the Ruffnova copyright holders. Commercial purposes include,
+but are not limited to, selling the software, selling modified versions,
+offering paid hosted services, bundling it with paid products, or using it as
+part of a commercial product or service.
+
+Ruffnova includes and integrates third-party components, including the Ruffle
+Flash Player emulator. Those components remain governed by their own license
+terms. In particular, Ruffle components are licensed under MIT OR Apache-2.0.
+Nothing in this notice changes or restricts rights granted by those third-party
+licenses.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in Ruffnova by you shall be dual licensed as above, without any
-additional terms or conditions.
+for inclusion in the original Ruffnova code is submitted under the same
+non-commercial terms described above.
+
+THE ORIGINAL RUFFNOVA CODE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
+OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.

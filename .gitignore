@@ -1,6 +1,7 @@
 .build/
 engine/target/
 xcuserdata/
+.vscode/
 .DS_Store
 **/.DS_Store
 

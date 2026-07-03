@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://www.swift.org"><img src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift" alt="Swift 5.9+"></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-edition%202024-000000?logo=rust" alt="Rust"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT%20%7C%20Apache--2.0-blue" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Non--Commercial-blue" alt="License"></a>
   <a><img src="https://img.shields.io/badge/Platform-macOS%2013%2B%20%7C%20iOS%2017%2B-lightgrey" alt="Platform"></a>
 </p>
 
@@ -15,7 +15,7 @@
 
 ## About
 
-Ruffnova is a native Apple-platform frontend for [Ruffle](https://ruffle.rs), the open-source Flash Player emulator. It wraps the Rust Flash emulation engine behind a C FFI layer, exposing it through a SwiftUI interface with Metal-accelerated rendering.
+Ruffnova is an unofficial native Apple-platform frontend for [Ruffle](https://ruffle.rs), the open-source Flash Player emulator. It wraps the Rust Flash emulation engine behind a C FFI layer, exposing it through a SwiftUI interface with Metal-accelerated rendering.
 
 No browser, no Electron — just a first-class native app for playing `.swf` files.
 
@@ -119,8 +119,12 @@ Ruffnova/
 
 ## Acknowledgments
 
-Ruffnova is built on [Ruffle](https://ruffle.rs), created by Mike Welsh and the Ruffle community. This project would not exist without their years of reverse-engineering the Flash runtime.
+Ruffnova is built on [Ruffle](https://ruffle.rs), created by Michael R. Welsh and the Ruffle community. This project would not exist without their years of reverse-engineering the Flash runtime.
+
+Ruffnova is not affiliated with, endorsed by, or maintained by the Ruffle project.
 
 ## License
 
-Dual-licensed under either of [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-APACHE), at your option. Same as upstream [Ruffle](https://github.com/ruffle-rs/ruffle).
+The original Ruffnova application code is available for non-commercial use only. Commercial use requires prior written permission from the Ruffnova copyright holders.
+
+Ruffle and other third-party components retain their original copyright notices and license terms. Ruffle components are licensed under [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-APACHE), at your option.

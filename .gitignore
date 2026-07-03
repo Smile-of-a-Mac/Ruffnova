@@ -1,6 +1,8 @@
 .build/
 engine/target/
 xcuserdata/
+.DS_Store
+**/.DS_Store
 
 # Agent-related docs
 AGENT.md
@@ -9,4 +11,3 @@ docs/
 
 # Test SWF assets
 swfs/
-

@@ -1,12 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-# build_engine.sh — Build libruffle_ffi.a for all Apple platforms.
-# Usage: ./build_engine.sh [--target macos|ios|ios-sim|all]
+# build_engine.sh — Build libruffle_ffi.a for macOS and iOS devices.
+# Usage: ./build_engine.sh [--target macos|ios|all]
 #
 # Prerequisites:
 #   rustup target add aarch64-apple-ios
-#   rustup target add aarch64-apple-ios-sim
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENGINE_DIR="${SCRIPT_DIR}/engine"
@@ -16,7 +15,7 @@ TARGET="${1:---target}"
 TARGET_VALUE="${2:-all}"
 
 if [[ "${TARGET}" != "--target" ]]; then
-    echo "Usage: $0 [--target macos|ios|ios-sim|all]"
+    echo "Usage: $0 [--target macos|ios|all]"
     exit 1
 fi
 
@@ -41,17 +40,13 @@ case "${TARGET_VALUE}" in
     ios)
         build_target "aarch64-apple-ios" "ios"
         ;;
-    ios-sim)
-        build_target "aarch64-apple-ios-sim" "ios-sim"
-        ;;
     all)
         build_target "aarch64-apple-darwin" "macos"
         build_target "aarch64-apple-ios" "ios"
-        build_target "aarch64-apple-ios-sim" "ios-sim"
         ;;
     *)
         echo "Unknown target: ${TARGET_VALUE}"
-        echo "Valid targets: macos, ios, ios-sim, all"
+        echo "Valid targets: macos, ios, all"
         exit 1
         ;;
 esac

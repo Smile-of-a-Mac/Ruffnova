@@ -37,7 +37,7 @@ No browser, no Electron — just a first-class native app for playing `.swf` fil
 | Xcode | 15+ | macOS SDK included |
 | Swift | 5.9+ | Included with Xcode |
 | Rust | stable | [rustup](https://rustup.rs) |
-| Rust targets | `aarch64-apple-darwin` | iOS: `aarch64-apple-ios`, `aarch64-apple-ios-sim` |
+| Rust targets | `aarch64-apple-darwin` | iOS device: `aarch64-apple-ios` |
 
 ## Quick Start
 
@@ -64,7 +64,7 @@ open Package.swift
 ### iOS
 
 ```bash
-rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+rustup target add aarch64-apple-ios
 ./build_engine.sh --target ios
 open Package.swift
 ```

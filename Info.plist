@@ -25,6 +25,8 @@
 	<string>Ruffnova</string>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>app.ruffnova.native</string>
 	<key>CFBundleInfoDictionaryVersion</key>

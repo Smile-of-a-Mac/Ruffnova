@@ -41,6 +41,25 @@ if [[ -d "${PROJECT_DIR}/Assets.xcassets" ]]; then
     cp -R "${PROJECT_DIR}/Assets.xcassets" "${APP}/Contents/Resources/Assets.xcassets"
 fi
 
+# Generate macOS .icns app icon for Finder/Dock.
+ICON_SOURCE="${PROJECT_DIR}/Assets.xcassets/AppIcon.appiconset"
+ICONSET="${BUILD_DIR}/AppIcon.iconset"
+if [[ -d "${ICON_SOURCE}" ]] && command -v iconutil >/dev/null 2>&1; then
+    rm -rf "${ICONSET}"
+    mkdir -p "${ICONSET}"
+    cp "${ICON_SOURCE}/icon_16x16.png" "${ICONSET}/icon_16x16.png"
+    cp "${ICON_SOURCE}/icon_16x16@2x.png" "${ICONSET}/icon_16x16@2x.png"
+    cp "${ICON_SOURCE}/icon_32x32.png" "${ICONSET}/icon_32x32.png"
+    cp "${ICON_SOURCE}/icon_32x32@2x.png" "${ICONSET}/icon_32x32@2x.png"
+    cp "${ICON_SOURCE}/icon_128x128.png" "${ICONSET}/icon_128x128.png"
+    cp "${ICON_SOURCE}/icon_128x128@2x.png" "${ICONSET}/icon_128x128@2x.png"
+    cp "${ICON_SOURCE}/icon_256x256.png" "${ICONSET}/icon_256x256.png"
+    cp "${ICON_SOURCE}/icon_256x256@2x.png" "${ICONSET}/icon_256x256@2x.png"
+    cp "${ICON_SOURCE}/icon_512x512.png" "${ICONSET}/icon_512x512.png"
+    cp "${ICON_SOURCE}/icon_512x512@2x.png" "${ICONSET}/icon_512x512@2x.png"
+    iconutil -c icns "${ICONSET}" -o "${APP}/Contents/Resources/AppIcon.icns"
+fi
+
 # Copy any additional resources
 if [[ -d "${PROJECT_DIR}/Resources" ]]; then
     cp -R "${PROJECT_DIR}/Resources" "${APP}/Contents/Resources/"

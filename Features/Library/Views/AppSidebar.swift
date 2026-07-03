@@ -78,7 +78,7 @@ struct AppSidebar: View {
     @ViewBuilder
     private var brandIcon: some View {
         #if os(macOS)
-        Image(nsImage: NSApplication.shared.applicationIconImage)
+        Image(nsImage: sidebarAppIcon)
             .resizable()
             .scaledToFit()
             .frame(width: 30, height: 30)
@@ -96,6 +96,17 @@ struct AppSidebar: View {
             .background(GlassMaterial.ultraLight, in: RoundedRectangle(cornerRadius: NativeRadius.sm, style: .continuous))
         #endif
     }
+
+    #if os(macOS)
+    private var sidebarAppIcon: NSImage {
+        if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let icon = NSImage(contentsOf: iconURL) {
+            return icon
+        }
+
+        return NSImage(named: "AppIcon") ?? NSApplication.shared.applicationIconImage
+    }
+    #endif
 
     private var searchField: some View {
         HStack(spacing: NativeSpacing.sm) {

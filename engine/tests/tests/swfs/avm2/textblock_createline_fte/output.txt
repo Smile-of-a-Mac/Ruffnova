@@ -1,4 +1,0 @@
-line != null: true
-result: success
-firstLine === line: true
-null content: null

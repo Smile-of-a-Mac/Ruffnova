@@ -377,6 +377,8 @@
     "library.selection.select": "选择",
     "library.selection.done": "完成",
     "library.selection.count": "已选择 %lld 项",
+    "library.selection.favorite": "收藏",
+    "library.selection.unfavorite": "取消",
 
     "collection.new": "新建合集",
     "collection.name.placeholder": "合集名称",

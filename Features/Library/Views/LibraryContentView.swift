@@ -221,7 +221,21 @@ struct LibraryGridView: View {
         content
     }
 
+    @ViewBuilder
     private var content: some View {
+        #if os(iOS)
+        scrollContent
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if isSelecting {
+                    iOSSelectionBar
+                }
+            }
+        #else
+        scrollContent
+        #endif
+    }
+
+    private var scrollContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: NativeSpacing.md) {
@@ -237,10 +251,14 @@ struct LibraryGridView: View {
 
                     Spacer()
 
+                    #if os(iOS)
+                    if !isSelecting, collectionID == nil {
+                        EmptyView()
+                    }
+                    #else
                     if isSelecting {
                         selectionActions
                     } else if collectionID == nil {
-                        #if !os(iOS)
                         Picker(locManager.localized("library.sort"), selection: $sortOrder) {
                             ForEach(LibrarySortOrder.allCases, id: \.self) { order in
                                 Text(locManager.localized(order.localizedKey)).tag(order)
@@ -256,8 +274,8 @@ struct LibraryGridView: View {
                         }
                         .pickerStyle(.menu)
                         .controlSize(.small)
-                        #endif
                     }
+                    #endif
 
                     Button(locManager.localized(isSelecting ? "library.selection.done" : "library.selection.select")) {
                         withAnimation(.glassSmooth) {
@@ -295,13 +313,65 @@ struct LibraryGridView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: displayedItems.map(\.id)) { ids in
-            selectedIDs.formIntersection(Set(ids))
-            if ids.isEmpty {
-                isSelecting = false
-            }
+        .task(id: displayedItems.map(\.id)) {
+            syncSelection(with: displayedItems.map(\.id))
         }
     }
+
+    private func syncSelection(with ids: [LibraryItem.ID]) {
+        selectedIDs.formIntersection(Set(ids))
+        if ids.isEmpty {
+            isSelecting = false
+        }
+    }
+
+    #if os(iOS)
+    private var iOSSelectionBar: some View {
+        VStack(spacing: NativeSpacing.sm) {
+            Divider()
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: NativeSpacing.sm) {
+                Button {
+                    selectedIDs = Set(displayedItems.map(\.id))
+                } label: {
+                    Label(locManager.localized("systemMenu.selectAll"), systemImage: "checkmark.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(displayedItems.isEmpty || selectedIDs.count == displayedItems.count)
+
+                Button {
+                    setSelectedFavorites(true)
+                } label: {
+                    Label(locManager.localized("library.selection.favorite"), systemImage: "star")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(selectedIDs.isEmpty)
+
+                Button {
+                    setSelectedFavorites(false)
+                } label: {
+                    Label(locManager.localized("library.selection.unfavorite"), systemImage: "star.slash")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(selectedIDs.isEmpty)
+
+                Button(role: .destructive) {
+                    removeSelectedItems()
+                } label: {
+                    Label(locManager.localized("systemMenu.delete"), systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(selectedIDs.isEmpty)
+            }
+            .buttonStyle(.bordered)
+            .labelStyle(.titleAndIcon)
+            .controlSize(.small)
+            .padding(.horizontal, NativeSpacing.md)
+            .padding(.bottom, NativeSpacing.sm)
+        }
+        .background(GlassMaterial.light)
+    }
+    #endif
 
     private var selectionActions: some View {
         HStack(spacing: NativeSpacing.sm) {

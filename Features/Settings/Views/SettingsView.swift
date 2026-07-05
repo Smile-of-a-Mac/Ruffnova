@@ -1,5 +1,11 @@
 import SwiftUI
 
+#if os(macOS)
+import AppKit
+#elseif os(iOS)
+import UIKit
+#endif
+
 struct SettingsActions {
     var setLooping: @MainActor (Bool) -> Void = { _ in }
     var setQuality: @MainActor (RuffleQuality) -> Void = { _ in }
@@ -54,6 +60,11 @@ struct InlineSettingsView: View {
     @EnvironmentObject private var locManager: LocalizationManager
     @State private var selectedCategory: SettingsCategory = .general
     var centerContent = true
+
+    init(initialCategory: SettingsCategory = .general, centerContent: Bool = true) {
+        self._selectedCategory = State(initialValue: initialCategory)
+        self.centerContent = centerContent
+    }
 
     private var categoryPickerWidth: CGFloat {
         #if os(macOS)
@@ -516,13 +527,29 @@ struct AboutSettingsView: View {
 
     var body: some View {
         Section {
+            HStack(alignment: .center, spacing: NativeSpacing.xl) {
+                AboutAppIconView()
+
+                VStack(alignment: .leading, spacing: NativeSpacing.xs) {
+                    Text(locManager.localized("about.title"))
+                        .font(.largeTitle.weight(.semibold))
+                    Text(locManager.localized("about.subtitle"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, NativeSpacing.md)
+            .accessibilityElement(children: .combine)
+        }
+
+        Section {
             LabeledContent(locManager.localized("about.version"), value: appVersion)
             LabeledContent(locManager.localized("about.build"), value: buildNumber)
             LabeledContent(locManager.localized("about.ruffleVersion"), value: "0.3.0")
         } header: {
-            Label(locManager.localized("about.title"), systemImage: "info.circle")
-        } footer: {
-            Text(locManager.localized("about.subtitle"))
+            Label(locManager.localized("settings.about"), systemImage: "info.circle")
         }
 
         if let ruffleSourceURL {
@@ -536,6 +563,50 @@ struct AboutSettingsView: View {
             }
         }
     }
+}
+
+private struct AboutAppIconView: View {
+    var body: some View {
+        icon
+            .frame(width: 84, height: 84)
+            .clipShape(RoundedRectangle(cornerRadius: NativeRadius.lg, style: .continuous))
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var icon: some View {
+        #if os(macOS)
+        Image(nsImage: NSApp.applicationIconImage)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+        #else
+        if let image = iosAppIcon {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        } else {
+            Image(systemName: "sparkles.tv")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .symbolRenderingMode(.hierarchical)
+        }
+        #endif
+    }
+
+    #if os(iOS)
+    private var iosAppIcon: UIImage? {
+        if let image = UIImage(named: "AppIcon") {
+            return image
+        }
+
+        guard let icons = Bundle.main.object(forInfoDictionaryKey: "CFBundleIcons") as? [String: Any],
+              let primaryIcon = icons["CFBundlePrimaryIcon"] as? [String: Any],
+              let iconFiles = primaryIcon["CFBundleIconFiles"] as? [String]
+        else { return nil }
+
+        return iconFiles.reversed().compactMap { UIImage(named: $0) }.first
+    }
+    #endif
 }
 
 private extension View {

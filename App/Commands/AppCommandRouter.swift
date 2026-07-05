@@ -96,13 +96,16 @@ enum AppCommandRouter {
     static func showAbout(loc: LocalizationManager) {
         #if os(macOS)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 680, height: 560),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = loc.localized("menu.about")
-        window.contentView = NSHostingView(rootView: AboutView().environmentObject(LocalizationManager.shared))
+        window.contentView = NSHostingView(
+            rootView: InlineSettingsView(initialCategory: .about)
+                .environmentObject(LocalizationManager.shared)
+        )
         window.center()
         window.isReleasedWhenClosed = false
         window.makeKeyAndOrderFront(nil)

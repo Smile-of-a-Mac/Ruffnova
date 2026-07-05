@@ -1,5 +1,5 @@
 .build/
-engine/target/
+engine/
 CRuffleFFI/**/*.a
 CRuffleFFI/*.a
 CRuffleFFI/RuffleFFI.xcframework/

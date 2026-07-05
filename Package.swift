@@ -48,6 +48,7 @@ let package = Package(
                 "AGENT.md",
                 "build_app.sh",
                 "build_engine.sh",
+                "setup.sh",
             ],
             resources: [
                 .process("Assets.xcassets"),

@@ -377,6 +377,8 @@
     "library.selection.select": "Select",
     "library.selection.done": "Done",
     "library.selection.count": "%lld selected",
+    "library.selection.favorite": "Favorite",
+    "library.selection.unfavorite": "Unfavorite",
 
     "collection.new": "New Collection",
     "collection.name.placeholder": "Collection Name",

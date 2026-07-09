@@ -9,6 +9,7 @@ struct FavoritesGridView: View {
 
     private var favoriteItems: [LibraryItem] {
         libraryService.filtered(by: .favorites)
+            .matchingSearchText(appState.searchText)
     }
 
     private var contentInsets: EdgeInsets {

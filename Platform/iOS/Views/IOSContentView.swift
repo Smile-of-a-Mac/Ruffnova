@@ -11,6 +11,7 @@ struct IOSContentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var libraryService = LibraryService.shared
     @Namespace private var playerNamespace
     @State private var selectedIPadSection: AppState.Section? = .library
     @State private var iPadColumnVisibility: NavigationSplitViewVisibility = .all
@@ -18,6 +19,18 @@ struct IOSContentView: View {
     @State private var showingCollectionsSheet = false
 
     private let iPadSections: [AppState.Section] = [.recent, .library, .player, .favorites, .settings]
+
+    private var hasLibrarySearchContent: Bool {
+        !libraryService.items.isEmpty
+    }
+
+    private var hasRecentSearchContent: Bool {
+        libraryService.sorted(by: .lastOpened).contains { $0.availabilityStatus == .available }
+    }
+
+    private var hasFavoriteSearchContent: Bool {
+        libraryService.items.contains { $0.isFavorite }
+    }
 
     var body: some View {
         Group {
@@ -178,6 +191,14 @@ struct IOSContentView: View {
             .environmentObject(locManager)
             .navigationTitle(locManager.localized("sidebar.library"))
             .navigationBarTitleDisplayMode(.large)
+            .iosSearchable(
+                hasLibrarySearchContent,
+                text: searchBinding,
+                prompt: locManager.localized("search.placeholder")
+            )
+            .onChange(of: hasLibrarySearchContent) { _, hasContent in
+                clearSearchIfNeeded(hasContent: hasContent)
+            }
             .toolbar(.visible, for: .navigationBar)
     }
 
@@ -244,6 +265,14 @@ struct IOSContentView: View {
             .environmentObject(locManager)
             .navigationTitle(locManager.localized("sidebar.recent"))
             .navigationBarTitleDisplayMode(.large)
+            .iosSearchable(
+                hasRecentSearchContent,
+                text: searchBinding,
+                prompt: locManager.localized("search.placeholder")
+            )
+            .onChange(of: hasRecentSearchContent) { _, hasContent in
+                clearSearchIfNeeded(hasContent: hasContent)
+            }
             .toolbar(.visible, for: .navigationBar)
     }
 
@@ -253,6 +282,14 @@ struct IOSContentView: View {
             .environmentObject(locManager)
             .navigationTitle(locManager.localized("sidebar.favorites"))
             .navigationBarTitleDisplayMode(.large)
+            .iosSearchable(
+                hasFavoriteSearchContent,
+                text: searchBinding,
+                prompt: locManager.localized("search.placeholder")
+            )
+            .onChange(of: hasFavoriteSearchContent) { _, hasContent in
+                clearSearchIfNeeded(hasContent: hasContent)
+            }
             .toolbar(.visible, for: .navigationBar)
     }
 
@@ -260,6 +297,19 @@ struct IOSContentView: View {
         SettingsView(settingsActions: SettingsActions(appState: appState))
             .environmentObject(appState)
             .environmentObject(locManager)
+    }
+
+    private var searchBinding: Binding<String> {
+        Binding(
+            get: { appState.searchText },
+            set: { appState.updateSearchText($0) }
+        )
+    }
+
+    private func clearSearchIfNeeded(hasContent: Bool) {
+        if !hasContent, !appState.searchText.isEmpty {
+            appState.updateSearchText("")
+        }
     }
 
     // MARK: - Detail Content (iPad)
@@ -474,6 +524,21 @@ struct IOSContentView: View {
     private func syncStageSystemChrome(for maximized: Bool) {
         withAnimation(.stageFullscreen) {
             hidesStageSystemChrome = maximized
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func iosSearchable(_ isEnabled: Bool, text: Binding<String>, prompt: String) -> some View {
+        if isEnabled {
+            searchable(
+                text: text,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: prompt
+            )
+        } else {
+            self
         }
     }
 }

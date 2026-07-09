@@ -56,6 +56,598 @@ extension EnvironmentValues {
     }
 }
 
+#if os(macOS)
+struct MacSettingsView: View {
+    @EnvironmentObject private var locManager: LocalizationManager
+    @Environment(\.settingsActions) private var settingsActions
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedCategory: SettingsCategory = .general
+    @AppStorage("autoplay") private var autoplay = true
+    @AppStorage("letterbox") private var letterbox = "fullscreen"
+    @AppStorage("defaultPlayerMode") private var defaultPlayerMode = PlayerMode.normal.rawValue
+    @AppStorage("loop") private var isLooping = false
+    @AppStorage("quality") private var qualityRawValue = Int(RuffleQuality.high.rawValue)
+    @AppStorage("speed") private var playbackSpeed = 1.0
+    @AppStorage("graphicsBackend") private var graphicsBackend = "auto"
+    @AppStorage("maxExecutionDuration") private var maxExecutionDuration = 15.0
+    @AppStorage("showDebugUI") private var showDebugUI = false
+    @ObservedObject private var permissionPolicy = PermissionPolicyService.shared
+    @State private var avm2OptimizerEnabled = true
+    @State private var showResetAlert = false
+
+    private let categories = SettingsCategory.macSettingsCases
+    private let windowSize = NSSize(width: 700, height: 560)
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 10) {
+                Text(locManager.localized(selectedCategory.titleKey))
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 28) {
+                    ForEach(categories) { category in
+                        MacSettingsTab(
+                            category: category,
+                            isSelected: selectedCategory == category
+                        ) {
+                            selectedCategory = category
+                        }
+                    }
+                }
+            }
+            .padding(.top, 22)
+            .padding(.bottom, 14)
+
+            Divider()
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    switch selectedCategory {
+                    case .general:
+                        macGeneralPane
+                    case .rendering:
+                        macRenderingPane
+                    case .privacy:
+                        macPrivacyPane
+                    case .advanced:
+                        macAdvancedPane
+                    case .about:
+                        EmptyView()
+                    }
+                }
+                .frame(width: 580, alignment: .top)
+                .padding(.vertical, 20)
+                .frame(maxWidth: .infinity)
+            }
+            .background(Color(nsColor: .windowBackgroundColor))
+
+            Divider()
+
+            HStack {
+                Button {
+                    AppCommandRouter.openHelp()
+                } label: {
+                    Image(systemName: "questionmark")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .background(Circle().fill(Color(nsColor: .controlBackgroundColor)))
+                .accessibilityLabel(locManager.localized("menu.help"))
+
+                Spacer()
+
+                Button(locManager.localized("collection.cancel")) {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button(locManager.localized("library.selection.done")) {
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 12)
+            .background(Color(nsColor: .windowBackgroundColor))
+        }
+        .frame(width: windowSize.width, height: windowSize.height)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .background(MacFixedSizeWindowConfigurator(size: windowSize))
+        .animation(.glassSmooth, value: selectedCategory)
+        .onAppear {
+            avm2OptimizerEnabled = settingsActions.avm2OptimizerEnabled()
+            if graphicsBackend == "vulkan" {
+                graphicsBackend = "auto"
+            }
+        }
+        .alert(locManager.localized("settings.advanced.reset.title"), isPresented: $showResetAlert) {
+            Button(locManager.localized("settings.advanced.reset.actionLabel"), role: .destructive, action: resetSettings)
+            Button(locManager.localized("collection.cancel"), role: .cancel) {}
+        } message: {
+            Text(locManager.localized("settings.advanced.reset.message"))
+        }
+    }
+
+    private var macGeneralPane: some View {
+        VStack(spacing: 12) {
+            MacSettingsGroup(title: locManager.localized("settings.general.playback")) {
+                Toggle(locManager.localized("settings.general.playback.autoplay"), isOn: $autoplay)
+                    .toggleStyle(.checkbox)
+
+                MacInlineSetting(label: locManager.localized("settings.general.playback.letterbox")) {
+                    Picker("", selection: $letterbox) {
+                        Text(locManager.localized("settings.general.playback.letterbox.fullscreen")).tag("fullscreen")
+                        Text(locManager.localized("settings.general.playback.letterbox.on")).tag("on")
+                        Text(locManager.localized("settings.general.playback.letterbox.off")).tag("off")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 128, alignment: .leading)
+                }
+
+                MacInlineSetting(label: locManager.localized("settings.general.playback.defaultMode")) {
+                    Picker("", selection: defaultPlayerModeBinding) {
+                        ForEach(PlayerMode.allCases) { mode in
+                            Text(locManager.localized(mode.localizedKey)).tag(mode.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 128, alignment: .leading)
+                }
+
+                Toggle(locManager.localized("settings.general.playback.loop"), isOn: loopingBinding)
+                        .toggleStyle(.checkbox)
+
+                MacInlineSetting(label: locManager.localized("settings.rendering.quality.stageQuality")) {
+                    Picker("", selection: qualityBinding) {
+                        Text(locManager.localized("settings.rendering.quality.low")).tag(RuffleQuality.low)
+                        Text(locManager.localized("settings.rendering.quality.medium")).tag(RuffleQuality.medium)
+                        Text(locManager.localized("settings.rendering.quality.high")).tag(RuffleQuality.high)
+                        Text(locManager.localized("settings.rendering.quality.best")).tag(RuffleQuality.best)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 128, alignment: .leading)
+                }
+
+                MacInlineSetting(label: locManager.localized("settings.general.playback.speed")) {
+                    HStack(spacing: 14) {
+                        Slider(value: speedBinding, in: 0.25...4.0, step: 0.25)
+                            .frame(width: 160)
+                        Text(String(format: "%.2fx", effectivePlaybackSpeed))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 56, alignment: .trailing)
+                    }
+                }
+            }
+
+            MacSettingsSeparator()
+
+            MacSettingsGroup(title: locManager.localized("settings.inline.language")) {
+                Picker("", selection: languageBinding) {
+                    ForEach(Language.allCases, id: \.self) { language in
+                        Text(language.displayName).tag(language)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 128, alignment: .leading)
+            }
+        }
+    }
+
+    private var macRenderingPane: some View {
+        VStack(spacing: 12) {
+            MacSettingsGroup(title: locManager.localized("settings.rendering.graphics")) {
+                MacInlineSetting(label: locManager.localized("settings.rendering.graphics.backend")) {
+                    Picker("", selection: $graphicsBackend) {
+                        Text(locManager.localized("settings.rendering.graphics.auto")).tag("auto")
+                        Text(locManager.localized("settings.rendering.graphics.metal")).tag("metal")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 128, alignment: .leading)
+                }
+
+                MacInlineSetting(label: locManager.localized("settings.rendering.graphics.unavailable")) {
+                    Text(locManager.localized("settings.rendering.graphics.vulkan.unavailable"))
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(String(format: locManager.localized("settings.rendering.graphics.metal.recommended"), platformName))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var macPrivacyPane: some View {
+        VStack(spacing: 12) {
+            MacSettingsGroup(title: locManager.localized("settings.privacy")) {
+                MacInlineSetting(label: locManager.localized("settings.privacy.network.prompt")) {
+                    Picker("", selection: globalDefaultBinding(for: .network)) {
+                        Text(locManager.localized("permission.global.alwaysAsk")).tag(PermissionGlobalDefault.alwaysAsk)
+                        Text(locManager.localized("permission.global.allow")).tag(PermissionGlobalDefault.allow)
+                        Text(locManager.localized("permission.global.deny")).tag(PermissionGlobalDefault.deny)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 128, alignment: .leading)
+                }
+
+                MacInlineSetting(label: locManager.localized("settings.privacy.filesystem.prompt")) {
+                    Picker("", selection: globalDefaultBinding(for: .filesystem)) {
+                        Text(locManager.localized("permission.global.alwaysAsk")).tag(PermissionGlobalDefault.alwaysAsk)
+                        Text(locManager.localized("permission.global.allow")).tag(PermissionGlobalDefault.allow)
+                        Text(locManager.localized("permission.global.deny")).tag(PermissionGlobalDefault.deny)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 128, alignment: .leading)
+                }
+
+                Text(locManager.localized("settings.privacy.defaults.footer"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            MacSettingsSeparator()
+
+            MacSettingsGroup(title: locManager.localized("settings.privacy.overrides")) {
+                if permissionPolicy.overrides.isEmpty {
+                    Text(locManager.localized("settings.privacy.overrides.empty"))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(permissionPolicy.overrides) { override in
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(override.fileName)
+                                Text("\(localizedScope(override.scope)) - \(localizedDecision(override.decision))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button(role: .destructive) {
+                                permissionPolicy.clearOverride(override.id)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+
+                    Button(role: .destructive) {
+                        permissionPolicy.clearAllOverrides()
+                    } label: {
+                        Label(locManager.localized("settings.privacy.overrides.clearAll"), systemImage: "trash")
+                    }
+                }
+
+                Text(locManager.localized("settings.privacy.overrides.subtitle"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            MacSettingsSeparator()
+
+            MacSettingsGroup(title: locManager.localized("settings.privacy.data")) {
+                MacInlineSetting(label: locManager.localized("settings.privacy.data.usageStats")) {
+                    Text(locManager.localized("settings.privacy.data.disabled"))
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(locManager.localized("settings.privacy.data.noCollection"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var macAdvancedPane: some View {
+        VStack(spacing: 12) {
+            MacSettingsGroup(title: locManager.localized("settings.advanced.actionscript")) {
+                Toggle(locManager.localized("settings.advanced.actionscript.avm2Optimizer"), isOn: avm2OptimizerBinding)
+                    .toggleStyle(.checkbox)
+
+                MacInlineSetting(label: locManager.localized("settings.advanced.actionscript.maxDuration")) {
+                    HStack(spacing: 14) {
+                        Slider(value: maxExecutionDurationBinding, in: 5...60, step: 1)
+                            .frame(width: 160)
+                        Text(String(format: locManager.localized("settings.advanced.actionscript.secondsFormat"), Int(effectiveMaxExecutionDuration)))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 74, alignment: .trailing)
+                    }
+                }
+            }
+
+            MacSettingsSeparator()
+
+            MacSettingsGroup(title: locManager.localized("settings.advanced.debug")) {
+                Toggle(locManager.localized("settings.advanced.debug.showUI"), isOn: showDebugUIBinding)
+                    .toggleStyle(.checkbox)
+
+                Button {
+                    settingsActions.showDiagnostics()
+                } label: {
+                    Label(locManager.localized("diagnostics.title"), systemImage: "stethoscope")
+                }
+                .disabled(!settingsActions.hasCurrentFile())
+
+                Text(locManager.localized("settings.advanced.debug.warning"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            MacSettingsSeparator()
+
+            MacSettingsGroup(title: locManager.localized("settings.advanced.reset")) {
+                Button(role: .destructive) {
+                    showResetAlert = true
+                } label: {
+                    Label(locManager.localized("settings.advanced.reset"), systemImage: "arrow.counterclockwise")
+                }
+            }
+        }
+    }
+
+    private var defaultPlayerModeBinding: Binding<String> {
+        Binding(
+            get: { defaultPlayerMode },
+            set: { newValue in
+                defaultPlayerMode = newValue
+                SettingsPersistence.shared.defaultPlayerMode = PlayerMode(rawValue: newValue) ?? .normal
+            }
+        )
+    }
+
+    private var loopingBinding: Binding<Bool> {
+        Binding(
+            get: { isLooping },
+            set: { newValue in
+                isLooping = newValue
+                settingsActions.setLooping(newValue)
+            }
+        )
+    }
+
+    private var qualityBinding: Binding<RuffleQuality> {
+        Binding(
+            get: { RuffleQuality(rawValue: Int32(qualityRawValue)) ?? .high },
+            set: { newValue in
+                qualityRawValue = Int(newValue.rawValue)
+                settingsActions.setQuality(newValue)
+            }
+        )
+    }
+
+    private var effectivePlaybackSpeed: Double {
+        playbackSpeed == 0 ? 1.0 : playbackSpeed
+    }
+
+    private var speedBinding: Binding<Double> {
+        Binding(
+            get: { effectivePlaybackSpeed },
+            set: { newValue in
+                playbackSpeed = newValue
+                settingsActions.setSpeed(Float(newValue))
+            }
+        )
+    }
+
+    private var languageBinding: Binding<Language> {
+        Binding(
+            get: { locManager.selectedLanguage },
+            set: { locManager.setLanguage($0) }
+        )
+    }
+
+    private func globalDefaultBinding(for scope: PermissionScope) -> Binding<PermissionGlobalDefault> {
+        Binding(
+            get: { permissionPolicy.globalDefault(for: scope) },
+            set: { permissionPolicy.setGlobalDefault($0, for: scope) }
+        )
+    }
+
+    private var avm2OptimizerBinding: Binding<Bool> {
+        Binding(
+            get: { avm2OptimizerEnabled },
+            set: { newValue in
+                avm2OptimizerEnabled = newValue
+                settingsActions.setAVM2OptimizerEnabled(newValue)
+            }
+        )
+    }
+
+    private var effectiveMaxExecutionDuration: Double {
+        maxExecutionDuration == 0 ? 15.0 : maxExecutionDuration
+    }
+
+    private var maxExecutionDurationBinding: Binding<Double> {
+        Binding(
+            get: { effectiveMaxExecutionDuration },
+            set: { newValue in
+                maxExecutionDuration = newValue
+                settingsActions.setMaxExecutionDuration(newValue)
+            }
+        )
+    }
+
+    private var showDebugUIBinding: Binding<Bool> {
+        Binding(
+            get: { showDebugUI },
+            set: { newValue in
+                showDebugUI = newValue
+                settingsActions.setShowDebugUI(newValue)
+            }
+        )
+    }
+
+    private var platformName: String { "macOS" }
+
+    private func localizedScope(_ scope: PermissionScope) -> String {
+        switch scope {
+        case .network:
+            return locManager.localized("permission.scope.network")
+        case .filesystem:
+            return locManager.localized("permission.scope.filesystem")
+        }
+    }
+
+    private func localizedDecision(_ decision: PermissionDecision) -> String {
+        switch decision {
+        case .alwaysAsk:
+            return locManager.localized("permission.decision.alwaysAsk")
+        case .allowOnce:
+            return locManager.localized("permission.decision.allowOnce")
+        case .allowForFile:
+            return locManager.localized("permission.decision.allowForFile")
+        case .denyForFile:
+            return locManager.localized("permission.decision.denyForFile")
+        case .useGlobalDefault:
+            return locManager.localized("permission.decision.useGlobalDefault")
+        }
+    }
+
+    private func resetSettings() {
+        SettingsPersistence.shared.resetAll()
+        PermissionPolicyService.shared.setGlobalDefault(.alwaysAsk, for: .network)
+        PermissionPolicyService.shared.setGlobalDefault(.alwaysAsk, for: .filesystem)
+        PermissionPolicyService.shared.clearAllOverrides()
+        maxExecutionDuration = SettingsPersistence.shared.maxExecutionDuration
+        showDebugUI = false
+        avm2OptimizerEnabled = true
+        settingsActions.resetRuntimeSettings()
+    }
+}
+
+private struct MacSettingsTab: View {
+    @EnvironmentObject private var locManager: LocalizationManager
+    let category: SettingsCategory
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: NativeSpacing.xs) {
+                Image(systemName: category.icon)
+                    .font(.system(size: 31, weight: .regular))
+                    .symbolRenderingMode(.hierarchical)
+                    .frame(height: 38)
+
+                Text(locManager.localized(category.titleKey))
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            .frame(width: 66, height: 66)
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(Color(nsColor: .separatorColor), lineWidth: 0.7)
+                    )
+            }
+        }
+        .accessibilityLabel(locManager.localized(category.titleKey))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+private struct MacSettingsGroup<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            Text(title + ":")
+                .font(.system(size: 14, weight: .semibold))
+                .multilineTextAlignment(.trailing)
+                .frame(width: 108, alignment: .trailing)
+
+            VStack(alignment: .leading, spacing: 9) {
+                content
+            }
+            .controlSize(.regular)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private struct MacInlineSetting<Control: View>: View {
+    let label: String
+    @ViewBuilder let control: Control
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label)
+                .foregroundStyle(.primary)
+                .frame(width: 170, alignment: .leading)
+
+            control
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct MacSettingsSeparator: View {
+    var body: some View {
+        Divider()
+            .padding(.leading, 124)
+    }
+}
+
+private struct MacFixedSizeWindowConfigurator: NSViewRepresentable {
+    let size: NSSize
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            configure(window: view.window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            configure(window: nsView.window)
+        }
+    }
+
+    private func configure(window: NSWindow?) {
+        guard let window else { return }
+        window.minSize = size
+        window.maxSize = size
+        window.setContentSize(size)
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.styleMask.remove(.resizable)
+        window.collectionBehavior.remove(.fullScreenPrimary)
+        window.collectionBehavior.insert(.fullScreenAuxiliary)
+        window.standardWindowButton(.closeButton)?.isHidden = true
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isEnabled = false
+    }
+}
+#endif
+
 struct InlineSettingsView: View {
     @EnvironmentObject private var locManager: LocalizationManager
     @State private var selectedCategory: SettingsCategory = .general
@@ -91,11 +683,7 @@ struct InlineSettingsView: View {
     }
 
     private var platformBackground: Color {
-        #if os(macOS)
-        Color(nsColor: .windowBackgroundColor)
-        #else
-        Color(.systemGroupedBackground)
-        #endif
+        settingsPageBackground
     }
 
     var body: some View {
@@ -141,6 +729,7 @@ private struct SettingsForm: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .background(settingsPageBackground)
         #if os(macOS)
         .formStyle(.grouped)
         #endif
@@ -188,8 +777,6 @@ struct GeneralSettingsView: View {
                 }
                 .settingsControlColumn()
             }
-        } header: {
-            Label(locManager.localized("settings.general.playback"), systemImage: "play.circle")
         }
 
         Section {
@@ -198,8 +785,6 @@ struct GeneralSettingsView: View {
                     Text(language.displayName).tag(language)
                 }
             }
-        } header: {
-            Label(locManager.localized("settings.inline.language"), systemImage: "globe")
         }
     }
 
@@ -269,8 +854,6 @@ struct RenderingSettingsView: View {
                 Text(locManager.localized("settings.rendering.graphics.vulkan.unavailable"))
                     .foregroundStyle(.secondary)
             }
-        } header: {
-            Label(locManager.localized("settings.rendering.graphics"), systemImage: "display")
         } footer: {
             Text(String(format: locManager.localized("settings.rendering.graphics.metal.recommended"), platformName))
         }
@@ -306,16 +889,12 @@ struct PrivacySettingsView: View {
                 Text(locManager.localized("permission.global.allow")).tag(PermissionGlobalDefault.allow)
                 Text(locManager.localized("permission.global.deny")).tag(PermissionGlobalDefault.deny)
             }
-        } header: {
-            Label(locManager.localized("settings.privacy"), systemImage: "hand.raised")
         } footer: {
             Text(locManager.localized("settings.privacy.defaults.footer"))
         }
 
         Section {
             PermissionOverridesListView()
-        } header: {
-            Label(locManager.localized("settings.privacy.overrides"), systemImage: "doc.badge.gearshape")
         } footer: {
             Text(locManager.localized("settings.privacy.overrides.subtitle"))
         }
@@ -325,8 +904,6 @@ struct PrivacySettingsView: View {
                 Text(locManager.localized("settings.privacy.data.disabled"))
                     .foregroundStyle(.secondary)
             }
-        } header: {
-            Label(locManager.localized("settings.privacy.data"), systemImage: "checkmark.shield")
         } footer: {
             Text(locManager.localized("settings.privacy.data.noCollection"))
         }
@@ -425,25 +1002,16 @@ struct AdvancedSettingsView: View {
                 }
                 .settingsControlColumn()
             }
-        } header: {
-            Label(locManager.localized("settings.advanced.actionscript"), systemImage: "curlybraces")
         }
 
         Section {
             Toggle(locManager.localized("settings.advanced.debug.showUI"), isOn: showDebugUIBinding)
-            Button {
-                settingsActions.showTraceConsole()
-            } label: {
-                Label(locManager.localized("menu.traceConsole"), systemImage: "terminal")
-            }
             Button {
                 settingsActions.showDiagnostics()
             } label: {
                 Label(locManager.localized("diagnostics.title"), systemImage: "stethoscope")
             }
             .disabled(!settingsActions.hasCurrentFile())
-        } header: {
-            Label(locManager.localized("settings.advanced.debug"), systemImage: "ladybug")
         } footer: {
             Text(locManager.localized("settings.advanced.debug.warning"))
         }
@@ -527,12 +1095,9 @@ struct AboutSettingsView: View {
 
     var body: some View {
         Section {
-            HStack(alignment: .center, spacing: NativeSpacing.xl) {
-                AboutAppIconView()
-
+            VStack(alignment: .leading, spacing: NativeSpacing.md) {
+                AppBrandHeader(size: .about)
                 VStack(alignment: .leading, spacing: NativeSpacing.xs) {
-                    Text(locManager.localized("about.title"))
-                        .font(.largeTitle.weight(.semibold))
                     Text(locManager.localized("about.subtitle"))
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -548,8 +1113,6 @@ struct AboutSettingsView: View {
             LabeledContent(locManager.localized("about.version"), value: appVersion)
             LabeledContent(locManager.localized("about.build"), value: buildNumber)
             LabeledContent(locManager.localized("about.ruffleVersion"), value: "0.3.0")
-        } header: {
-            Label(locManager.localized("settings.about"), systemImage: "info.circle")
         }
 
         if let ruffleSourceURL {
@@ -565,50 +1128,6 @@ struct AboutSettingsView: View {
     }
 }
 
-private struct AboutAppIconView: View {
-    var body: some View {
-        icon
-            .frame(width: 84, height: 84)
-            .clipShape(RoundedRectangle(cornerRadius: NativeRadius.lg, style: .continuous))
-            .accessibilityHidden(true)
-    }
-
-    @ViewBuilder
-    private var icon: some View {
-        #if os(macOS)
-        Image(nsImage: NSApp.applicationIconImage)
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-        #else
-        if let image = iosAppIcon {
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-        } else {
-            Image(systemName: "sparkles.tv")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .symbolRenderingMode(.hierarchical)
-        }
-        #endif
-    }
-
-    #if os(iOS)
-    private var iosAppIcon: UIImage? {
-        if let image = UIImage(named: "AppIcon") {
-            return image
-        }
-
-        guard let icons = Bundle.main.object(forInfoDictionaryKey: "CFBundleIcons") as? [String: Any],
-              let primaryIcon = icons["CFBundlePrimaryIcon"] as? [String: Any],
-              let iconFiles = primaryIcon["CFBundleIconFiles"] as? [String]
-        else { return nil }
-
-        return iconFiles.reversed().compactMap { UIImage(named: $0) }.first
-    }
-    #endif
-}
-
 private extension View {
     @ViewBuilder
     func settingsControlColumn() -> some View {
@@ -618,6 +1137,14 @@ private extension View {
         self
         #endif
     }
+}
+
+private var settingsPageBackground: Color {
+    #if os(macOS)
+    Color(nsColor: .underPageBackgroundColor)
+    #else
+    Color(.systemGroupedBackground)
+    #endif
 }
 
 struct SettingsView: View {
@@ -640,7 +1167,7 @@ struct SettingsView: View {
                 .environment(\.settingsActions, settingsActions)
         }
         #else
-        InlineSettingsView()
+        MacSettingsView()
             .environmentObject(locManager)
             .environment(\.settingsActions, settingsActions)
         #endif
@@ -695,6 +1222,10 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     case about
 
     var id: Self { self }
+
+    #if os(macOS)
+    static let macSettingsCases: [SettingsCategory] = [.general, .rendering, .privacy, .advanced]
+    #endif
 
     var icon: String {
         switch self {

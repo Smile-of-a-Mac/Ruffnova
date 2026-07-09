@@ -175,10 +175,14 @@ struct LibraryGridView: View {
     @State private var selectedIDs: Set<UUID> = []
 
     private var displayedItems: [LibraryItem] {
+        let items: [LibraryItem]
         if let collectionID {
-            return collectionService.items(in: collectionID, from: libraryService.items)
+            items = collectionService.items(in: collectionID, from: libraryService.items)
+        } else {
+            items = libraryService.items(matching: filter, sortedBy: sortOrder)
         }
-        return libraryService.items(matching: filter, sortedBy: sortOrder)
+
+        return items.matchingSearchText(appState.searchText)
     }
 
     private var selectedCollection: LibraryCollection? {
@@ -468,5 +472,27 @@ struct LibraryGridView: View {
         }
         selectedIDs.removeAll()
         isSelecting = false
+    }
+}
+
+extension Array where Element == LibraryItem {
+    func matchingSearchText(_ searchText: String) -> [LibraryItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return self }
+        return filter { $0.matchesSearchText(query) }
+    }
+}
+
+extension LibraryItem {
+    func matchesSearchText(_ searchText: String) -> Bool {
+        localizedContains(name, searchText)
+            || localizedContains(url.lastPathComponent, searchText)
+            || localizedContains(url.deletingLastPathComponent().path, searchText)
+            || tags.contains { localizedContains($0, searchText) }
+            || localizedContains(notes, searchText)
+    }
+
+    private func localizedContains(_ text: String, _ searchText: String) -> Bool {
+        text.range(of: searchText, options: [.caseInsensitive, .diacriticInsensitive]) != nil
     }
 }

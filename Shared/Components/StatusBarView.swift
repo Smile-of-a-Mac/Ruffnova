@@ -11,7 +11,14 @@ struct StatusBarView: View {
     @EnvironmentObject var locManager: LocalizationManager
     @ObservedObject private var libraryService = LibraryService.shared
 
-    private let ruffleVersion = "0.1.0"
+    private var appVersion: String {
+        guard let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+              !version.isEmpty,
+              !version.hasPrefix("$(") else {
+            return "Unkown"
+        }
+        return version
+    }
 
     var body: some View {
         HStack(alignment: .bottom) {
@@ -41,7 +48,7 @@ struct StatusBarView: View {
                 statusDivider
                 statusItem(
                     icon: "number",
-                    text: ruffleVersion,
+                    text: appVersion,
                     helpText: locManager.localized("statusbar.version.help")
                 )
             }

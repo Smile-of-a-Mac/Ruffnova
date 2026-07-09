@@ -4,9 +4,6 @@
 
 import Combine
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 struct AppSidebar: View {
     @EnvironmentObject var appState: AppState
@@ -60,53 +57,14 @@ struct AppSidebar: View {
     }
 
     private var brandHeader: some View {
-        HStack(spacing: NativeSpacing.md) {
-            brandIcon
-
-            Text(locManager.localized("app.name"))
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
+        HStack(spacing: NativeSpacing.sm) {
+            AppBrandHeader(size: .sidebar)
 
             Spacer(minLength: 0)
         }
         .padding(.horizontal, NativeSpacing.xs)
-        .accessibilityElement(children: .combine)
         .accessibilityLabel(locManager.localized("app.name"))
     }
-
-    @ViewBuilder
-    private var brandIcon: some View {
-        #if os(macOS)
-        Image(nsImage: sidebarAppIcon)
-            .resizable()
-            .scaledToFit()
-            .frame(width: 30, height: 30)
-            .padding(3)
-            .background(GlassMaterial.ultraLight, in: RoundedRectangle(cornerRadius: NativeRadius.sm, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: NativeRadius.sm, style: .continuous)
-                    .strokeBorder(.separator.opacity(0.35), lineWidth: 0.7)
-            }
-        #else
-        Image(systemName: "play.rectangle.fill")
-            .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(.tint)
-            .frame(width: 30, height: 30)
-            .background(GlassMaterial.ultraLight, in: RoundedRectangle(cornerRadius: NativeRadius.sm, style: .continuous))
-        #endif
-    }
-
-    #if os(macOS)
-    private var sidebarAppIcon: NSImage {
-        if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
-           let icon = NSImage(contentsOf: iconURL) {
-            return icon
-        }
-
-        return NSImage(named: "AppIcon") ?? NSApplication.shared.applicationIconImage
-    }
-    #endif
 
     private var searchField: some View {
         HStack(spacing: NativeSpacing.sm) {

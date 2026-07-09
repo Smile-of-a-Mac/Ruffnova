@@ -10,6 +10,7 @@ struct RecentListView: View {
         libraryService.sorted(by: .lastOpened)
             .filter { $0.availabilityStatus == .available }
             .prefix(20).map { $0 }
+            .matchingSearchText(appState.searchText)
     }
 
     private var contentInsets: EdgeInsets {

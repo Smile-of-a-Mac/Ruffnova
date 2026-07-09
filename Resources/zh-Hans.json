@@ -79,7 +79,7 @@
     "settings.privacy.data.subtitle": "隐私与数据收集",
     "settings.privacy.data.usageStats": "使用统计",
     "settings.privacy.data.disabled": "已禁用",
-    "settings.privacy.data.noCollection": "Ruffle 不收集任何个人数据。",
+    "settings.privacy.data.noCollection": "Ruffnova 不收集任何个人数据。",
 
     "settings.advanced.actionscript": "ActionScript",
     "settings.advanced.actionscript.subtitle": "AVM2 和执行设置",

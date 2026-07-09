@@ -13,55 +13,73 @@ struct AboutView: View {
     }
 
     var body: some View {
-        VStack(spacing: NativeSpacing.xl) {
-            Image(systemName: "sparkles.tv")
-                .font(.system(size: 56, weight: .ultraLight))
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .center, spacing: 34) {
+                brandBlock
 
-            Text(locManager.localized("about.title"))
-                .font(.largeTitle.weight(.semibold))
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(locManager.localized("about.subtitle"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
 
-            Text(locManager.localized("about.subtitle"))
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
-
-            Divider()
-                .frame(width: 200)
-
-            VStack(spacing: NativeSpacing.md) {
-                AboutRow(label: locManager.localized("about.version"), value: appVersion)
-                AboutRow(label: locManager.localized("about.build"), value: buildNumber)
-                AboutRow(label: locManager.localized("about.ruffleVersion"), value: "0.3.0")
+                    VStack(spacing: 0) {
+                        AboutRow(label: locManager.localized("about.version"), value: appVersion)
+                        Divider()
+                        AboutRow(label: locManager.localized("about.build"), value: buildNumber)
+                        Divider()
+                        AboutRow(label: locManager.localized("about.ruffleVersion"), value: "0.3.0")
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Divider()
-                .frame(width: 200)
 
-            footer
+            VStack(alignment: .leading, spacing: 8) {
+                Text(locManager.localized("about.copyright"))
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 10) {
+                    if let ruffleSourceURL {
+                        Link(locManager.localized("about.sourceLink"), destination: ruffleSourceURL)
+                    }
+
+                    Text(locManager.localized("about.license"))
+                        .foregroundStyle(.tertiary)
+                }
+                .font(.footnote)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(40)
-        .frame(width: 360, height: 420)
+        .padding(.horizontal, 34)
+        .padding(.top, 34)
+        .padding(.bottom, 24)
+        .frame(width: 520, height: 300)
+        .background(.background)
     }
 
-    private var footer: some View {
-        VStack(spacing: NativeSpacing.xs) {
-            Text(locManager.localized("about.copyright"))
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+    private var brandBlock: some View {
+        VStack(alignment: .center, spacing: 14) {
+            Image("SidebarBrandIcon")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 96, height: 96)
+                .accessibilityHidden(true)
 
-            if let ruffleSourceURL {
-                Link(locManager.localized("about.sourceLink"), destination: ruffleSourceURL)
-                    .font(.caption)
-            }
-
-            Text(locManager.localized("about.license"))
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
+            Image("SidebarWordmark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 170, height: 48, alignment: .center)
+                .offset(x: 24)
+                .accessibilityHidden(true)
         }
-        .frame(maxWidth: 260)
+        .frame(width: 180, alignment: .center)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(locManager.localized("about.title")))
     }
 }
 
@@ -72,12 +90,13 @@ private struct AboutRow: View {
     var body: some View {
         HStack {
             Text(label)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
             Spacer()
             Text(value)
                 .fontWeight(.medium)
         }
-        .frame(width: 200)
+        .font(.callout)
+        .padding(.vertical, 7)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value)")
     }

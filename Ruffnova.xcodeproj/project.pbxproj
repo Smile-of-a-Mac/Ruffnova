@@ -40,6 +40,7 @@
 		A10032 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10032 /* Assets.xcassets */; };
 		A10033 /* zh-Hans.json in Resources */ = {isa = PBXBuildFile; fileRef = B10033 /* zh-Hans.json */; };
 		A10034 /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = B10034 /* en.json */; };
+		A10035 /* zh-Hant.json in Resources */ = {isa = PBXBuildFile; fileRef = B10054 /* zh-Hant.json */; };
 		A10038 /* IOSContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10041 /* IOSContentView.swift */; };
 		A10039 /* IOSAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10042 /* IOSAppDelegate.swift */; };
 		A10040 /* FilePickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10043 /* FilePickerService.swift */; };
@@ -52,6 +53,12 @@
 		A10047 /* en InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10051 /* en InfoPlist.strings */; };
 		A10048 /* zh-Hans InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10052 /* zh-Hans InfoPlist.strings */; };
 		A10049 /* MacMenuLocalizationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10053 /* MacMenuLocalizationService.swift */; };
+		A10050 /* zh-Hant InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10055 /* zh-Hant InfoPlist.strings */; };
+		A10051 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = B10056 /* ja.json */; };
+		A10052 /* ja InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10057 /* ja InfoPlist.strings */; };
+		A10054 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = B10059 /* ko.json */; };
+		A10055 /* ko InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10060 /* ko InfoPlist.strings */; };
+		A10053 /* AppBrandHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10058 /* AppBrandHeader.swift */; };
 		A20001 /* LibraryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* LibraryItem.swift */; };
 		A20002 /* LibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002 /* LibraryService.swift */; };
 		A20003 /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20003 /* ImportService.swift */; };
@@ -125,6 +132,13 @@
 		B10051 /* en InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "en InfoPlist.strings"; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B10052 /* zh-Hans InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans InfoPlist.strings"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		B10053 /* MacMenuLocalizationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMenuLocalizationService.swift; sourceTree = "<group>"; };
+		B10054 /* zh-Hant.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "zh-Hant.json"; sourceTree = "<group>"; };
+		B10055 /* zh-Hant InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant InfoPlist.strings"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		B10056 /* ja.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ja.json; sourceTree = "<group>"; };
+		B10057 /* ja InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "ja InfoPlist.strings"; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		B10059 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ko.json; sourceTree = "<group>"; };
+		B10060 /* ko InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "ko InfoPlist.strings"; path = ko.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		B10058 /* AppBrandHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBrandHeader.swift; sourceTree = "<group>"; };
 		B20001 /* LibraryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryItem.swift; sourceTree = "<group>"; };
 		B20002 /* LibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryService.swift; sourceTree = "<group>"; };
 		B20003 /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
@@ -363,6 +377,7 @@
 		G10310 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				B10058 /* AppBrandHeader.swift */,
 				B10024 /* StatusBarView.swift */,
 			);
 			path = Components;
@@ -448,9 +463,15 @@
 			isa = PBXGroup;
 			children = (
 				B10033 /* zh-Hans.json */,
+				B10054 /* zh-Hant.json */,
 				B10034 /* en.json */,
+				B10056 /* ja.json */,
+				B10059 /* ko.json */,
 				B10051 /* en InfoPlist.strings */,
 				B10052 /* zh-Hans InfoPlist.strings */,
+				B10055 /* zh-Hant InfoPlist.strings */,
+				B10057 /* ja InfoPlist.strings */,
+				B10060 /* ko InfoPlist.strings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -680,6 +701,9 @@
 			knownRegions = (
 				en,
 				"zh-Hans",
+				"zh-Hant",
+				ja,
+				ko,
 			);
 			mainGroup = G10000;
 			productRefGroup = G10099 /* Products */;
@@ -698,9 +722,15 @@
 			files = (
 				A10032 /* Assets.xcassets in Resources */,
 				A10033 /* zh-Hans.json in Resources */,
+				A10035 /* zh-Hant.json in Resources */,
 				A10034 /* en.json in Resources */,
+				A10051 /* ja.json in Resources */,
+				A10054 /* ko.json in Resources */,
 				A10047 /* en InfoPlist.strings in Resources */,
 				A10048 /* zh-Hans InfoPlist.strings in Resources */,
+				A10050 /* zh-Hant InfoPlist.strings in Resources */,
+				A10052 /* ja InfoPlist.strings in Resources */,
+				A10055 /* ko InfoPlist.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -740,6 +770,7 @@
 				A10022 /* SettingsView.swift in Sources */,
 				A10023 /* RuffleBridge.swift in Sources */,
 				A10024 /* StatusBarView.swift in Sources */,
+				A10053 /* AppBrandHeader.swift in Sources */,
 				A10025 /* NotificationName+Extensions.swift in Sources */,
 				A10026 /* Language.swift in Sources */,
 				A10027 /* BookmarkManager.swift in Sources */,
@@ -842,7 +873,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 26G09a;
 				DEVELOPMENT_TEAM = B8NH9LK6K6;
 				ENABLE_DEBUG_DYLIB = NO;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
@@ -861,7 +892,7 @@
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/CRuffleFFI/ios";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/CRuffleFFI/ios-sim";
 				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = "$(SRCROOT)/CRuffleFFI/macos";
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 1.0.0;
 				OTHER_LDFLAGS = "$(inherited)";
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
@@ -909,7 +940,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 26G09a;
 				DEVELOPMENT_TEAM = B8NH9LK6K6;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				INFOPLIST_FILE = Info.plist;
@@ -927,7 +958,7 @@
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/CRuffleFFI/ios";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/CRuffleFFI/ios-sim";
 				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = "$(SRCROOT)/CRuffleFFI/macos";
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 1.0.0;
 				OTHER_LDFLAGS = "$(inherited)";
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",

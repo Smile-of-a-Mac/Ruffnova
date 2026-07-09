@@ -10,6 +10,14 @@ struct RuffleCommands: Commands {
     private var loc: LocalizationManager { locManager }
 
     var body: some Commands {
+        #if os(macOS)
+        CommandGroup(replacing: .appInfo) {
+            Button(loc.localized("menu.about")) {
+                openWindow(id: "ruffnova-about")
+            }
+        }
+        #endif
+
         // MARK: - File Menu
         CommandGroup(replacing: .newItem) {
             Button(loc.localized("menu.open")) {
@@ -238,12 +246,6 @@ struct RuffleCommands: Commands {
 
         // MARK: - Help Menu
         CommandGroup(replacing: .help) {
-            Button(loc.localized("menu.about")) {
-                AppCommandRouter.showAbout(loc: loc)
-            }
-
-            Divider()
-
             Button(loc.localized("menu.help")) {
                 AppCommandRouter.openHelp()
             }

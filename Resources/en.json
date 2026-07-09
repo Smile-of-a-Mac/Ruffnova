@@ -79,7 +79,7 @@
     "settings.privacy.data.subtitle": "Privacy and data collection",
     "settings.privacy.data.usageStats": "Usage Statistics",
     "settings.privacy.data.disabled": "Disabled",
-    "settings.privacy.data.noCollection": "No personal data is collected by Ruffle.",
+    "settings.privacy.data.noCollection": "No personal data is collected by Ruffnova.",
 
     "settings.advanced.actionscript": "ActionScript",
     "settings.advanced.actionscript.subtitle": "AVM2 and execution settings",

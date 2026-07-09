@@ -68,6 +68,7 @@
     "settings.privacy.filesystem.prompt": "SWF가 파일 접근을 요청할 때:",
     "settings.privacy.filesystem.restricted": "파일 접근은 샌드박스 디렉토리로 제한됩니다.",
     "settings.privacy.defaults.footer": "파일별 결정이 없는 경우 이 기본값이 새 파일에 적용됩니다.",
+    "settings.privacy.comingSoon.footer": "개인정보 권한 제어는 곧 제공될 예정입니다.",
     "settings.privacy.overrides": "파일별 결정",
     "settings.privacy.overrides.subtitle": "파일별 네트워크 및 파일 시스템 선택 사항 확인",
     "settings.privacy.overrides.empty": "파일별 결정 없음",
@@ -85,6 +86,7 @@
     "settings.advanced.actionscript.subtitle": "AVM2 및 실행 설정",
     "settings.advanced.actionscript.avm2Optimizer": "AVM2 최적화 사용",
     "settings.advanced.actionscript.maxDuration": "최대 실행 시간",
+    "settings.advanced.actionscript.maxDuration.footer": "다음 플레이어 세션이 생성될 때 적용됩니다.",
     "settings.advanced.actionscript.seconds": "초",
     "settings.advanced.actionscript.secondsFormat": "%d초",
 

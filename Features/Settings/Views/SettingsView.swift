@@ -11,12 +11,11 @@ struct SettingsActions {
     var setQuality: @MainActor (RuffleQuality) -> Void = { _ in }
     var setSpeed: @MainActor (Float) -> Void = { _ in }
     var setMaxExecutionDuration: @MainActor (Double) -> Void = { _ in }
-    var setAVM2OptimizerEnabled: @MainActor (Bool) -> Void = { _ in }
+    var setLetterbox: @MainActor (String) -> Void = { _ in }
     var setShowDebugUI: @MainActor (Bool) -> Void = { _ in }
     var showTraceConsole: @MainActor () -> Void = {}
     var showDiagnostics: @MainActor () -> Void = {}
     var hasCurrentFile: @MainActor () -> Bool = { false }
-    var avm2OptimizerEnabled: @MainActor () -> Bool = { true }
     var resetRuntimeSettings: @MainActor () -> Void = {}
 
     init() {}
@@ -27,19 +26,18 @@ struct SettingsActions {
         setQuality = { [weak appState] value in appState?.quality = value }
         setSpeed = { [weak appState] value in appState?.setSpeed(value) }
         setMaxExecutionDuration = { [weak appState] value in appState?.maxExecutionDuration = value }
-        setAVM2OptimizerEnabled = { [weak appState] value in appState?.avm2OptimizerEnabled = value }
+        setLetterbox = { [weak appState] value in appState?.setLetterbox(value) }
         setShowDebugUI = { [weak appState] value in appState?.showDebugUI = value }
         showTraceConsole = { [weak appState] in appState?.showTraceConsole = true }
         showDiagnostics = { [weak appState] in appState?.showDiagnostics = true }
         hasCurrentFile = { [weak appState] in appState?.currentFileURL != nil }
-        avm2OptimizerEnabled = { [weak appState] in appState?.avm2OptimizerEnabled ?? true }
         resetRuntimeSettings = { [weak appState] in
             appState?.quality = .high
             appState?.isLooping = false
             appState?.setSpeed(1.0)
             appState?.maxExecutionDuration = SettingsPersistence.shared.maxExecutionDuration
+            appState?.setLetterbox(SettingsPersistence.shared.letterbox)
             appState?.playerMode = .normal
-            appState?.avm2OptimizerEnabled = true
             appState?.showDebugUI = false
         }
     }
@@ -68,11 +66,8 @@ struct MacSettingsView: View {
     @AppStorage("loop") private var isLooping = false
     @AppStorage("quality") private var qualityRawValue = Int(RuffleQuality.high.rawValue)
     @AppStorage("speed") private var playbackSpeed = 1.0
-    @AppStorage("graphicsBackend") private var graphicsBackend = "auto"
     @AppStorage("maxExecutionDuration") private var maxExecutionDuration = 15.0
     @AppStorage("showDebugUI") private var showDebugUI = false
-    @ObservedObject private var permissionPolicy = PermissionPolicyService.shared
-    @State private var avm2OptimizerEnabled = true
     @State private var showResetAlert = false
 
     private let categories = SettingsCategory.macSettingsCases
@@ -106,10 +101,6 @@ struct MacSettingsView: View {
                     switch selectedCategory {
                     case .general:
                         macGeneralPane
-                    case .rendering:
-                        macRenderingPane
-                    case .privacy:
-                        macPrivacyPane
                     case .advanced:
                         macAdvancedPane
                     case .about:
@@ -158,12 +149,6 @@ struct MacSettingsView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .background(MacFixedSizeWindowConfigurator(size: windowSize))
         .animation(.glassSmooth, value: selectedCategory)
-        .onAppear {
-            avm2OptimizerEnabled = settingsActions.avm2OptimizerEnabled()
-            if graphicsBackend == "vulkan" {
-                graphicsBackend = "auto"
-            }
-        }
         .alert(locManager.localized("settings.advanced.reset.title"), isPresented: $showResetAlert) {
             Button(locManager.localized("settings.advanced.reset.actionLabel"), role: .destructive, action: resetSettings)
             Button(locManager.localized("collection.cancel"), role: .cancel) {}
@@ -179,7 +164,7 @@ struct MacSettingsView: View {
                     .toggleStyle(.checkbox)
 
                 MacInlineSetting(label: locManager.localized("settings.general.playback.letterbox")) {
-                    Picker("", selection: $letterbox) {
+                    Picker("", selection: letterboxBinding) {
                         Text(locManager.localized("settings.general.playback.letterbox.fullscreen")).tag("fullscreen")
                         Text(locManager.localized("settings.general.playback.letterbox.on")).tag("on")
                         Text(locManager.localized("settings.general.playback.letterbox.off")).tag("off")
@@ -242,123 +227,9 @@ struct MacSettingsView: View {
         }
     }
 
-    private var macRenderingPane: some View {
-        VStack(spacing: 12) {
-            MacSettingsGroup(title: locManager.localized("settings.rendering.graphics")) {
-                MacInlineSetting(label: locManager.localized("settings.rendering.graphics.backend")) {
-                    Picker("", selection: $graphicsBackend) {
-                        Text(locManager.localized("settings.rendering.graphics.auto")).tag("auto")
-                        Text(locManager.localized("settings.rendering.graphics.metal")).tag("metal")
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 128, alignment: .leading)
-                }
-
-                MacInlineSetting(label: locManager.localized("settings.rendering.graphics.unavailable")) {
-                    Text(locManager.localized("settings.rendering.graphics.vulkan.unavailable"))
-                        .foregroundStyle(.secondary)
-                }
-
-                Text(String(format: locManager.localized("settings.rendering.graphics.metal.recommended"), platformName))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private var macPrivacyPane: some View {
-        VStack(spacing: 12) {
-            MacSettingsGroup(title: locManager.localized("settings.privacy")) {
-                MacInlineSetting(label: locManager.localized("settings.privacy.network.prompt")) {
-                    Picker("", selection: globalDefaultBinding(for: .network)) {
-                        Text(locManager.localized("permission.global.alwaysAsk")).tag(PermissionGlobalDefault.alwaysAsk)
-                        Text(locManager.localized("permission.global.allow")).tag(PermissionGlobalDefault.allow)
-                        Text(locManager.localized("permission.global.deny")).tag(PermissionGlobalDefault.deny)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 128, alignment: .leading)
-                }
-
-                MacInlineSetting(label: locManager.localized("settings.privacy.filesystem.prompt")) {
-                    Picker("", selection: globalDefaultBinding(for: .filesystem)) {
-                        Text(locManager.localized("permission.global.alwaysAsk")).tag(PermissionGlobalDefault.alwaysAsk)
-                        Text(locManager.localized("permission.global.allow")).tag(PermissionGlobalDefault.allow)
-                        Text(locManager.localized("permission.global.deny")).tag(PermissionGlobalDefault.deny)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 128, alignment: .leading)
-                }
-
-                Text(locManager.localized("settings.privacy.defaults.footer"))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            MacSettingsSeparator()
-
-            MacSettingsGroup(title: locManager.localized("settings.privacy.overrides")) {
-                if permissionPolicy.overrides.isEmpty {
-                    Text(locManager.localized("settings.privacy.overrides.empty"))
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(permissionPolicy.overrides) { override in
-                        HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(override.fileName)
-                                Text("\(localizedScope(override.scope)) - \(localizedDecision(override.decision))")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Button(role: .destructive) {
-                                permissionPolicy.clearOverride(override.id)
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                    }
-
-                    Button(role: .destructive) {
-                        permissionPolicy.clearAllOverrides()
-                    } label: {
-                        Label(locManager.localized("settings.privacy.overrides.clearAll"), systemImage: "trash")
-                    }
-                }
-
-                Text(locManager.localized("settings.privacy.overrides.subtitle"))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            MacSettingsSeparator()
-
-            MacSettingsGroup(title: locManager.localized("settings.privacy.data")) {
-                MacInlineSetting(label: locManager.localized("settings.privacy.data.usageStats")) {
-                    Text(locManager.localized("settings.privacy.data.disabled"))
-                        .foregroundStyle(.secondary)
-                }
-
-                Text(locManager.localized("settings.privacy.data.noCollection"))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
     private var macAdvancedPane: some View {
         VStack(spacing: 12) {
             MacSettingsGroup(title: locManager.localized("settings.advanced.actionscript")) {
-                Toggle(locManager.localized("settings.advanced.actionscript.avm2Optimizer"), isOn: avm2OptimizerBinding)
-                    .toggleStyle(.checkbox)
-
                 MacInlineSetting(label: locManager.localized("settings.advanced.actionscript.maxDuration")) {
                     HStack(spacing: 14) {
                         Slider(value: maxExecutionDurationBinding, in: 5...60, step: 1)
@@ -369,6 +240,11 @@ struct MacSettingsView: View {
                             .frame(width: 74, alignment: .trailing)
                     }
                 }
+
+                Text(locManager.localized("settings.advanced.actionscript.maxDuration.footer"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             MacSettingsSeparator()
@@ -408,6 +284,16 @@ struct MacSettingsView: View {
             set: { newValue in
                 defaultPlayerMode = newValue
                 SettingsPersistence.shared.defaultPlayerMode = PlayerMode(rawValue: newValue) ?? .normal
+            }
+        )
+    }
+
+    private var letterboxBinding: Binding<String> {
+        Binding(
+            get: { letterbox },
+            set: { newValue in
+                letterbox = newValue
+                settingsActions.setLetterbox(newValue)
             }
         )
     }
@@ -453,23 +339,6 @@ struct MacSettingsView: View {
         )
     }
 
-    private func globalDefaultBinding(for scope: PermissionScope) -> Binding<PermissionGlobalDefault> {
-        Binding(
-            get: { permissionPolicy.globalDefault(for: scope) },
-            set: { permissionPolicy.setGlobalDefault($0, for: scope) }
-        )
-    }
-
-    private var avm2OptimizerBinding: Binding<Bool> {
-        Binding(
-            get: { avm2OptimizerEnabled },
-            set: { newValue in
-                avm2OptimizerEnabled = newValue
-                settingsActions.setAVM2OptimizerEnabled(newValue)
-            }
-        )
-    }
-
     private var effectiveMaxExecutionDuration: Double {
         maxExecutionDuration == 0 ? 15.0 : maxExecutionDuration
     }
@@ -494,32 +363,6 @@ struct MacSettingsView: View {
         )
     }
 
-    private var platformName: String { "macOS" }
-
-    private func localizedScope(_ scope: PermissionScope) -> String {
-        switch scope {
-        case .network:
-            return locManager.localized("permission.scope.network")
-        case .filesystem:
-            return locManager.localized("permission.scope.filesystem")
-        }
-    }
-
-    private func localizedDecision(_ decision: PermissionDecision) -> String {
-        switch decision {
-        case .alwaysAsk:
-            return locManager.localized("permission.decision.alwaysAsk")
-        case .allowOnce:
-            return locManager.localized("permission.decision.allowOnce")
-        case .allowForFile:
-            return locManager.localized("permission.decision.allowForFile")
-        case .denyForFile:
-            return locManager.localized("permission.decision.denyForFile")
-        case .useGlobalDefault:
-            return locManager.localized("permission.decision.useGlobalDefault")
-        }
-    }
-
     private func resetSettings() {
         SettingsPersistence.shared.resetAll()
         PermissionPolicyService.shared.setGlobalDefault(.alwaysAsk, for: .network)
@@ -527,7 +370,6 @@ struct MacSettingsView: View {
         PermissionPolicyService.shared.clearAllOverrides()
         maxExecutionDuration = SettingsPersistence.shared.maxExecutionDuration
         showDebugUI = false
-        avm2OptimizerEnabled = true
         settingsActions.resetRuntimeSettings()
     }
 }
@@ -718,10 +560,6 @@ private struct SettingsForm: View {
             switch category {
             case .general:
                 GeneralSettingsView()
-            case .rendering:
-                RenderingSettingsView()
-            case .privacy:
-                PrivacySettingsView()
             case .advanced:
                 AdvancedSettingsView()
             case .about:
@@ -749,7 +587,7 @@ struct GeneralSettingsView: View {
     var body: some View {
         Section {
             Toggle(locManager.localized("settings.general.playback.autoplay"), isOn: $autoplay)
-            Picker(locManager.localized("settings.general.playback.letterbox"), selection: $letterbox) {
+            Picker(locManager.localized("settings.general.playback.letterbox"), selection: letterboxBinding) {
                 Text(locManager.localized("settings.general.playback.letterbox.fullscreen")).tag("fullscreen")
                 Text(locManager.localized("settings.general.playback.letterbox.on")).tag("on")
                 Text(locManager.localized("settings.general.playback.letterbox.off")).tag("off")
@@ -798,6 +636,16 @@ struct GeneralSettingsView: View {
         )
     }
 
+    private var letterboxBinding: Binding<String> {
+        Binding(
+            get: { letterbox },
+            set: { newValue in
+                letterbox = newValue
+                settingsActions.setLetterbox(newValue)
+            }
+        )
+    }
+
     private var loopingBinding: Binding<Bool> {
         Binding(
             get: { isLooping },
@@ -840,157 +688,15 @@ struct GeneralSettingsView: View {
     }
 }
 
-struct RenderingSettingsView: View {
-    @EnvironmentObject private var locManager: LocalizationManager
-    @AppStorage("graphicsBackend") private var graphicsBackend = "auto"
-
-    var body: some View {
-        Section {
-            Picker(locManager.localized("settings.rendering.graphics.backend"), selection: $graphicsBackend) {
-                Text(locManager.localized("settings.rendering.graphics.auto")).tag("auto")
-                Text(locManager.localized("settings.rendering.graphics.metal")).tag("metal")
-            }
-            LabeledContent(locManager.localized("settings.rendering.graphics.unavailable")) {
-                Text(locManager.localized("settings.rendering.graphics.vulkan.unavailable"))
-                    .foregroundStyle(.secondary)
-            }
-        } footer: {
-            Text(String(format: locManager.localized("settings.rendering.graphics.metal.recommended"), platformName))
-        }
-        .onAppear {
-            if graphicsBackend == "vulkan" {
-                graphicsBackend = "auto"
-            }
-        }
-    }
-
-    private var platformName: String {
-        #if os(macOS)
-        "macOS"
-        #else
-        "iOS"
-        #endif
-    }
-}
-
-struct PrivacySettingsView: View {
-    @EnvironmentObject private var locManager: LocalizationManager
-    @ObservedObject private var permissionPolicy = PermissionPolicyService.shared
-
-    var body: some View {
-        Section {
-            Picker(locManager.localized("settings.privacy.network.prompt"), selection: globalDefaultBinding(for: .network)) {
-                Text(locManager.localized("permission.global.alwaysAsk")).tag(PermissionGlobalDefault.alwaysAsk)
-                Text(locManager.localized("permission.global.allow")).tag(PermissionGlobalDefault.allow)
-                Text(locManager.localized("permission.global.deny")).tag(PermissionGlobalDefault.deny)
-            }
-            Picker(locManager.localized("settings.privacy.filesystem.prompt"), selection: globalDefaultBinding(for: .filesystem)) {
-                Text(locManager.localized("permission.global.alwaysAsk")).tag(PermissionGlobalDefault.alwaysAsk)
-                Text(locManager.localized("permission.global.allow")).tag(PermissionGlobalDefault.allow)
-                Text(locManager.localized("permission.global.deny")).tag(PermissionGlobalDefault.deny)
-            }
-        } footer: {
-            Text(locManager.localized("settings.privacy.defaults.footer"))
-        }
-
-        Section {
-            PermissionOverridesListView()
-        } footer: {
-            Text(locManager.localized("settings.privacy.overrides.subtitle"))
-        }
-
-        Section {
-            LabeledContent(locManager.localized("settings.privacy.data.usageStats")) {
-                Text(locManager.localized("settings.privacy.data.disabled"))
-                    .foregroundStyle(.secondary)
-            }
-        } footer: {
-            Text(locManager.localized("settings.privacy.data.noCollection"))
-        }
-    }
-
-    private func globalDefaultBinding(for scope: PermissionScope) -> Binding<PermissionGlobalDefault> {
-        Binding(
-            get: { permissionPolicy.globalDefault(for: scope) },
-            set: { permissionPolicy.setGlobalDefault($0, for: scope) }
-        )
-    }
-}
-
-private struct PermissionOverridesListView: View {
-    @EnvironmentObject private var locManager: LocalizationManager
-    @ObservedObject private var permissionPolicy = PermissionPolicyService.shared
-
-    var body: some View {
-        if permissionPolicy.overrides.isEmpty {
-            LabeledContent(locManager.localized("settings.privacy.overrides.empty")) {
-                Text(locManager.localized("settings.privacy.overrides.none"))
-                    .foregroundStyle(.secondary)
-            }
-        } else {
-            ForEach(permissionPolicy.overrides) { override in
-                HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: NativeSpacing.xs) {
-                        Text(override.fileName)
-                        Text("\(localizedScope(override.scope)) - \(localizedDecision(override.decision))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button(role: .destructive) {
-                        permissionPolicy.clearOverride(override.id)
-                    } label: {
-                        Label(locManager.localized("settings.privacy.overrides.clear"), systemImage: "trash")
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                }
-            }
-
-            Button(role: .destructive) {
-                permissionPolicy.clearAllOverrides()
-            } label: {
-                Label(locManager.localized("settings.privacy.overrides.clearAll"), systemImage: "trash")
-            }
-        }
-    }
-
-    private func localizedScope(_ scope: PermissionScope) -> String {
-        switch scope {
-        case .network:
-            return locManager.localized("permission.scope.network")
-        case .filesystem:
-            return locManager.localized("permission.scope.filesystem")
-        }
-    }
-
-    private func localizedDecision(_ decision: PermissionDecision) -> String {
-        switch decision {
-        case .alwaysAsk:
-            return locManager.localized("permission.decision.alwaysAsk")
-        case .allowOnce:
-            return locManager.localized("permission.decision.allowOnce")
-        case .allowForFile:
-            return locManager.localized("permission.decision.allowForFile")
-        case .denyForFile:
-            return locManager.localized("permission.decision.denyForFile")
-        case .useGlobalDefault:
-            return locManager.localized("permission.decision.useGlobalDefault")
-        }
-    }
-}
-
 struct AdvancedSettingsView: View {
     @EnvironmentObject private var locManager: LocalizationManager
     @Environment(\.settingsActions) private var settingsActions
     @AppStorage("maxExecutionDuration") private var maxExecutionDuration = 15.0
     @AppStorage("showDebugUI") private var showDebugUI = false
-    @State private var avm2OptimizerEnabled = true
     @State private var showResetAlert = false
 
     var body: some View {
         Section {
-            Toggle(locManager.localized("settings.advanced.actionscript.avm2Optimizer"), isOn: avm2OptimizerBinding)
             LabeledContent(locManager.localized("settings.advanced.actionscript.maxDuration")) {
                 HStack(spacing: NativeSpacing.md) {
                     Slider(value: maxExecutionDurationBinding, in: 5...60, step: 1)
@@ -1002,8 +708,11 @@ struct AdvancedSettingsView: View {
                 }
                 .settingsControlColumn()
             }
+        } footer: {
+            Text(locManager.localized("settings.advanced.actionscript.maxDuration.footer"))
         }
 
+        #if os(macOS)
         Section {
             Toggle(locManager.localized("settings.advanced.debug.showUI"), isOn: showDebugUIBinding)
             Button {
@@ -1015,12 +724,14 @@ struct AdvancedSettingsView: View {
         } footer: {
             Text(locManager.localized("settings.advanced.debug.warning"))
         }
+        #endif
 
         Section {
             Button(role: .destructive) {
                 showResetAlert = true
             } label: {
                 Label(locManager.localized("settings.advanced.reset"), systemImage: "arrow.counterclockwise")
+                    .foregroundStyle(.red)
             }
         }
         .alert(locManager.localized("settings.advanced.reset.title"), isPresented: $showResetAlert) {
@@ -1029,19 +740,6 @@ struct AdvancedSettingsView: View {
         } message: {
             Text(locManager.localized("settings.advanced.reset.message"))
         }
-        .onAppear {
-            avm2OptimizerEnabled = settingsActions.avm2OptimizerEnabled()
-        }
-    }
-
-    private var avm2OptimizerBinding: Binding<Bool> {
-        Binding(
-            get: { avm2OptimizerEnabled },
-            set: { newValue in
-                avm2OptimizerEnabled = newValue
-                settingsActions.setAVM2OptimizerEnabled(newValue)
-            }
-        )
     }
 
     private var effectiveMaxExecutionDuration: Double {
@@ -1075,7 +773,6 @@ struct AdvancedSettingsView: View {
         PermissionPolicyService.shared.clearAllOverrides()
         maxExecutionDuration = SettingsPersistence.shared.maxExecutionDuration
         showDebugUI = false
-        avm2OptimizerEnabled = true
         settingsActions.resetRuntimeSettings()
     }
 }
@@ -1094,10 +791,29 @@ struct AboutSettingsView: View {
     }
 
     var body: some View {
+        #if os(iOS)
+        Form {
+            aboutSections
+        }
+        .scrollContentBackground(.hidden)
+        .background(settingsPageBackground)
+        .navigationTitle(locManager.localized("settings.about"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        #else
+        aboutSections
+        #endif
+    }
+
+    @ViewBuilder
+    private var aboutSections: some View {
         Section {
-            VStack(alignment: .leading, spacing: NativeSpacing.md) {
-                AppBrandHeader(size: .about)
+            HStack(alignment: .center, spacing: NativeSpacing.xl) {
+                AboutAppIconView()
+
                 VStack(alignment: .leading, spacing: NativeSpacing.xs) {
+                    Text(locManager.localized("about.title"))
+                        .font(.largeTitle.weight(.semibold))
                     Text(locManager.localized("about.subtitle"))
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -1126,6 +842,50 @@ struct AboutSettingsView: View {
             }
         }
     }
+}
+
+private struct AboutAppIconView: View {
+    var body: some View {
+        icon
+            .frame(width: 84, height: 84)
+            .clipShape(RoundedRectangle(cornerRadius: NativeRadius.lg, style: .continuous))
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var icon: some View {
+        #if os(macOS)
+        Image(nsImage: NSApp.applicationIconImage)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+        #else
+        if let image = iosAppIcon {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        } else {
+            Image(systemName: "sparkles.tv")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .symbolRenderingMode(.hierarchical)
+        }
+        #endif
+    }
+
+    #if os(iOS)
+    private var iosAppIcon: UIImage? {
+        if let image = UIImage(named: "AppIcon") {
+            return image
+        }
+
+        guard let icons = Bundle.main.object(forInfoDictionaryKey: "CFBundleIcons") as? [String: Any],
+              let primaryIcon = icons["CFBundlePrimaryIcon"] as? [String: Any],
+              let iconFiles = primaryIcon["CFBundleIconFiles"] as? [String]
+        else { return nil }
+
+        return iconFiles.reversed().compactMap { UIImage(named: $0) }.first
+    }
+    #endif
 }
 
 private extension View {
@@ -1157,27 +917,15 @@ struct SettingsView: View {
 
     var body: some View {
         #if os(iOS)
-        if isIPad {
-            InlineSettingsView()
-                .environmentObject(locManager)
-                .environment(\.settingsActions, settingsActions)
-        } else {
-            IOSSettingsRootView()
-                .environmentObject(locManager)
-                .environment(\.settingsActions, settingsActions)
-        }
+        IOSSettingsRootView()
+            .environmentObject(locManager)
+            .environment(\.settingsActions, settingsActions)
         #else
         MacSettingsView()
             .environmentObject(locManager)
             .environment(\.settingsActions, settingsActions)
         #endif
     }
-
-    #if os(iOS)
-    private var isIPad: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
-    }
-    #endif
 }
 
 #if os(iOS)
@@ -1185,53 +933,41 @@ struct IOSSettingsRootView: View {
     @EnvironmentObject private var locManager: LocalizationManager
 
     var body: some View {
-        List {
-            ForEach(SettingsCategory.allCases) { category in
+        Form {
+            GeneralSettingsView()
+            AdvancedSettingsView()
+
+            Section {
                 NavigationLink {
-                    SettingsCategoryDetailView(category: category)
+                    AboutSettingsView()
                 } label: {
-                    Label(locManager.localized(category.titleKey), systemImage: category.icon)
+                    Label(locManager.localized("settings.about"), systemImage: "info.circle")
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(settingsPageBackground)
         .navigationTitle(locManager.localized("sidebar.settings"))
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.visible, for: .navigationBar)
-    }
-}
-
-struct SettingsCategoryDetailView: View {
-    @EnvironmentObject private var locManager: LocalizationManager
-    let category: SettingsCategory
-
-    var body: some View {
-        SettingsForm(category: category)
-            .navigationTitle(locManager.localized(category.titleKey))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.visible, for: .navigationBar)
     }
 }
 #endif
 
 enum SettingsCategory: String, CaseIterable, Identifiable {
     case general
-    case rendering
-    case privacy
     case advanced
     case about
 
     var id: Self { self }
 
     #if os(macOS)
-    static let macSettingsCases: [SettingsCategory] = [.general, .rendering, .privacy, .advanced]
+    static let macSettingsCases: [SettingsCategory] = [.general, .advanced]
     #endif
 
     var icon: String {
         switch self {
         case .general: return "gearshape"
-        case .rendering: return "display"
-        case .privacy: return "hand.raised"
         case .advanced: return "wrench.and.screwdriver"
         case .about: return "info.circle"
         }
@@ -1240,8 +976,6 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     var titleKey: String {
         switch self {
         case .general: return "settings.general"
-        case .rendering: return "settings.rendering"
-        case .privacy: return "settings.privacy"
         case .advanced: return "settings.advanced"
         case .about: return "settings.about"
         }

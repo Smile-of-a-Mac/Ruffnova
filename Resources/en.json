@@ -68,6 +68,7 @@
     "settings.privacy.filesystem.prompt": "When a SWF requests file access:",
     "settings.privacy.filesystem.restricted": "File access is restricted to sandboxed directories.",
     "settings.privacy.defaults.footer": "These defaults apply to new files unless a per-file decision exists.",
+    "settings.privacy.comingSoon.footer": "Privacy permission controls are coming soon.",
     "settings.privacy.overrides": "Per-File Decisions",
     "settings.privacy.overrides.subtitle": "Review file-specific network and filesystem choices.",
     "settings.privacy.overrides.empty": "No per-file decisions",
@@ -85,6 +86,7 @@
     "settings.advanced.actionscript.subtitle": "AVM2 and execution settings",
     "settings.advanced.actionscript.avm2Optimizer": "Enable AVM2 Optimizer",
     "settings.advanced.actionscript.maxDuration": "Max execution duration",
+    "settings.advanced.actionscript.maxDuration.footer": "Applies the next time a player session is created.",
     "settings.advanced.actionscript.seconds": "seconds",
     "settings.advanced.actionscript.secondsFormat": "%d seconds",
 

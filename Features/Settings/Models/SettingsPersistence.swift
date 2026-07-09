@@ -72,7 +72,6 @@ final class SettingsPersistence {
         for key in ["quality", "volume", "isMuted", "loop",
                       "speed", "showDebugUI", "showToolbar",
                       "maxExecutionDuration", "letterbox", "autoplay",
-                      "graphicsBackend", "networkAccess", "filesystemAccess",
                       "defaultPlayerMode"] {
             defaults.removeObject(forKey: key)
         }

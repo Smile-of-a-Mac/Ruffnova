@@ -181,7 +181,6 @@ final class AppState: ObservableObject {
 
     @Published var quality: RuffleQuality = .high
     @Published var maxExecutionDuration: TimeInterval = 15.0
-    @Published var avm2OptimizerEnabled: Bool = true
 
     var language: String {
         LocalizationManager.shared.selectedLanguage.locale.identifier
@@ -254,6 +253,7 @@ final class AppState: ObservableObject {
         $quality.sink { [weak self] value in
             guard let self, !self.isRestoringPlaybackPreferences else { return }
             s.quality = value.rawValue
+            self.bridge?.setQuality(value)
             self.persistPlaybackPreferences()
         }.store(in: &cancellables)
         $volume.sink { [weak self] value in
@@ -269,6 +269,7 @@ final class AppState: ObservableObject {
         $isLooping.sink { [weak self] value in
             guard let self, !self.isRestoringPlaybackPreferences else { return }
             s.isLooping = value
+            self.bridge?.setLooping(value)
             self.persistPlaybackPreferences()
         }.store(in: &cancellables)
         $playbackSpeed.sink { [weak self] value in
@@ -278,7 +279,10 @@ final class AppState: ObservableObject {
         }.store(in: &cancellables)
         $showDebugUI.sink { s.showDebugUI = $0 }.store(in: &cancellables)
         $showToolbar.sink { s.showToolbar = $0 }.store(in: &cancellables)
-        $maxExecutionDuration.sink { s.maxExecutionDuration = $0 }.store(in: &cancellables)
+        $maxExecutionDuration.sink { [weak self] value in
+            s.maxExecutionDuration = value
+            self?.bridge?.setMaxExecutionDuration(Float(value))
+        }.store(in: &cancellables)
     }
 
     private func setupNotifications() {
@@ -336,6 +340,7 @@ final class AppState: ObservableObject {
             }
         }
         bridge?.setVolume(isMuted ? 0.0 : volume)
+        bridge?.setQuality(quality)
         bridge?.setLooping(isLooping)
         bridge?.setSpeed(playbackSpeed)
         applyLetterbox(SettingsPersistence.shared.letterbox)
@@ -791,6 +796,7 @@ final class AppState: ObservableObject {
         isRestoringPlaybackPreferences = false
 
         bridge?.setVolume(isMuted ? 0.0 : volume)
+        bridge?.setQuality(quality)
         bridge?.setLooping(isLooping)
         bridge?.setSpeed(playbackSpeed)
         applyLetterbox(preferences.letterbox)
@@ -1455,6 +1461,12 @@ final class AppState: ObservableObject {
     func setSpeed(_ speed: Float) {
         playbackSpeed = speed
         bridge?.setSpeed(speed)
+        persistPlaybackPreferences()
+    }
+
+    func setLetterbox(_ value: String) {
+        SettingsPersistence.shared.letterbox = value
+        applyLetterbox(value)
         persistPlaybackPreferences()
     }
 

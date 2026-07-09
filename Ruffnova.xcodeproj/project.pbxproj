@@ -56,9 +56,9 @@
 		A10050 /* zh-Hant InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10055 /* zh-Hant InfoPlist.strings */; };
 		A10051 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = B10056 /* ja.json */; };
 		A10052 /* ja InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10057 /* ja InfoPlist.strings */; };
+		A10053 /* AppBrandHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10058 /* AppBrandHeader.swift */; };
 		A10054 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = B10059 /* ko.json */; };
 		A10055 /* ko InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10060 /* ko InfoPlist.strings */; };
-		A10053 /* AppBrandHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10058 /* AppBrandHeader.swift */; };
 		A20001 /* LibraryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* LibraryItem.swift */; };
 		A20002 /* LibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002 /* LibraryService.swift */; };
 		A20003 /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20003 /* ImportService.swift */; };
@@ -136,9 +136,9 @@
 		B10055 /* zh-Hant InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant InfoPlist.strings"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		B10056 /* ja.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ja.json; sourceTree = "<group>"; };
 		B10057 /* ja InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "ja InfoPlist.strings"; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		B10058 /* AppBrandHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBrandHeader.swift; sourceTree = "<group>"; };
 		B10059 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ko.json; sourceTree = "<group>"; };
 		B10060 /* ko InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "ko InfoPlist.strings"; path = ko.lproj/InfoPlist.strings; sourceTree = "<group>"; };
-		B10058 /* AppBrandHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBrandHeader.swift; sourceTree = "<group>"; };
 		B20001 /* LibraryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryItem.swift; sourceTree = "<group>"; };
 		B20002 /* LibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryService.swift; sourceTree = "<group>"; };
 		B20003 /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
@@ -871,9 +871,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 26G09a;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = B8NH9LK6K6;
 				ENABLE_DEBUG_DYLIB = NO;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
@@ -892,7 +893,7 @@
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/CRuffleFFI/ios";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/CRuffleFFI/ios-sim";
 				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = "$(SRCROOT)/CRuffleFFI/macos";
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "$(inherited)";
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
@@ -938,11 +939,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 26G09a;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = B8NH9LK6K6;
-				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				"EXCLUDED_ARCHS[sdk=*]" = x86_64;
 				INFOPLIST_FILE = Info.plist;
 				"INFOPLIST_FILE[sdk=iphoneos*]" = "Info-iOS.plist";
 				"INFOPLIST_FILE[sdk=iphonesimulator*]" = "Info-iOS.plist";
@@ -958,7 +960,7 @@
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/CRuffleFFI/ios";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/CRuffleFFI/ios-sim";
 				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = "$(SRCROOT)/CRuffleFFI/macos";
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "$(inherited)";
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",

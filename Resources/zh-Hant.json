@@ -68,6 +68,7 @@
     "settings.privacy.filesystem.prompt": "當 SWF 請求檔案存取時：",
     "settings.privacy.filesystem.restricted": "檔案存取被限制在沙箱目錄內。",
     "settings.privacy.defaults.footer": "這些預設值會應用到新檔案，除非存在單檔案決策。",
+    "settings.privacy.comingSoon.footer": "隱私權限控制即將推出。",
     "settings.privacy.overrides": "單檔案決策",
     "settings.privacy.overrides.subtitle": "檢視針對單一檔案的網路和檔案系統選擇。",
     "settings.privacy.overrides.empty": "沒有單檔案決策",
@@ -85,6 +86,7 @@
     "settings.advanced.actionscript.subtitle": "AVM2 和執行設定",
     "settings.advanced.actionscript.avm2Optimizer": "啟用 AVM2 最佳化器",
     "settings.advanced.actionscript.maxDuration": "最大執行時間",
+    "settings.advanced.actionscript.maxDuration.footer": "將在下次建立播放器會話時生效。",
     "settings.advanced.actionscript.seconds": "秒",
     "settings.advanced.actionscript.secondsFormat": "%d 秒",
 

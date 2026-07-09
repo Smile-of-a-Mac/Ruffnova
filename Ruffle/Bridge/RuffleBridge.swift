@@ -41,9 +41,9 @@ final class RuffleBridge {
     private var viewportWidth: UInt32
     private var viewportHeight: UInt32
     private var viewportScaleFactor: Float
-    private let configuredQuality: Int32
+    private var configuredQuality: Int32
     private let configuredAutoplay: Bool
-    private let configuredMaxExecutionSecs: Float
+    private var configuredMaxExecutionSecs: Float
     private var displayTimer: Timer?
     private var lastFrameTime: UInt64 = 0
     private var renderedFrames: UInt64 = 0
@@ -394,6 +394,20 @@ final class RuffleBridge {
     }
 
     func getSpeed() -> Float { playbackSpeed }
+
+    // MARK: - Quality
+
+    func setQuality(_ quality: RuffleQuality) {
+        configuredQuality = quality.rawValue
+        #if RUST_FFI_AVAILABLE
+        guard let p = playerPointer else { return }
+        _ = ruffle_player_set_quality(p, quality.rawValue)
+        #endif
+    }
+
+    func setMaxExecutionDuration(_ seconds: Float) {
+        configuredMaxExecutionSecs = seconds
+    }
 
     // MARK: - Looping (Phase 1)
 

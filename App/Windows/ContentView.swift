@@ -73,14 +73,7 @@ struct ContentView: View {
             guard let i = n.userInfo,
                   let kc = i["keyCode"] as? UInt32, let cc = i["charCode"] as? UInt32,
                   let dn = i["isDown"] as? Bool, let mod = i["modifiers"] as? UInt else { return }
-            appState.bridge?.sendKeyEvent(keyCode: kc, charCode: cc, isDown: dn, modifiers: UInt32(mod))
-        }
-        .onReceive(appState.$selectedSection.dropFirst()) { newSection in
-            if newSection == .player {
-                appState.resumePlaybackForNavigation()
-            } else if appState.currentFileURL != nil {
-                appState.pausePlaybackForNavigation()
-            }
+            appState.routePlayerKeyEvent(keyCode: kc, charCode: cc, isDown: dn, modifiers: UInt32(mod))
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleSWFInfo)) { _ in
             appState.showSWFInfoPanel.toggle()
@@ -533,6 +526,15 @@ struct ContentView: View {
                 }
                 .controlSize(.small)
             }
+            Button(locManager.localized("menu.reload")) {
+                appState.retryCurrentFile()
+            }
+            .controlSize(.small)
+            .disabled(appState.currentFileURL == nil)
+            Button(locManager.localized("menu.backToWorkspace")) {
+                appState.closeFile()
+            }
+            .controlSize(.small)
             Button(locManager.localized("player.dismiss")) { appState.errorMessage = nil }
                 .controlSize(.small)
         }

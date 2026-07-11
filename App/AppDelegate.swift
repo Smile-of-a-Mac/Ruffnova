@@ -82,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configure(_ window: NSWindow) {
+        guard WindowAppearancePolicy.shouldConfigure(window) else { return }
         window.isOpaque = false
         window.backgroundColor = .clear
         window.titleVisibility = .hidden

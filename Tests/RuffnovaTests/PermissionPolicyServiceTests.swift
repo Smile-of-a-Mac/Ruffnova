@@ -42,11 +42,17 @@ final class PermissionPolicyServiceTests: XCTestCase {
     func testAllowOnceDoesNotPersistOverride() throws {
         let defaults = try makeDefaults()
         let service = PermissionPolicyService(storageURL: temporaryStorageURL(), defaults: defaults)
+        let fileURL = URL(fileURLWithPath: "/tmp/one.swf")
 
-        let result = service.apply(.allowOnce, for: URL(fileURLWithPath: "/tmp/one.swf"), scope: .filesystem)
+        let result = service.apply(.allowOnce, for: fileURL, scope: .filesystem)
 
         XCTAssertEqual(result, .allowed)
+        XCTAssertEqual(service.evaluation(for: fileURL, scope: .filesystem), .allowed)
         XCTAssertTrue(service.overrides.isEmpty)
+
+        service.clearSessionAllowances(for: fileURL)
+
+        XCTAssertEqual(service.evaluation(for: fileURL, scope: .filesystem), .requiresPrompt)
     }
 
     private func makeDefaults() throws -> UserDefaults {

@@ -5,6 +5,7 @@ struct LibraryItemDetailsView: View {
     @EnvironmentObject var locManager: LocalizationManager
     @ObservedObject private var libraryService = LibraryService.shared
     @ObservedObject private var collectionService = CollectionService.shared
+    @ObservedObject private var permissionPolicyService = PermissionPolicyService.shared
 
     let itemID: UUID
     @State private var tagsText = ""
@@ -26,6 +27,12 @@ struct LibraryItemDetailsView: View {
                         .frame(minHeight: 96)
                         .accessibilityLabel(locManager.localized("library.details.notes"))
                 }
+
+                runtimeSettingsSection(item)
+
+                permissionSettingsSection(item)
+
+                GameStorageSection(libraryID: item.id)
 
                 Section(locManager.localized("sidebar.collections")) {
                     if collectionService.collections.isEmpty {
@@ -73,6 +80,149 @@ struct LibraryItemDetailsView: View {
                 }
             }
         )
+    }
+
+    private func runtimeSettingsSection(_ item: LibraryItem) -> some View {
+        Section(locManager.localized("library.details.runtime")) {
+            Picker(locManager.localized("menu.quality"), selection: runtimeProfileBinding(\.qualityRawValue)) {
+                Text(locManager.localized("library.details.runtime.useDefault")).tag(Optional<Int32>.none)
+                Text(locManager.localized("menu.quality.low")).tag(Optional(RuffleQuality.low.rawValue))
+                Text(locManager.localized("menu.quality.medium")).tag(Optional(RuffleQuality.medium.rawValue))
+                Text(locManager.localized("menu.quality.high")).tag(Optional(RuffleQuality.high.rawValue))
+                Text(locManager.localized("menu.quality.best")).tag(Optional(RuffleQuality.best.rawValue))
+            }
+
+            Picker(locManager.localized("settings.general.playback.letterbox"), selection: runtimeProfileBinding(\.letterbox)) {
+                Text(locManager.localized("library.details.runtime.useDefault")).tag(Optional<String>.none)
+                Text(locManager.localized("settings.general.playback.letterbox.fullscreen")).tag(Optional("fullscreen"))
+                Text(locManager.localized("settings.general.playback.letterbox.on")).tag(Optional("on"))
+                Text(locManager.localized("settings.general.playback.letterbox.off")).tag(Optional("off"))
+            }
+
+            Picker(locManager.localized("settings.general.playback.loop"), selection: runtimeProfileBinding(\.isLooping)) {
+                Text(locManager.localized("library.details.runtime.useDefault")).tag(Optional<Bool>.none)
+                Text(locManager.localized("player.loop.on")).tag(Optional(true))
+                Text(locManager.localized("player.loop.off")).tag(Optional(false))
+            }
+
+            Picker(locManager.localized("settings.general.playback.autoplay"), selection: runtimeProfileBinding(\.autoplay)) {
+                Text(locManager.localized("library.details.runtime.useDefault")).tag(Optional<Bool>.none)
+                Text(locManager.localized("player.loop.on")).tag(Optional(true))
+                Text(locManager.localized("player.loop.off")).tag(Optional(false))
+            }
+
+            Toggle(locManager.localized("settings.general.playback.speed"), isOn: speedOverrideBinding)
+            if runtimeProfile.playbackSpeed != nil {
+                Slider(value: speedBinding, in: 0.25...4.0, step: 0.25)
+                Text(String(format: "%.2fx", runtimeProfile.playbackSpeed ?? 1.0))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle(locManager.localized("settings.advanced.actionscript.maxDuration"), isOn: executionDurationOverrideBinding)
+            if runtimeProfile.maxExecutionDuration != nil {
+                Slider(value: executionDurationBinding, in: 5...60, step: 1)
+                Text(String(format: locManager.localized("settings.advanced.actionscript.secondsFormat"), Int(runtimeProfile.maxExecutionDuration ?? 15)))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            if item.url == appState.currentFileURL {
+                Button(locManager.localized("menu.reload")) {
+                    appState.retryCurrentFile()
+                }
+            }
+            Text(locManager.localized("library.details.runtime.reloadRequired"))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Button(locManager.localized("library.details.runtime.reset"), role: .destructive) {
+                libraryService.resetRuntimeProfile(for: itemID)
+                appState.applyRuntimeProfile(for: itemID)
+            }
+            .disabled(runtimeProfile.isEmpty)
+        }
+    }
+
+    private func permissionSettingsSection(_ item: LibraryItem) -> some View {
+        Section(locManager.localized("library.details.permissions")) {
+            ForEach(PermissionScope.allCases) { scope in
+                Picker(permissionScopeTitle(scope), selection: permissionBinding(item.url, scope: scope)) {
+                    Text(locManager.localized("permission.decision.useGlobalDefault")).tag(PermissionDecision.useGlobalDefault)
+                    Text(locManager.localized("permission.decision.allowForFile")).tag(PermissionDecision.allowForFile)
+                    Text(locManager.localized("permission.decision.denyForFile")).tag(PermissionDecision.denyForFile)
+                }
+            }
+            Text(locManager.localized("library.details.permissions.p1bNote"))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var runtimeProfile: FileRuntimeProfile {
+        libraryService.item(with: itemID)?.runtimeProfile ?? FileRuntimeProfile()
+    }
+
+    private func runtimeProfileBinding<Value>(_ keyPath: WritableKeyPath<FileRuntimeProfile, Value>) -> Binding<Value> {
+        Binding(
+            get: { runtimeProfile[keyPath: keyPath] },
+            set: { value in updateRuntimeProfile { $0[keyPath: keyPath] = value } }
+        )
+    }
+
+    private var speedOverrideBinding: Binding<Bool> {
+        Binding(
+            get: { runtimeProfile.playbackSpeed != nil },
+            set: { enabled in
+                updateRuntimeProfile { $0.playbackSpeed = enabled ? SettingsPersistence.shared.speed : nil }
+            }
+        )
+    }
+
+    private var speedBinding: Binding<Double> {
+        Binding(
+            get: { Double(runtimeProfile.playbackSpeed ?? SettingsPersistence.shared.speed) },
+            set: { value in updateRuntimeProfile { $0.playbackSpeed = Float(value) } }
+        )
+    }
+
+    private var executionDurationOverrideBinding: Binding<Bool> {
+        Binding(
+            get: { runtimeProfile.maxExecutionDuration != nil },
+            set: { enabled in
+                updateRuntimeProfile { $0.maxExecutionDuration = enabled ? SettingsPersistence.shared.maxExecutionDuration : nil }
+            }
+        )
+    }
+
+    private var executionDurationBinding: Binding<Double> {
+        Binding(
+            get: { runtimeProfile.maxExecutionDuration ?? SettingsPersistence.shared.maxExecutionDuration },
+            set: { value in updateRuntimeProfile { $0.maxExecutionDuration = value } }
+        )
+    }
+
+    private func updateRuntimeProfile(_ changes: (inout FileRuntimeProfile) -> Void) {
+        var profile = runtimeProfile
+        changes(&profile)
+        libraryService.update(itemID) { $0.runtimeProfile = profile.isEmpty ? nil : profile }
+        appState.applyRuntimeProfile(for: itemID)
+    }
+
+    private func permissionBinding(_ url: URL, scope: PermissionScope) -> Binding<PermissionDecision> {
+        Binding(
+            get: { permissionPolicyService.override(for: url, scope: scope)?.decision ?? .useGlobalDefault },
+            set: { _ = permissionPolicyService.apply($0, for: url, scope: scope) }
+        )
+    }
+
+    private func permissionScopeTitle(_ scope: PermissionScope) -> String {
+        switch scope {
+        case .network:
+            locManager.localized("permission.scope.network")
+        case .filesystem:
+            locManager.localized("permission.scope.filesystem")
+        }
     }
 
     private func loadDraft() {

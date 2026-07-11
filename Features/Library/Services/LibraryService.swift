@@ -4,7 +4,7 @@ import OSLog
 @MainActor
 final class LibraryService: ObservableObject {
     static let shared = LibraryService()
-    static let currentSchemaVersion = 2
+    static let currentSchemaVersion = 3
 
     @Published private(set) var items: [LibraryItem] = []
     @Published private(set) var migrationFailures: [PersistenceMigrationFailure] = []
@@ -60,6 +60,28 @@ final class LibraryService: ObservableObject {
         save()
     }
 
+    func importFiles(_ urls: [URL]) -> ImportResult {
+        let preview = ImportPreview(candidates: urls, existingURLs: items.map(\.url))
+        guard !preview.newURLs.isEmpty else {
+            return ImportResult(addedURLs: [], duplicateURLs: preview.duplicateURLs)
+        }
+
+        let now = Date()
+        for url in preview.newURLs {
+            let resourceValues = try? url.resourceValues(forKeys: [.fileSizeKey])
+            var item = LibraryItem(
+                url: url,
+                fileSize: Int64(resourceValues?.fileSize ?? 0),
+                lastOpened: now,
+                dateAdded: now
+            )
+            item.bookmarkData = createBookmarkData(for: url)
+            items.append(item)
+        }
+        save()
+        return ImportResult(addedURLs: preview.newURLs, duplicateURLs: preview.duplicateURLs)
+    }
+
     func update(_ id: UUID, changes: (inout LibraryItem) -> Void) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         objectWillChange.send()
@@ -96,6 +118,10 @@ final class LibraryService: ObservableObject {
 
     func contains(_ url: URL) -> Bool {
         items.contains(where: { $0.url.resolvingSymlinksInPath() == url.resolvingSymlinksInPath() })
+    }
+
+    func effectiveRuntimeProfile(for url: URL, defaults: RuntimeDefaults) -> RuntimeDefaults {
+        item(for: url)?.runtimeProfile?.resolved(using: defaults) ?? defaults
     }
 
     // MARK: - Sorting
@@ -146,6 +172,12 @@ final class LibraryService: ObservableObject {
             return items.filter { $0.contentType == .animation }
         case .interactive:
             return items.filter { $0.contentType == .interactive }
+        case .continuePlaying:
+            return items.filter { $0.availabilityStatus == .available && ($0.lastPlaybackFrame ?? 0) > 0 }
+        case .recentlyAdded:
+            return items.sorted { $0.dateAdded > $1.dateAdded }
+        case .untagged:
+            return items.filter { $0.tags.isEmpty }
         }
     }
 
@@ -195,6 +227,10 @@ final class LibraryService: ObservableObject {
             items[index].fileSize = Int64(resourceValues.fileSize ?? 0)
         }
         save()
+    }
+
+    func resetRuntimeProfile(for id: UUID) {
+        update(id) { $0.runtimeProfile = nil }
     }
 
     // MARK: - Migration

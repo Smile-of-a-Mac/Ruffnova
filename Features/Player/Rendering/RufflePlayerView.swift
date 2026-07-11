@@ -28,6 +28,18 @@ enum RuffleMetalConfig {
     }
 }
 
+enum RuffleSurfaceInitialization {
+    static func isReady(
+        hasWindow: Bool,
+        width: CGFloat,
+        height: CGFloat,
+        drawableWidth: CGFloat,
+        drawableHeight: CGFloat
+    ) -> Bool {
+        hasWindow && width > 0 && height > 0 && drawableWidth > 0 && drawableHeight > 0
+    }
+}
+
 // MARK: - Platform-adaptive SwiftUI wrapper
 
 struct RufflePlayerView: View {
@@ -62,12 +74,10 @@ struct RufflePlayerViewMacOS: NSViewRepresentable {
             )
         }
         view.onReady = { [weak appState] metalLayer, width, height, scaleFactor in
-            DispatchQueue.main.async {
-                appState?.initializeBridge(
-                    metalLayer: metalLayer, width: width,
-                    height: height, scaleFactor: scaleFactor
-                )
-            }
+            appState?.initializeBridge(
+                metalLayer: metalLayer, width: width,
+                height: height, scaleFactor: scaleFactor
+            ) ?? false
         }
         return view
     }
@@ -80,9 +90,10 @@ struct RufflePlayerViewMacOS: NSViewRepresentable {
 
 final class RuffleMetalViewMacOS: MTKView {
     var onMouseEvent: ((RuffleMetalMouseEvent) -> Void)?
-    var onReady: ((CAMetalLayer, UInt32, UInt32, Float) -> Void)?
+    var onReady: ((CAMetalLayer, UInt32, UInt32, Float) -> Bool)?
     var appState: AppState?
     private var bridgeInitialized = false
+    private var initializationRetryScheduled = false
     private var trackingArea: NSTrackingArea?
     private var focusObserver: NSObjectProtocol?
 
@@ -120,15 +131,35 @@ final class RuffleMetalViewMacOS: MTKView {
 
     func tryInitializeBridge() {
         guard !bridgeInitialized,
-              let metalLayer = self.metalLayer,
               let window = self.window,
-              bounds.width > 0, bounds.height > 0
+              bounds.width > 0,
+              bounds.height > 0
         else { return }
-        bridgeInitialized = true
-        let scaleFactor = Float(window.backingScaleFactor)
-        let w = UInt32(bounds.width * CGFloat(scaleFactor))
-        let h = UInt32(bounds.height * CGFloat(scaleFactor))
-        onReady?(metalLayer, max(w, 1), max(h, 1), scaleFactor)
+        let scaleFactor = CGFloat(window.backingScaleFactor)
+        layer?.contentsScale = scaleFactor
+        drawableSize = CGSize(width: bounds.width * scaleFactor, height: bounds.height * scaleFactor)
+        guard let metalLayer = self.metalLayer,
+              RuffleSurfaceInitialization.isReady(
+                hasWindow: true,
+                width: bounds.width,
+                height: bounds.height,
+                drawableWidth: drawableSize.width,
+                drawableHeight: drawableSize.height
+              )
+        else { return }
+        metalLayer.device = device
+        metalLayer.pixelFormat = colorPixelFormat
+        metalLayer.framebufferOnly = framebufferOnly
+        let scale = Float(scaleFactor)
+        let w = UInt32(bounds.width * scaleFactor)
+        let h = UInt32(bounds.height * scaleFactor)
+        let created = onReady?(metalLayer, max(w, 1), max(h, 1), scale) ?? false
+        if RufflePlayerLifecycle.shouldCommitSurfaceInitialization(rendererCreated: created) {
+            bridgeInitialized = true
+            initializationRetryScheduled = false
+        } else {
+            scheduleInitializationRetry()
+        }
     }
 
     override func updateTrackingAreas() {
@@ -144,8 +175,15 @@ final class RuffleMetalViewMacOS: MTKView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window == nil { bridgeInitialized = false }
-        else { tryInitializeBridge(); updateViewport() }
+        if window == nil {
+            bridgeInitialized = false
+            initializationRetryScheduled = false
+            appState?.setStageInputFocused(false)
+        } else {
+            layer?.contentsScale = window?.backingScaleFactor ?? 1.0
+            tryInitializeBridge()
+            updateViewport()
+        }
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -165,6 +203,16 @@ final class RuffleMetalViewMacOS: MTKView {
             name: .viewportChanged, object: nil,
             userInfo: ["width": width, "height": height, "scaleFactor": scaleFactor]
         )
+    }
+
+    private func scheduleInitializationRetry() {
+        guard !initializationRetryScheduled else { return }
+        initializationRetryScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self else { return }
+            self.initializationRetryScheduled = false
+            self.tryInitializeBridge()
+        }
     }
 
     // MARK: Mouse Events
@@ -270,6 +318,18 @@ final class RuffleMetalViewMacOS: MTKView {
 
     override var acceptsFirstResponder: Bool { true }
 
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted { appState?.setStageInputFocused(true) }
+        return accepted
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let accepted = super.resignFirstResponder()
+        if accepted { appState?.setStageInputFocused(false) }
+        return accepted
+    }
+
     override func keyDown(with event: NSEvent) {
         guard shouldForwardToPlayer(event) else {
             super.keyDown(with: event)
@@ -302,7 +362,7 @@ final class RuffleMetalViewMacOS: MTKView {
     }
 
     private func keyMap(_ event: NSEvent) -> (UInt32, UInt32) {
-        let kc = UInt32(event.keyCode)
+        let kc = HIDKeyMapper.macVirtualKeyToHID(event.keyCode) ?? 0
         let cc = event.characters?.first.map { UInt32($0.asciiValue ?? 0) } ?? 0
         return (kc, cc)
     }
@@ -343,7 +403,12 @@ struct RufflePlayerViewIOS: UIViewRepresentable {
             appState?.bridge?.sendMouseEvent(x: event.x, y: event.y, eventType: event.type, scrollDelta: event.scrollDelta)
         }
         view.onReady = { [weak appState] metalLayer, width, height, scaleFactor in
-            appState?.initializeBridge(metalLayer: metalLayer, width: width, height: height, scaleFactor: scaleFactor)
+            appState?.initializeBridge(
+                metalLayer: metalLayer,
+                width: width,
+                height: height,
+                scaleFactor: scaleFactor
+            ) ?? false
         }
         return view
     }
@@ -356,9 +421,10 @@ struct RufflePlayerViewIOS: UIViewRepresentable {
 
 final class RuffleMetalViewIOS: MTKView {
     var onMouseEvent: ((RuffleMetalMouseEvent) -> Void)?
-    var onReady: ((CAMetalLayer, UInt32, UInt32, Float) -> Void)?
+    var onReady: ((CAMetalLayer, UInt32, UInt32, Float) -> Bool)?
     var appState: AppState?
     private var bridgeInitialized = false
+    private var initializationRetryScheduled = false
     private var focusObserver: NSObjectProtocol?
 
     var metalLayer: CAMetalLayer? { layer as? CAMetalLayer }
@@ -400,7 +466,7 @@ final class RuffleMetalViewIOS: MTKView {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.becomeFirstResponder()
+            _ = self?.becomeFirstResponder()
         }
     }
 
@@ -410,22 +476,66 @@ final class RuffleMetalViewIOS: MTKView {
         }
     }
 
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard window != nil else {
+            bridgeInitialized = false
+            initializationRetryScheduled = false
+            appState?.setStageInputFocused(false)
+            return
+        }
+        layer.contentsScale = displayScale
+        tryInitializeBridge()
+        updateViewport()
+    }
+
     func tryInitializeBridge() {
         guard !bridgeInitialized,
-              let metalLayer = self.metalLayer,
-              bounds.width > 0, bounds.height > 0
+              window != nil,
+              bounds.width > 0,
+              bounds.height > 0
         else { return }
-        bridgeInitialized = true
-        let scaleFactor = Float(displayScale)
-        let w = UInt32(bounds.width * CGFloat(scaleFactor))
-        let h = UInt32(bounds.height * CGFloat(scaleFactor))
-        onReady?(metalLayer, max(w, 1), max(h, 1), scaleFactor)
+        let scaleFactor = displayScale
+        layer.contentsScale = scaleFactor
+        drawableSize = CGSize(width: bounds.width * scaleFactor, height: bounds.height * scaleFactor)
+        guard let metalLayer = self.metalLayer,
+              RuffleSurfaceInitialization.isReady(
+                hasWindow: true,
+                width: bounds.width,
+                height: bounds.height,
+                drawableWidth: drawableSize.width,
+                drawableHeight: drawableSize.height
+              )
+        else { return }
+        metalLayer.device = device
+        metalLayer.pixelFormat = colorPixelFormat
+        metalLayer.framebufferOnly = framebufferOnly
+        let scale = Float(scaleFactor)
+        let w = UInt32(bounds.width * scaleFactor)
+        let h = UInt32(bounds.height * scaleFactor)
+        let created = onReady?(metalLayer, max(w, 1), max(h, 1), scale) ?? false
+        if RufflePlayerLifecycle.shouldCommitSurfaceInitialization(rendererCreated: created) {
+            bridgeInitialized = true
+            initializationRetryScheduled = false
+        } else {
+            scheduleInitializationRetry()
+        }
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         tryInitializeBridge()
         updateViewport()
+    }
+
+    private func scheduleInitializationRetry() {
+        guard !initializationRetryScheduled else { return }
+        initializationRetryScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self else { return }
+            self.initializationRetryScheduled = false
+            self.tryInitializeBridge()
+        }
     }
 
     func updateViewport() {
@@ -445,7 +555,7 @@ final class RuffleMetalViewIOS: MTKView {
     }
 
     @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
-        becomeFirstResponder()
+        _ = becomeFirstResponder()
         appState?.handlePlayerPointerActivity()
         let p = scaledLocation(from: gesture)
         onMouseEvent?(RuffleMetalMouseEvent(x: Float(p.x), y: Float(p.y), type: 1, scrollDelta: 0))
@@ -488,6 +598,18 @@ final class RuffleMetalViewIOS: MTKView {
 
     override var canBecomeFirstResponder: Bool { true }
 
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted { appState?.setStageInputFocused(true) }
+        return accepted
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let accepted = super.resignFirstResponder()
+        if accepted { appState?.setStageInputFocused(false) }
+        return accepted
+    }
+
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         for press in presses {
             guard let key = press.key else { continue }
@@ -513,7 +635,7 @@ final class RuffleMetalViewIOS: MTKView {
     }
 
     private func keyMap(_ key: UIKey) -> (UInt32, UInt32) {
-        let kc = UInt32(key.keyCode.rawValue)
+        let kc = HIDKeyMapper.hidUsage(UInt16(key.keyCode.rawValue)) ?? 0
         let cc = key.characters.first.map { UInt32($0.asciiValue ?? 0) } ?? 0
         return (kc, cc)
     }

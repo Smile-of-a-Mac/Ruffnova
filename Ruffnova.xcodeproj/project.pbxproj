@@ -59,6 +59,7 @@
 		A10053 /* AppBrandHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10058 /* AppBrandHeader.swift */; };
 		A10054 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = B10059 /* ko.json */; };
 		A10055 /* ko InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10060 /* ko InfoPlist.strings */; };
+		A10056 /* WindowAppearancePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10061 /* WindowAppearancePolicy.swift */; };
 		A20001 /* LibraryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* LibraryItem.swift */; };
 		A20002 /* LibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002 /* LibraryService.swift */; };
 		A20003 /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20003 /* ImportService.swift */; };
@@ -78,6 +79,14 @@
 		A20017 /* CollectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20017 /* CollectionService.swift */; };
 		A20018 /* LibraryItemDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20018 /* LibraryItemDetailsView.swift */; };
 		A20019 /* SidebarCollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20019 /* SidebarCollectionsView.swift */; };
+		A20020 /* PlayerLoadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20020 /* PlayerLoadState.swift */; };
+		A20021 /* InputProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20021 /* InputProfile.swift */; };
+		A20022 /* InputRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20022 /* InputRouter.swift */; };
+		A20023 /* GameControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20023 /* GameControlsView.swift */; };
+		A20024 /* SharedObjectStoragePaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20024 /* SharedObjectStoragePaths.swift */; };
+		A20025 /* GameControllerInputService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20025 /* GameControllerInputService.swift */; };
+		A20026 /* GameStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20026 /* GameStorageService.swift */; };
+		A20027 /* GameStorageSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20027 /* GameStorageSection.swift */; };
 		A30001 /* PermissionPolicyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30001 /* PermissionPolicyService.swift */; };
 /* End PBXBuildFile section */
 
@@ -139,6 +148,7 @@
 		B10058 /* AppBrandHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBrandHeader.swift; sourceTree = "<group>"; };
 		B10059 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ko.json; sourceTree = "<group>"; };
 		B10060 /* ko InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "ko InfoPlist.strings"; path = ko.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		B10061 /* WindowAppearancePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowAppearancePolicy.swift; sourceTree = "<group>"; };
 		B20001 /* LibraryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryItem.swift; sourceTree = "<group>"; };
 		B20002 /* LibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryService.swift; sourceTree = "<group>"; };
 		B20003 /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
@@ -158,6 +168,14 @@
 		B20017 /* CollectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionService.swift; sourceTree = "<group>"; };
 		B20018 /* LibraryItemDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryItemDetailsView.swift; sourceTree = "<group>"; };
 		B20019 /* SidebarCollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarCollectionsView.swift; sourceTree = "<group>"; };
+		B20020 /* PlayerLoadState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerLoadState.swift; sourceTree = "<group>"; };
+		B20021 /* InputProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputProfile.swift; sourceTree = "<group>"; };
+		B20022 /* InputRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputRouter.swift; sourceTree = "<group>"; };
+		B20023 /* GameControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlsView.swift; sourceTree = "<group>"; };
+		B20024 /* SharedObjectStoragePaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedObjectStoragePaths.swift; sourceTree = "<group>"; };
+		B20025 /* GameControllerInputService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControllerInputService.swift; sourceTree = "<group>"; };
+		B20026 /* GameStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStorageService.swift; sourceTree = "<group>"; };
+		B20027 /* GameStorageSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStorageSection.swift; sourceTree = "<group>"; };
 		B30001 /* PermissionPolicyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionPolicyService.swift; sourceTree = "<group>"; };
 		C10099 /* Ruffnova.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ruffnova.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -219,6 +237,7 @@
 			children = (
 				B10006 /* AboutWindow.swift */,
 				B10007 /* ContentView.swift */,
+				B10061 /* WindowAppearancePolicy.swift */,
 			);
 			path = Windows;
 			sourceTree = "<group>";
@@ -331,6 +350,8 @@
 				B10018 /* DebugOverlayView.swift */,
 				B10019 /* SWFInfoPanel.swift */,
 				B10020 /* TraceConsoleView.swift */,
+				B20023 /* GameControlsView.swift */,
+				B20027 /* GameStorageSection.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -404,6 +425,7 @@
 			children = (
 				B10027 /* BookmarkManager.swift */,
 				B10028 /* LibraryPersistence.swift */,
+				B20024 /* SharedObjectStoragePaths.swift */,
 			);
 			path = Persistence;
 			sourceTree = "<group>";
@@ -652,7 +674,9 @@
 		G20060 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				B20020 /* PlayerLoadState.swift */,
 				B20010 /* PlayerMode.swift */,
+				B20021 /* InputProfile.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -661,6 +685,9 @@
 			isa = PBXGroup;
 			children = (
 				B20011 /* PlayerInputCoordinator.swift */,
+				B20022 /* InputRouter.swift */,
+				B20025 /* GameControllerInputService.swift */,
+				B20026 /* GameStorageService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -749,6 +776,7 @@
 				A10005 /* AppToolbar.swift in Sources */,
 				A10006 /* AboutWindow.swift in Sources */,
 				A10007 /* ContentView.swift in Sources */,
+				A10056 /* WindowAppearancePolicy.swift in Sources */,
 				A10008 /* AppSidebar.swift in Sources */,
 				A10010 /* EmptyStateView.swift in Sources */,
 				A10011 /* FavoritesGridView.swift in Sources */,
@@ -801,6 +829,14 @@
 				A20017 /* CollectionService.swift in Sources */,
 				A20018 /* LibraryItemDetailsView.swift in Sources */,
 				A20019 /* SidebarCollectionsView.swift in Sources */,
+				A20020 /* PlayerLoadState.swift in Sources */,
+				A20021 /* InputProfile.swift in Sources */,
+				A20022 /* InputRouter.swift in Sources */,
+				A20023 /* GameControlsView.swift in Sources */,
+				A20024 /* SharedObjectStoragePaths.swift in Sources */,
+				A20025 /* GameControllerInputService.swift in Sources */,
+				A20026 /* GameStorageService.swift in Sources */,
+				A20027 /* GameStorageSection.swift in Sources */,
 				A30001 /* PermissionPolicyService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

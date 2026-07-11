@@ -37,6 +37,22 @@ final class DiagnosticsServiceTests: XCTestCase {
         XCTAssertEqual(summary, ["trace 10", "trace 11", "trace 12"])
     }
 
+    func testReportRedactsAbsoluteFilePathsAndURLSecrets() {
+        let report = DiagnosticsService.shared.makeReport(
+            fileURL: URL(fileURLWithPath: "/Users/alice/Documents/private/game.swf"),
+            fileSize: 0,
+            metadata: nil,
+            currentFrame: 0,
+            issues: [],
+            permissionPolicy: "network: deny",
+            traceMessages: ["Policy 1 https://user:password@example.com/path?token=secret"]
+        )
+
+        XCTAssertEqual(report.filePath, "game.swf")
+        XCTAssertFalse(report.traceSummary.joined().contains("password"))
+        XCTAssertFalse(report.traceSummary.joined().contains("token=secret"))
+    }
+
     private static func localize(_ key: String) -> String {
         [
             "diagnostics.report.title": "Compatibility Report",

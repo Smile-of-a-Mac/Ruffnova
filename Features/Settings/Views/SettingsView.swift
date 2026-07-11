@@ -69,6 +69,7 @@ struct MacSettingsView: View {
     @AppStorage("maxExecutionDuration") private var maxExecutionDuration = 15.0
     @AppStorage("showDebugUI") private var showDebugUI = false
     @State private var showResetAlert = false
+    @ObservedObject private var permissionPolicyService = PermissionPolicyService.shared
 
     private let categories = SettingsCategory.macSettingsCases
     private let windowSize = NSSize(width: 700, height: 560)
@@ -103,6 +104,8 @@ struct MacSettingsView: View {
                         macGeneralPane
                     case .advanced:
                         macAdvancedPane
+                    case .privacy:
+                        macPrivacyPane
                     case .about:
                         EmptyView()
                     }
@@ -276,6 +279,52 @@ struct MacSettingsView: View {
                 }
             }
         }
+    }
+
+    private var macPrivacyPane: some View {
+        VStack(spacing: 12) {
+            MacSettingsGroup(title: locManager.localized("settings.privacy")) {
+                MacInlineSetting(label: locManager.localized("settings.privacy.network")) {
+                    Picker("", selection: globalPermissionBinding(.network)) {
+                        ForEach(PermissionGlobalDefault.allCases) { decision in
+                            Text(locManager.localized("permission.global.\(decision.rawValue)")).tag(decision)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 128, alignment: .leading)
+                }
+                MacInlineSetting(label: locManager.localized("settings.privacy.filesystem")) {
+                    Picker("", selection: globalPermissionBinding(.filesystem)) {
+                        ForEach(PermissionGlobalDefault.allCases) { decision in
+                            Text(locManager.localized("permission.global.\(decision.rawValue)")).tag(decision)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 128, alignment: .leading)
+                }
+                Text(locManager.localized("settings.privacy.defaults.footer"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !permissionPolicyService.overrides.isEmpty {
+                MacSettingsSeparator()
+                MacSettingsGroup(title: locManager.localized("settings.privacy.overrides")) {
+                    Button(locManager.localized("settings.privacy.overrides.clearAll"), role: .destructive) {
+                        permissionPolicyService.clearAllOverrides()
+                    }
+                }
+            }
+        }
+    }
+
+    private func globalPermissionBinding(_ scope: PermissionScope) -> Binding<PermissionGlobalDefault> {
+        Binding(
+            get: { permissionPolicyService.globalDefault(for: scope) },
+            set: { permissionPolicyService.setGlobalDefault($0, for: scope) }
+        )
     }
 
     private var defaultPlayerModeBinding: Binding<String> {
@@ -562,6 +611,8 @@ private struct SettingsForm: View {
                 GeneralSettingsView()
             case .advanced:
                 AdvancedSettingsView()
+            case .privacy:
+                PrivacySettingsView()
             case .about:
                 AboutSettingsView()
             }
@@ -777,6 +828,61 @@ struct AdvancedSettingsView: View {
     }
 }
 
+struct PrivacySettingsView: View {
+    @EnvironmentObject private var locManager: LocalizationManager
+    @ObservedObject private var permissionPolicyService = PermissionPolicyService.shared
+    var showsOverrides = true
+
+    var body: some View {
+        Section {
+            Picker(locManager.localized("settings.privacy.network"), selection: globalPermissionBinding(.network)) {
+                permissionOptions
+            }
+            Picker(locManager.localized("settings.privacy.filesystem"), selection: globalPermissionBinding(.filesystem)) {
+                permissionOptions
+            }
+        } footer: {
+            Text(locManager.localized("settings.privacy.defaults.footer"))
+        }
+
+        if showsOverrides {
+            Section(locManager.localized("settings.privacy.overrides")) {
+                if permissionPolicyService.overrides.isEmpty {
+                    Text(locManager.localized("settings.privacy.overrides.empty"))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(permissionPolicyService.overrides) { override in
+                        HStack {
+                            Text(override.fileName)
+                            Spacer()
+                            Button(locManager.localized("settings.privacy.overrides.clear"), role: .destructive) {
+                                permissionPolicyService.clearOverride(override.id)
+                            }
+                        }
+                    }
+                    Button(locManager.localized("settings.privacy.overrides.clearAll"), role: .destructive) {
+                        permissionPolicyService.clearAllOverrides()
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var permissionOptions: some View {
+        ForEach(PermissionGlobalDefault.allCases) { decision in
+            Text(locManager.localized("permission.global.\(decision.rawValue)")).tag(decision)
+        }
+    }
+
+    private func globalPermissionBinding(_ scope: PermissionScope) -> Binding<PermissionGlobalDefault> {
+        Binding(
+            get: { permissionPolicyService.globalDefault(for: scope) },
+            set: { permissionPolicyService.setGlobalDefault($0, for: scope) }
+        )
+    }
+}
+
 struct AboutSettingsView: View {
     @EnvironmentObject private var locManager: LocalizationManager
 
@@ -809,6 +915,9 @@ struct AboutSettingsView: View {
     private var aboutSections: some View {
         Section {
             HStack(alignment: .center, spacing: NativeSpacing.xl) {
+                #if os(iOS)
+                IOSAboutBrandBlock(subtitle: locManager.localized("about.subtitle"))
+                #else
                 AboutAppIconView()
 
                 VStack(alignment: .leading, spacing: NativeSpacing.xs) {
@@ -820,6 +929,7 @@ struct AboutSettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                #endif
             }
             .padding(.vertical, NativeSpacing.md)
             .accessibilityElement(children: .combine)
@@ -843,6 +953,47 @@ struct AboutSettingsView: View {
         }
     }
 }
+
+#if os(iOS)
+private struct IOSAboutBrandBlock: View {
+    let subtitle: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: NativeSpacing.xl) {
+            if let appIcon = UIImage(named: "AppIcon") {
+                Image(uiImage: appIcon)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: 84, height: 84)
+            } else {
+                Image("SidebarBrandIcon")
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: 84, height: 84)
+            }
+
+            VStack(alignment: .leading, spacing: 0) {
+                Image("SidebarWordmark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 156, height: 48, alignment: .leading)
+
+                Spacer(minLength: NativeSpacing.sm)
+
+                Text(subtitle)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 84, maxHeight: 84, alignment: .topLeading)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Ruffnova, \(subtitle)")
+    }
+}
+#endif
 
 private struct AboutAppIconView: View {
     var body: some View {
@@ -935,6 +1086,7 @@ struct IOSSettingsRootView: View {
     var body: some View {
         Form {
             GeneralSettingsView()
+            PrivacySettingsView(showsOverrides: false)
             AdvancedSettingsView()
 
             Section {
@@ -956,18 +1108,20 @@ struct IOSSettingsRootView: View {
 
 enum SettingsCategory: String, CaseIterable, Identifiable {
     case general
+    case privacy
     case advanced
     case about
 
     var id: Self { self }
 
     #if os(macOS)
-    static let macSettingsCases: [SettingsCategory] = [.general, .advanced]
+    static let macSettingsCases: [SettingsCategory] = [.general, .privacy, .advanced]
     #endif
 
     var icon: String {
         switch self {
         case .general: return "gearshape"
+        case .privacy: return "lock"
         case .advanced: return "wrench.and.screwdriver"
         case .about: return "info.circle"
         }
@@ -976,6 +1130,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     var titleKey: String {
         switch self {
         case .general: return "settings.general"
+        case .privacy: return "settings.privacy"
         case .advanced: return "settings.advanced"
         case .about: return "settings.about"
         }

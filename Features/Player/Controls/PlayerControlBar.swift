@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import MediaPlayer
+#endif
 
 struct PlayerControlBar: View {
     @EnvironmentObject var appState: AppState
@@ -24,10 +27,17 @@ struct PlayerControlBar: View {
     #if os(iOS)
     @ViewBuilder
     private var iosControlBar: some View {
-        if appState.swfContentType == .interactive {
-            iosInteractiveControlBar
-        } else {
-            iosAnimationControlBar
+        ZStack {
+            if appState.swfContentType == .interactive {
+                iosInteractiveControlBar
+            } else {
+                iosAnimationControlBar
+            }
+
+            IOSSystemVolumeView(appState: appState)
+                .frame(width: 1, height: 1)
+                .opacity(0.01)
+                .allowsHitTesting(false)
         }
     }
 
@@ -35,29 +45,39 @@ struct PlayerControlBar: View {
         HStack(spacing: NativeSpacing.md) {
             iosPlayButton(size: 44, iconSize: 17)
 
+            Button(action: { appState.toggleVirtualControls() }) {
+                Image(systemName: appState.showVirtualControls ? "gamecontroller.fill" : "gamecontroller")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(appState.showVirtualControls ? Color.accentColor : Color.secondary)
+                    .frame(width: 44, height: 44)
+                    .nativeLiquidGlass(in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(locManager.localized("player.virtualControls"))
+            .accessibilityValue(locManager.localized(appState.showVirtualControls ? "player.virtualControls.hide" : "player.virtualControls.show"))
+
             Button(action: { appState.toggleMute() }) {
                 Image(systemName: appState.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 34, height: 34)
-                    .background(.ultraThinMaterial, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .nativeLiquidGlass(in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(locManager.localized(appState.isMuted ? "player.unmute" : "player.mute"))
 
             Slider(value: Binding(
-                get: { Double(appState.volume) },
-                set: { appState.setVolume(Float($0)) }
+                get: { Double(appState.systemVolume) },
+                set: { appState.setSystemVolume(Float($0)) }
             ), in: 0...1)
             .tint(.secondary)
+            .accessibilityLabel(locManager.localized("player.volume"))
+            .accessibilityValue("\(Int(appState.volume * 100))%")
         }
         .padding(.horizontal, NativeSpacing.sm)
         .padding(.vertical, NativeSpacing.sm)
-        .background(.black.opacity(0.08), in: RoundedRectangle(cornerRadius: NativeRadius.xl, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: NativeRadius.xl, style: .continuous)
-                .strokeBorder(.white.opacity(0.14), lineWidth: 0.7)
-        }
+        .frame(maxWidth: .infinity)
+        .nativeLiquidGlass(in: RoundedRectangle(cornerRadius: NativeRadius.xl, style: .continuous))
     }
 
     private var iosAnimationControlBar: some View {
@@ -93,11 +113,7 @@ struct PlayerControlBar: View {
         }
         .padding(.horizontal, NativeSpacing.sm)
         .padding(.vertical, NativeSpacing.sm)
-        .background(.black.opacity(0.08), in: RoundedRectangle(cornerRadius: NativeRadius.xl, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: NativeRadius.xl, style: .continuous)
-                .strokeBorder(.white.opacity(0.14), lineWidth: 0.7)
-        }
+        .nativeLiquidGlass(in: RoundedRectangle(cornerRadius: NativeRadius.xl, style: .continuous))
     }
 
     private func iosPlayButton(size: CGFloat, iconSize: CGFloat) -> some View {
@@ -124,6 +140,8 @@ struct PlayerControlBar: View {
                 if !editing { appState.seekToFrame(UInt32(appState.seekPosition)) }
             }
             .tint(.primary)
+            .accessibilityLabel(locManager.localized("player.timeline"))
+            .accessibilityValue("\(appState.formattedCurrentTime) / \(appState.formattedTotalTime)")
 
             Text(appState.formattedTotalTime)
                 .frame(width: 38, alignment: .trailing)
@@ -137,8 +155,8 @@ struct PlayerControlBar: View {
             Image(systemName: systemName)
                 .font(.system(size: size, weight: .semibold))
                 .foregroundStyle(.secondary)
-                .frame(width: 34, height: 34)
-                .background(.ultraThinMaterial, in: Circle())
+                .frame(width: 44, height: 44)
+                .nativeLiquidGlass(in: Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(locManager.localized(labelKey))
@@ -149,10 +167,10 @@ struct PlayerControlBar: View {
             Image(systemName: appState.isLooping ? "repeat.1" : "repeat")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(appState.isLooping ? Color.accentColor : Color.secondary)
-                .frame(width: 30, height: 30)
+                .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
-        .background(.ultraThinMaterial, in: Circle())
+        .nativeLiquidGlass(in: Circle())
         .accessibilityLabel(locManager.localized("menu.loop"))
         .accessibilityValue(locManager.localized(appState.isLooping ? "player.loop.on" : "player.loop.off"))
     }
@@ -166,8 +184,8 @@ struct PlayerControlBar: View {
             Text(String(format: "%.2fx", appState.playbackSpeed))
                 .font(.caption2.monospacedDigit().weight(.bold))
                 .foregroundStyle(.secondary)
-                .frame(width: 46, height: 30)
-                .background(.ultraThinMaterial, in: Capsule())
+                .frame(width: 46, height: 44)
+                .nativeLiquidGlass(in: Capsule())
         }
         .accessibilityLabel(locManager.localized("menu.speed"))
         .accessibilityValue(String(format: "%.2fx", appState.playbackSpeed))
@@ -177,9 +195,9 @@ struct PlayerControlBar: View {
         Button(action: { appState.toggleMute() }) {
             Image(systemName: appState.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 30, height: 30)
-                .background(.ultraThinMaterial, in: Circle())
+            .foregroundStyle(.secondary)
+            .frame(width: 44, height: 44)
+            .nativeLiquidGlass(in: Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(locManager.localized(appState.isMuted ? "player.unmute" : "player.mute"))
@@ -216,10 +234,10 @@ struct PlayerControlBar: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(locManager.localized(appState.isMuted ? "player.unmute" : "player.mute"))
 
-                Slider(value: Binding(
-                    get: { Double(appState.volume) },
-                    set: { appState.setVolume(Float($0)) }
-                ), in: 0...1)
+            Slider(value: Binding(
+                get: { Double(appState.volume) },
+                set: { appState.setVolume(Float($0)) }
+            ), in: 0...1)
                 .tint(.secondary)
             }
             .frame(maxWidth: 160)
@@ -374,6 +392,29 @@ struct PlayerControlBar: View {
         }
     }
 }
+
+#if os(iOS)
+private struct IOSSystemVolumeView: UIViewRepresentable {
+    let appState: AppState
+
+    func makeUIView(context: Context) -> MPVolumeView {
+        let volumeView = MPVolumeView(frame: .zero)
+        volumeView.showsVolumeSlider = true
+
+        DispatchQueue.main.async {
+            let slider = volumeView.subviews.compactMap { $0 as? UISlider }.first
+            appState.attachSystemVolumeSlider(slider)
+        }
+        return volumeView
+    }
+
+    func updateUIView(_ volumeView: MPVolumeView, context: Context) {
+        let slider = volumeView.subviews.compactMap { $0 as? UISlider }.first
+        appState.attachSystemVolumeSlider(slider)
+    }
+
+}
+#endif
 
 #Preview("Controls") {
     PlayerControlBar()

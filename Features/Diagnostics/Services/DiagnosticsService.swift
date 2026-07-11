@@ -25,7 +25,7 @@ final class DiagnosticsService {
         CompatibilityReport(
             generatedAt: generatedAt,
             fileName: fileURL?.lastPathComponent ?? "-",
-            filePath: fileURL?.path ?? "-",
+            filePath: fileURL?.lastPathComponent ?? "-",
             fileSize: fileSize,
             appVersion: appVersion,
             engineVersion: engineVersion,
@@ -33,12 +33,30 @@ final class DiagnosticsService {
             currentFrame: currentFrame,
             issues: issues,
             permissionPolicy: permissionPolicy,
-            traceSummary: traceSummary(from: traceMessages)
+            traceSummary: traceSummary(from: traceMessages.map(redactedTraceMessage))
         )
     }
 
     func traceSummary(from messages: [String], maxEntries: Int = 10) -> [String] {
         Array(messages.suffix(maxEntries))
+    }
+
+    private func redactedTraceMessage(_ message: String) -> String {
+        message.split(whereSeparator: \.isWhitespace).map { token in
+            let value = String(token)
+            if value.hasPrefix("/") {
+                return "<redacted-path>"
+            }
+            guard let url = URL(string: value), let scheme = url.scheme else { return value }
+            switch scheme {
+            case "http", "https":
+                return "\(scheme)://\(url.host ?? "unknown")"
+            case "file":
+                return "file:\(url.lastPathComponent)"
+            default:
+                return "<redacted-url>"
+            }
+        }.joined(separator: " ")
     }
 
     func copyReport(_ text: String) {

@@ -38,7 +38,7 @@ struct LibraryFileCell: View {
                     locateFile()
                 }
                 Button(locManager.localized("library.remove")) {
-                    libraryService.remove(file.id)
+                    appState.removeLibraryItem(file.id)
                 }
                 Divider()
             } else {
@@ -74,7 +74,7 @@ struct LibraryFileCell: View {
             }
             Divider()
             Button(locManager.localized("library.remove")) {
-                libraryService.remove(file.id)
+                appState.removeLibraryItem(file.id)
             }
         }
         .sheet(isPresented: $showingDetails) {
@@ -98,6 +98,8 @@ struct LibraryFileCell: View {
         if panel.runModal() == .OK, let url = panel.url {
             libraryService.locateFile(for: file.id, newURL: url)
         }
+        #elseif os(iOS)
+        appState.locateLibraryItem(file.id)
         #endif
     }
 

@@ -1,5 +1,71 @@
 import Foundation
 
+struct RuntimeDefaults: Equatable {
+    var quality: RuffleQuality
+    var letterbox: String
+    var playbackSpeed: Float
+    var isLooping: Bool
+    var autoplay: Bool
+    var maxExecutionDuration: TimeInterval
+
+    init(
+        quality: RuffleQuality = .high,
+        letterbox: String = "fullscreen",
+        playbackSpeed: Float = 1.0,
+        isLooping: Bool = false,
+        autoplay: Bool = true,
+        maxExecutionDuration: TimeInterval = 15.0
+    ) {
+        self.quality = quality
+        self.letterbox = letterbox
+        self.playbackSpeed = playbackSpeed
+        self.isLooping = isLooping
+        self.autoplay = autoplay
+        self.maxExecutionDuration = maxExecutionDuration
+    }
+}
+
+struct FileRuntimeProfile: Codable, Equatable {
+    var qualityRawValue: Int32?
+    var letterbox: String?
+    var playbackSpeed: Float?
+    var isLooping: Bool?
+    var autoplay: Bool?
+    var maxExecutionDuration: TimeInterval?
+
+    init(
+        qualityRawValue: Int32? = nil,
+        letterbox: String? = nil,
+        playbackSpeed: Float? = nil,
+        isLooping: Bool? = nil,
+        autoplay: Bool? = nil,
+        maxExecutionDuration: TimeInterval? = nil
+    ) {
+        self.qualityRawValue = qualityRawValue
+        self.letterbox = letterbox
+        self.playbackSpeed = playbackSpeed
+        self.isLooping = isLooping
+        self.autoplay = autoplay
+        self.maxExecutionDuration = maxExecutionDuration
+    }
+
+    func resolved(using defaults: RuntimeDefaults) -> RuntimeDefaults {
+        RuntimeDefaults(
+            quality: qualityRawValue.flatMap(RuffleQuality.init(rawValue:)) ?? defaults.quality,
+            letterbox: letterbox ?? defaults.letterbox,
+            playbackSpeed: playbackSpeed ?? defaults.playbackSpeed,
+            isLooping: isLooping ?? defaults.isLooping,
+            autoplay: autoplay ?? defaults.autoplay,
+            maxExecutionDuration: maxExecutionDuration ?? defaults.maxExecutionDuration
+        )
+    }
+
+    var isEmpty: Bool {
+        qualityRawValue == nil && letterbox == nil && playbackSpeed == nil &&
+            isLooping == nil && autoplay == nil && maxExecutionDuration == nil
+    }
+}
+
 struct LibraryItem: Identifiable, Codable, Equatable {
     let id: UUID
     var url: URL
@@ -17,6 +83,9 @@ struct LibraryItem: Identifiable, Codable, Equatable {
     var isFavorite: Bool
     var lastPlaybackFrame: UInt32?
     var playbackPreferences: PlaybackPreferences?
+    var runtimeProfile: FileRuntimeProfile?
+    var showsVirtualControls: Bool?
+    var inputProfile: InputProfile?
     var contentType: LibraryContentType?
     var compatibilityStatus: CompatibilityStatus
     var availabilityStatus: AvailabilityStatus
@@ -38,6 +107,9 @@ struct LibraryItem: Identifiable, Codable, Equatable {
         isFavorite: Bool = false,
         lastPlaybackFrame: UInt32? = nil,
         playbackPreferences: PlaybackPreferences? = nil,
+        runtimeProfile: FileRuntimeProfile? = nil,
+        showsVirtualControls: Bool? = nil,
+        inputProfile: InputProfile? = nil,
         contentType: LibraryContentType? = nil,
         compatibilityStatus: CompatibilityStatus = .unknown,
         availabilityStatus: AvailabilityStatus = .available
@@ -58,6 +130,9 @@ struct LibraryItem: Identifiable, Codable, Equatable {
         self.isFavorite = isFavorite
         self.lastPlaybackFrame = lastPlaybackFrame
         self.playbackPreferences = playbackPreferences
+        self.runtimeProfile = runtimeProfile
+        self.showsVirtualControls = showsVirtualControls
+        self.inputProfile = inputProfile
         self.contentType = contentType
         self.compatibilityStatus = compatibilityStatus
         self.availabilityStatus = availabilityStatus
@@ -65,6 +140,12 @@ struct LibraryItem: Identifiable, Codable, Equatable {
 
     static func == (lhs: LibraryItem, rhs: LibraryItem) -> Bool {
         lhs.id == rhs.id
+    }
+}
+
+enum LibraryRemovalPolicy {
+    static func shouldClosePlayer(currentFileURL: URL?, removing item: LibraryItem) -> Bool {
+        currentFileURL?.standardizedFileURL == item.url.standardizedFileURL
     }
 }
 
@@ -108,6 +189,9 @@ enum LibraryFilter: String, CaseIterable {
     case compatibilityIssues
     case animation
     case interactive
+    case continuePlaying
+    case recentlyAdded
+    case untagged
 
     var localizedKey: String {
         switch self {
@@ -118,6 +202,9 @@ enum LibraryFilter: String, CaseIterable {
         case .compatibilityIssues: return "filter.compatibilityIssues"
         case .animation: return "filter.animation"
         case .interactive: return "filter.interactive"
+        case .continuePlaying: return "filter.continuePlaying"
+        case .recentlyAdded: return "filter.recentlyAdded"
+        case .untagged: return "filter.untagged"
         }
     }
 }

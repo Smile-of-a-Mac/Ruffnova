@@ -63,6 +63,24 @@ final class LibraryMigrationTests: XCTestCase {
         XCTAssertEqual(try readLibraryStore(from: directory).items.first?.thumbnailIdentifier, identifier)
     }
 
+    func testMigratesSchemaTwoLibraryWithoutRuntimeProfileToSchemaThree() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let legacyItem = LibraryItem(url: directory.appendingPathComponent("legacy.swf"))
+        try JSONEncoder().encode(LibraryStore(schemaVersion: 2, items: [legacyItem]))
+            .write(to: directory.appendingPathComponent("library.json"))
+        try JSONEncoder().encode(2).write(to: directory.appendingPathComponent("library.version"))
+
+        let service = LibraryService(directory: directory, thumbnailService: ThumbnailService(cacheDirectory: directory.appendingPathComponent("Thumbnails")))
+        let report = service.migrateIfNeeded()
+
+        XCTAssertTrue(report.failures.isEmpty)
+        XCTAssertNil(service.items.first?.runtimeProfile)
+        XCTAssertEqual(try readLibraryStore(from: directory).schemaVersion, 3)
+        XCTAssertEqual(try readLibraryVersion(from: directory), 3)
+    }
+
     func testCorruptLibraryDoesNotCrashAndReportsRecoveryFailure() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

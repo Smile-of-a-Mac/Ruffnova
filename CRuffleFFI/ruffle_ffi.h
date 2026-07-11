@@ -16,6 +16,20 @@ typedef int RuffleResult;
 #define RUFFLE_RESULT_ERROR_RENDERER_INIT       -4
 #define RUFFLE_RESULT_ERROR_LOAD_FAILED         -5
 
+typedef enum {
+    RuffleAccessPolicy_Deny = 0,
+    RuffleAccessPolicy_Allow = 1,
+} RuffleAccessPolicy;
+
+typedef enum {
+    RuffleDiagnosticKind_FilesystemDenied = 0,
+    RuffleDiagnosticKind_NetworkDenied = 1,
+    RuffleDiagnosticKind_NetworkUnsupported = 2,
+    RuffleDiagnosticKind_UnsupportedScheme = 3,
+    RuffleDiagnosticKind_NavigationDenied = 4,
+    RuffleDiagnosticKind_SocketDenied = 5,
+} RuffleDiagnosticKind;
+
 typedef struct {
     unsigned int width;
     unsigned int height;
@@ -23,6 +37,8 @@ typedef struct {
     int quality;
     bool autoplay;
     float max_execution_secs;
+    RuffleAccessPolicy network_access;
+    RuffleAccessPolicy filesystem_access;
 } RuffleConfig;
 
 typedef struct {
@@ -62,6 +78,18 @@ typedef struct {
 } RufflePlaybackInfo;
 
 typedef enum {
+    RuffleLoadState_Idle = 0,
+    RuffleLoadState_Loading = 1,
+    RuffleLoadState_Ready = 2,
+    RuffleLoadState_Failed = 3,
+} RuffleLoadState;
+
+typedef struct {
+    RuffleLoadState state;
+    RuffleResult error;
+} RuffleLoadInfo;
+
+typedef enum {
     RuffleScaleMode_ShowAll = 0,
     RuffleScaleMode_NoScale = 1,
     RuffleScaleMode_ExactFit = 2,
@@ -79,9 +107,24 @@ typedef struct {
     unsigned int len;
 } RuffleString;
 
-// ─── Phase 1: Functions ───────────────────────────────────────────────────────
+typedef struct {
+    unsigned char *data;
+    unsigned int len;
+} RuffleBytes;
+
+typedef struct {
+    RuffleString *data;
+    unsigned int len;
+} RuffleStringList;
+
+typedef struct {
+    RuffleDiagnosticKind kind;
+    RuffleString target;
+} RuffleDiagnostic;
 
 RuffleResult ruffle_player_get_playback_info(const RufflePlayer*, RufflePlaybackInfo*);
+RuffleResult ruffle_player_get_load_info(const RufflePlayer*, RuffleLoadInfo*);
+bool ruffle_player_next_diagnostic(RufflePlayer*, RuffleDiagnostic*);
 RuffleResult ruffle_player_get_metadata(RufflePlayer*, RuffleMetadata*);
 RuffleResult ruffle_player_seek_frame(RufflePlayer*, unsigned int frame);
 RuffleResult ruffle_player_seek_time(RufflePlayer*, float seconds);
@@ -97,6 +140,12 @@ RuffleResult ruffle_player_recreate_surface(RufflePlayer*, void *metal_layer, un
 
 RufflePlayer *ruffle_player_create(RuffleConfig config);
 RufflePlayer *ruffle_player_create_with_renderer(RuffleConfig config, RuffleRenderer *renderer);
+RufflePlayer *ruffle_player_create_with_renderer_and_storage(
+    RuffleConfig config,
+    RuffleRenderer *renderer,
+    const char *storage_root,
+    const char *library_id
+);
 void ruffle_player_free(RufflePlayer *ptr);
 RuffleResult ruffle_player_load_url(RufflePlayer *ptr, const char *url);
 RuffleResult ruffle_player_load_data(RufflePlayer *ptr, const uint8_t *data, unsigned int len);
@@ -114,6 +163,14 @@ RuffleResult ruffle_player_set_fullscreen(RufflePlayer *ptr, bool fullscreen);
 unsigned int ruffle_player_stage_width(const RufflePlayer *ptr);
 unsigned int ruffle_player_stage_height(const RufflePlayer *ptr);
 void ruffle_string_free(RuffleString s);
+void ruffle_bytes_free(RuffleBytes bytes);
+void ruffle_string_list_free(RuffleStringList list);
+RuffleResult ruffle_storage_list(const char *storage_root, const char *library_id, RuffleStringList *out);
+RuffleResult ruffle_storage_read(const char *storage_root, const char *library_id, const char *name, RuffleBytes *out);
+RuffleResult ruffle_storage_replace(const char *storage_root, const char *library_id, const char *name, const uint8_t *data, unsigned int len);
+RuffleResult ruffle_storage_delete(const char *storage_root, const char *library_id, const char *name);
+RuffleResult ruffle_storage_get_size(const char *storage_root, const char *library_id, const char *name, uint64_t *out);
+RuffleResult ruffle_storage_get_usage(const char *storage_root, const char *library_id, uint64_t *used, uint64_t *quota);
 
 RuffleRenderer *ruffle_renderer_create(void *metal_layer, unsigned int width, unsigned int height, float scale_factor);
 RuffleResult ruffle_renderer_recreate_surface(RuffleRenderer *ptr, void *metal_layer, unsigned int width, unsigned int height);

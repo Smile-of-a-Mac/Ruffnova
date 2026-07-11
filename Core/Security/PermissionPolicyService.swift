@@ -71,6 +71,11 @@ struct PermissionRequestContext: Identifiable, Equatable {
     }
 }
 
+private struct PermissionSessionAllowance: Hashable {
+    var fileIdentifier: String
+    var scope: PermissionScope
+}
+
 @MainActor
 final class PermissionPolicyService: ObservableObject {
     static let shared = PermissionPolicyService()
@@ -81,6 +86,7 @@ final class PermissionPolicyService: ObservableObject {
     private let defaults: UserDefaults
     private let schemaVersion = 1
     private let logger = Logger(subsystem: "com.ruffnova", category: "permissions")
+    private var sessionAllowances: Set<PermissionSessionAllowance> = []
 
     convenience init() {
         let fileManager = FileManager.default
@@ -129,6 +135,11 @@ final class PermissionPolicyService: ObservableObject {
     }
 
     func evaluation(for fileURL: URL?, scope: PermissionScope) -> PermissionPolicyEvaluation {
+        if let identifier = fileIdentifier(for: fileURL),
+           sessionAllowances.contains(PermissionSessionAllowance(fileIdentifier: identifier, scope: scope)) {
+            return .allowed
+        }
+
         if let override = override(for: fileURL, scope: scope) {
             switch override.decision {
             case .allowForFile:
@@ -154,6 +165,9 @@ final class PermissionPolicyService: ObservableObject {
     func apply(_ decision: PermissionDecision, for fileURL: URL?, scope: PermissionScope) -> PermissionPolicyEvaluation {
         switch decision {
         case .allowOnce:
+            if let identifier = fileIdentifier(for: fileURL) {
+                sessionAllowances.insert(PermissionSessionAllowance(fileIdentifier: identifier, scope: scope))
+            }
             return .allowed
         case .allowForFile:
             setOverride(.allowForFile, for: fileURL, scope: scope)
@@ -175,6 +189,11 @@ final class PermissionPolicyService: ObservableObject {
         guard let identifier = fileIdentifier(for: fileURL) else { return }
         overrides.removeAll { $0.fileIdentifier == identifier && $0.scope == scope }
         save()
+    }
+
+    func clearSessionAllowances(for fileURL: URL?) {
+        guard let identifier = fileIdentifier(for: fileURL) else { return }
+        sessionAllowances = Set(sessionAllowances.filter { $0.fileIdentifier != identifier })
     }
 
     func clearOverride(_ id: UUID) {

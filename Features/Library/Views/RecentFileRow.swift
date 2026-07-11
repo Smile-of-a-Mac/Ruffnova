@@ -5,6 +5,7 @@ struct RecentFileRow: View {
     @EnvironmentObject var locManager: LocalizationManager
     @ObservedObject private var libraryService = LibraryService.shared
     let file: LibraryItem
+    @State private var showDetails = false
 
     var body: some View {
         Button { appState.openFile(file.url) } label: {
@@ -36,9 +37,17 @@ struct RecentFileRow: View {
         .buttonStyle(.plain)
         .accessibilityLabel(file.name)
         .contextMenu {
-            Button(locManager.localized("library.removeFromRecent")) {
-                libraryService.remove(file.id)
+            Button(locManager.localized("library.details.edit")) {
+                showDetails = true
             }
+            Button(locManager.localized("library.removeFromRecent")) {
+                appState.removeLibraryItem(file.id)
+            }
+        }
+        .sheet(isPresented: $showDetails) {
+            LibraryItemDetailsView(itemID: file.id)
+                .environmentObject(appState)
+                .environmentObject(locManager)
         }
     }
 }

@@ -100,6 +100,20 @@ struct LiquidGlassModifier<S: InsettableShape>: ViewModifier {
 }
 
 extension View {
+    /// Uses the system Liquid Glass API when available, with the native material fallback.
+    @ViewBuilder
+    func nativeLiquidGlass<S: Shape>(in shape: S) -> some View {
+        #if os(iOS)
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self.background(.regularMaterial, in: shape)
+        }
+        #else
+        self.background(.regularMaterial, in: shape)
+        #endif
+    }
+
     func nativeCard(cornerRadius: CGFloat = NativeRadius.lg, material: Material = GlassMaterial.ultraLight) -> some View {
         modifier(NativeCardModifier(cornerRadius: cornerRadius, material: material))
     }

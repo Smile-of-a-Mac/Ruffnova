@@ -9,6 +9,7 @@ import ImageIO
 import AppKit
 #elseif os(iOS)
 import UIKit
+import AVFAudio
 #endif
 #if RUST_FFI_AVAILABLE
 import CRuffleFFI
@@ -94,10 +95,14 @@ final class AppState: ObservableObject {
     @Published var isStageMaximized: Bool = false
     @Published var stageWidth: UInt32 = 550
     @Published var stageHeight: UInt32 = 400
+    #if os(iOS)
+    @Published private(set) var systemVolume: Float = AVAudioSession.sharedInstance().outputVolume
+    #endif
 
     @Published var swfContentType: SwfContentType = .animation
 
     @Published var showControlBar: Bool = true
+    @Published var showVirtualControls: Bool = true
     @Published var playerMode: PlayerMode = .normal
     private let playerViewModel = PlayerViewModel()
     private enum StageMaximizedExitIntent {
@@ -132,7 +137,7 @@ final class AppState: ObservableObject {
     @Published var showToolbar: Bool = true
     @Published var toolbarRefreshToken: Int = 0
     @Published var showDebugUI: Bool = false
-    @Published var isLoading: Bool = false
+    @Published private(set) var playerLoadState: PlayerLoadState = .idle
     @Published var errorMessage: String?
     @Published var sidebarCollapsed: Bool = false
     @Published var showSWFInfoPanel: Bool = false {
@@ -157,9 +162,14 @@ final class AppState: ObservableObject {
         }
     }
     @Published var playerIssues: [PlayerIssue] = []
+    @Published private(set) var policyDiagnostics: [RufflePolicyDiagnostic] = []
     @Published var pendingPermissionRequest: PermissionRequestContext?
-    private var pausedForNavigation = false
     private let playerInputCoordinator = PlayerInputCoordinator()
+    private let inputRouter = InputRouter()
+    private var stageInputFocused = false
+    private lazy var controllerInputService = GameControllerInputService { [weak self] controllerID, action, isDown in
+        self?.sendControllerGameAction(action, controllerID: controllerID, isDown: isDown)
+    }
     private var isRestoringPlaybackPreferences = false
     private var pendingStageMaximizedExitIntent: StageMaximizedExitIntent?
 
@@ -198,21 +208,35 @@ final class AppState: ObservableObject {
 
     private(set) var bridge: RuffleBridge?
     private var pendingFileURL: URL?
+    private var pendingPermissionRetryURL: URL?
     #if os(iOS)
     private var filePickerService: IOSFilePickerService?
     private var securityScopedURL: URL?
     #endif
     private var timelinePollTimer: Timer?
     private var loadTimeoutTask: Task<Void, Never>?
+    private var loadStatePollingTask: Task<Void, Never>?
+    private var loadCoordinator = PlayerLoadCoordinator()
+    private var activeLoadRequestID: UUID?
+    private var pendingStorageLibraryID: UUID?
     private var cancellables = Set<AnyCancellable>()
     #if os(iOS)
     private var pausedForSystemInterruption = false
     private var sceneIsActive = true
     private var playerSurfaceVisible = false
+    private var systemVolumeObservation: NSKeyValueObservation?
+    private weak var systemVolumeSlider: UISlider?
     #endif
 
     var libraryItems: [LibraryItem] {
         LibraryService.shared.items
+    }
+
+    var isLoading: Bool {
+        if case .loading = playerLoadState {
+            return true
+        }
+        return false
     }
 
     init() {
@@ -220,7 +244,11 @@ final class AppState: ObservableObject {
             self?.showControlBar = isVisible
         }
         setupNotifications()
+        _ = controllerInputService
         setupFullscreenObserver()
+        #if os(iOS)
+        setupSystemVolumeObservation()
+        #endif
         restoreSettings()
         setupPersistence()
         let migrationReport = LibraryService.shared.migrateIfNeeded()
@@ -298,6 +326,12 @@ final class AppState: ObservableObject {
         #if os(macOS)
         NotificationCenter.default.addObserver(
             self,
+            selector: #selector(handleFullscreenEnter),
+            name: NSWindow.didEnterFullScreenNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
             selector: #selector(handleFullscreenExit),
             name: NSWindow.didExitFullScreenNotification,
             object: nil
@@ -305,7 +339,14 @@ final class AppState: ObservableObject {
         #endif
     }
 
+    @objc private func handleFullscreenEnter() {
+        isFullscreen = true
+        bridge?.setFullscreen(true)
+    }
+
     @objc private func handleFullscreenExit() {
+        isFullscreen = false
+        bridge?.setFullscreen(false)
         guard isStageMaximized else { return }
         let intent = pendingStageMaximizedExitIntent ?? defaultStageMaximizedExitIntent(restoreWorkspaceChrome: true)
         pendingStageMaximizedExitIntent = nil
@@ -317,21 +358,25 @@ final class AppState: ObservableObject {
         openFile(url)
     }
 
-    func initializeBridge(metalLayer: CAMetalLayer, width: UInt32, height: UInt32, scaleFactor: Float) {
+    @discardableResult
+    func initializeBridge(metalLayer: CAMetalLayer, width: UInt32, height: UInt32, scaleFactor: Float) -> Bool {
         if let bridge {
             bridge.updateSurface(metalLayer: metalLayer, width: width, height: height)
             bridge.setViewport(width: width, height: height, scaleFactor: scaleFactor)
             updateIOSRenderLoopAvailability()
-            return
+            return true
         }
-        let storedQuality = SettingsPersistence.shared.quality
-        let storedAutoplay = SettingsPersistence.shared.autoplay
-        let storedMaxExec = SettingsPersistence.shared.maxExecutionDuration
+        let runtimeProfile = resolvedRuntimeProfile(for: currentFileURL)
+        let accessPolicies = resolvedEngineAccessPolicies(for: currentFileURL)
         bridge = RuffleBridge(
             metalLayer: metalLayer, width: width, height: height, scaleFactor: scaleFactor,
-            quality: storedQuality,
-            autoplay: storedAutoplay,
-            maxExecutionSecs: Float(storedMaxExec)
+            quality: runtimeProfile.quality.rawValue,
+            autoplay: runtimeProfile.autoplay,
+            maxExecutionSecs: Float(runtimeProfile.maxExecutionDuration),
+            networkAccess: accessPolicies.network,
+            filesystemAccess: accessPolicies.filesystem,
+            storageRoot: pendingStorageLibraryID == nil ? nil : SharedObjectStoragePaths().rootURL,
+            storageLibraryID: pendingStorageLibraryID
         )
         bridge?.onFrameUpdate = { [weak self] fps, frame in
             DispatchQueue.main.async {
@@ -339,46 +384,61 @@ final class AppState: ObservableObject {
                 self?.debugCurrentFrame = frame
             }
         }
+        bridge?.onPolicyDiagnostic = { [weak self] diagnostic in
+            self?.recordEnginePolicyDiagnostic(diagnostic)
+        }
         bridge?.setVolume(isMuted ? 0.0 : volume)
         bridge?.setQuality(quality)
         bridge?.setLooping(isLooping)
         bridge?.setSpeed(playbackSpeed)
-        applyLetterbox(SettingsPersistence.shared.letterbox)
+        bridge?.setAutoplay(runtimeProfile.autoplay)
+        bridge?.setMaxExecutionDuration(Float(runtimeProfile.maxExecutionDuration))
+        applyLetterbox(runtimeProfile.letterbox)
         updateIOSRenderLoopAvailability()
 
         guard bridge != nil else {
             presentPlayerIssue(.renderInitFailure)
-            return
+            return false
         }
 
         if let url = pendingFileURL {
+            if let libraryID = pendingStorageLibraryID {
+                bridge?.configureSharedObjectStorage(root: SharedObjectStoragePaths().rootURL, libraryID: libraryID)
+            }
             guard bridge?.loadURL(url) == true else {
                 pendingFileURL = nil
-                presentPlayerIssue(.ruffleLoadFailure)
-                return
+                failPlayerLoad(activeLoadRequestID, issue: .ruffleLoadFailure)
+                return false
             }
             pendingFileURL = nil
-            afterMovieLoaded()
+            if let requestID = activeLoadRequestID {
+                startLoadStatePolling(for: requestID)
+            }
         }
+        return true
     }
 
     func openFile(_ url: URL) {
+        if currentFileURL != url {
+            PermissionPolicyService.shared.clearSessionAllowances(for: currentFileURL)
+        }
         #if os(iOS)
         if securityScopedURL != url {
             securityScopedURL?.stopAccessingSecurityScopedResource()
             securityScopedURL = url.startAccessingSecurityScopedResource() ? url : nil
         }
         #endif
-        isLoading = true
+        let requestID = beginPlayerLoad()
         errorMessage = nil
         playerIssues = []
+        policyDiagnostics = []
         showDiagnostics = false
         currentFileURL = url
         loadTimeoutTask?.cancel()
 
         if let issue = fileAccessIssue(for: url) {
             selectedSection = .player
-            presentPlayerIssue(issue)
+            failPlayerLoad(requestID, issue: issue)
             return
         }
 
@@ -402,32 +462,42 @@ final class AppState: ObservableObject {
             recentFiles.insert(updated, at: 0)
         }
 
+        let libraryItem: LibraryItem
         if LibraryService.shared.contains(url) {
             LibraryService.shared.update(LibraryService.shared.item(for: url)!.id) {
                 $0.lastOpened = Date()
             }
+            libraryItem = LibraryService.shared.item(for: url)!
         } else {
-            LibraryService.shared.add(LibraryItem(
+            let item = LibraryItem(
                 url: url,
                 fileSize: Int64(resourceValues?.fileSize ?? 0),
                 lastOpened: Date()
-            ))
+            )
+            LibraryService.shared.add(item)
+            libraryItem = LibraryService.shared.item(for: url)!
         }
+        pendingStorageLibraryID = libraryItem.id
+        // Reuse the cached classification while the new player loads. Unknown files
+        // stay in the non-interactive state until the engine confirms their content.
+        swfContentType = libraryItem.contentType == .interactive ? .interactive : .animation
 
         restorePlaybackPreferences(for: url)
 
         loadTimeoutTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 15_000_000_000)
-            guard let self, self.isLoading else { return }
-            self.presentPlayerIssue(.scriptTimeout, fallbackMessageKey: "error.loadTimeout")
+            self?.failPlayerLoad(requestID, issue: .scriptTimeout, fallbackMessageKey: "error.loadTimeout")
         }
 
         if let bridge {
+            bridge.configureSharedObjectStorage(root: SharedObjectStoragePaths().rootURL, libraryID: libraryItem.id)
+            let accessPolicies = resolvedEngineAccessPolicies(for: url)
+            bridge.setAccessPolicies(network: accessPolicies.network, filesystem: accessPolicies.filesystem)
             guard bridge.loadURL(url) else {
-                presentPlayerIssue(.ruffleLoadFailure)
+                failPlayerLoad(requestID, issue: .ruffleLoadFailure)
                 return
             }
-            afterMovieLoaded()
+            startLoadStatePolling(for: requestID)
         } else {
             pendingFileURL = url
         }
@@ -439,28 +509,77 @@ final class AppState: ObservableObject {
         isPlaying = bridge.isPlaying()
     }
 
-    private func afterMovieLoaded() {
+    private func afterMovieLoaded(for requestID: UUID) {
+        guard completePlayerLoad(requestID, with: .ready) else { return }
         restoreLastPlaybackFrame()
-        let shouldAutoplay = UserDefaults.standard.object(forKey: "autoplay") as? Bool ?? true
-        if shouldAutoplay {
+        if Self.shouldAutoplayAfterMovieLoads(resolvedRuntimeProfile(for: currentFileURL)) {
             bridge?.setPlaying(true)
             syncPlayingState()
         }
         detectContentType()
         enterGameModeIfNeeded()
         updateIOSRenderLoopAvailability()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.adoptStageSize()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-            self?.adoptStageSize()
-            self?.persistCurrentMetadata()
-            self?.isLoading = false
-            self?.loadTimeoutTask?.cancel()
-            NotificationCenter.default.post(name: .swfLoaded, object: nil)
-        }
+        #if os(macOS)
+        startTimelinePolling()
+        #endif
+        adoptStageSize()
+        persistCurrentMetadata()
+        NotificationCenter.default.post(name: .swfLoaded, object: nil)
         scheduleThumbnailCapture(for: currentFileURL)
         scheduleControlBarHide()
+    }
+
+    nonisolated static func shouldAutoplayAfterMovieLoads(_ runtimeProfile: RuntimeDefaults) -> Bool {
+        runtimeProfile.autoplay
+    }
+
+    private func beginPlayerLoad() -> UUID {
+        loadTimeoutTask?.cancel()
+        loadStatePollingTask?.cancel()
+        let requestID = loadCoordinator.begin()
+        activeLoadRequestID = requestID
+        playerLoadState = loadCoordinator.state
+        return requestID
+    }
+
+    private func completePlayerLoad(_ requestID: UUID, with state: PlayerLoadState) -> Bool {
+        guard loadCoordinator.complete(requestID, with: state) else { return false }
+        playerLoadState = loadCoordinator.state
+        activeLoadRequestID = nil
+        loadTimeoutTask?.cancel()
+        loadStatePollingTask?.cancel()
+        return true
+    }
+
+    private func failPlayerLoad(_ requestID: UUID?, issue: PlayerIssue, fallbackMessageKey: String? = nil) {
+        guard let requestID,
+              completePlayerLoad(requestID, with: .failed(issue == .scriptTimeout ? .timedOut : .engineLoadFailed))
+        else { return }
+        presentPlayerIssue(issue, fallbackMessageKey: fallbackMessageKey)
+    }
+
+    private func startLoadStatePolling(for requestID: UUID) {
+        loadStatePollingTask?.cancel()
+        loadStatePollingTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                guard !Task.isCancelled,
+                      let self,
+                      self.activeLoadRequestID == requestID
+                else { return }
+
+                switch self.bridge?.loadState() {
+                case .ready:
+                    self.afterMovieLoaded(for: requestID)
+                    return
+                case .failed:
+                    self.failPlayerLoad(requestID, issue: .ruffleLoadFailure)
+                    return
+                case .idle, .loading, .none:
+                    continue
+                }
+            }
+        }
     }
 
     private func scheduleThumbnailCapture(for url: URL?) {
@@ -539,8 +658,8 @@ final class AppState: ObservableObject {
     }
 
     func presentPlayerIssue(_ issue: PlayerIssue, fallbackMessageKey: String? = nil) {
-        isLoading = false
         loadTimeoutTask?.cancel()
+        loadStatePollingTask?.cancel()
         playerIssues = [issue]
         errorMessage = fallbackMessageKey.map { LocalizationManager.shared.localized($0) }
             ?? issue.displayMessage(localize: LocalizationManager.shared.localized)
@@ -566,7 +685,9 @@ final class AppState: ObservableObject {
     func makeCompatibilityReport() -> CompatibilityReport {
         let metadata = currentMetadataForDiagnostics()
         let engineVersion = metadata.flatMap { $0.playerVersion > 0 ? String($0.playerVersion) : nil }
-        let traceMessages = TraceConsole.shared.messages.map(\.text)
+        let traceMessages = TraceConsole.shared.messages.map(\.text) + policyDiagnostics.map {
+            "Policy \($0.kind.rawValue): \($0.target)"
+        }
         return DiagnosticsService.shared.makeReport(
             fileURL: currentFileURL,
             fileSize: currentFileSizeForDiagnostics(),
@@ -597,12 +718,63 @@ final class AppState: ObservableObject {
         }
     }
 
+    private func resolvedEngineAccessPolicies(for fileURL: URL?) -> (network: UInt32, filesystem: UInt32) {
+        let policies = PermissionPolicyService.shared
+        let network = policies.evaluation(for: fileURL, scope: .network) == .allowed ? UInt32(1) : UInt32(0)
+        let filesystem = policies.evaluation(for: fileURL, scope: .filesystem) == .allowed ? UInt32(1) : UInt32(0)
+        return (network, filesystem)
+    }
+
+    private func recordEnginePolicyDiagnostic(_ diagnostic: RufflePolicyDiagnostic) {
+        policyDiagnostics.append(diagnostic)
+        if policyDiagnostics.count > 50 {
+            policyDiagnostics.removeFirst(policyDiagnostics.count - 50)
+        }
+
+        switch diagnostic.kind {
+        case .filesystemDenied:
+            handleEnginePermissionDenial(scope: .filesystem, target: diagnostic.target, issue: .filesystemBlocked)
+        case .networkDenied, .navigationDenied, .socketDenied:
+            handleEnginePermissionDenial(scope: .network, target: diagnostic.target, issue: .networkBlocked)
+        case .networkUnsupported, .unsupportedScheme:
+            break
+        }
+    }
+
+    private func handleEnginePermissionDenial(scope: PermissionScope, target: String, issue: PlayerIssue) {
+        presentPlayerIssue(issue)
+
+        switch PermissionPolicyService.shared.evaluation(for: currentFileURL, scope: scope) {
+        case .requiresPrompt:
+            if pendingPermissionRequest?.scope != scope || pendingPermissionRequest?.fileURL != currentFileURL {
+                _ = requestPermission(scope: scope, requestedResource: target)
+            }
+        case .allowed:
+            schedulePermissionRetry()
+        case .denied:
+            break
+        }
+    }
+
     func resolvePendingPermission(with decision: PermissionDecision) {
         guard let request = pendingPermissionRequest else { return }
         pendingPermissionRequest = nil
         let result = PermissionPolicyService.shared.apply(decision, for: request.fileURL, scope: request.scope)
-        if result == .denied {
+        if result == .allowed {
+            schedulePermissionRetry()
+        } else if result == .denied {
             recordBlockedPermission(request.scope)
+        }
+    }
+
+    private func schedulePermissionRetry() {
+        guard let url = currentFileURL, pendingPermissionRetryURL == nil else { return }
+        pendingPermissionRetryURL = url
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.pendingPermissionRetryURL == url else { return }
+            self.pendingPermissionRetryURL = nil
+            guard self.currentFileURL == url else { return }
+            self.openFile(url)
         }
     }
 
@@ -775,6 +947,7 @@ final class AppState: ObservableObject {
     private func restorePlaybackPreferences(for url: URL) {
         guard let item = LibraryService.shared.item(for: url) else { return }
         let settings = SettingsPersistence.shared
+        let runtimeProfile = resolvedRuntimeProfile(for: url)
         let preferences = item.playbackPreferences ?? PlaybackPreferences(
             volume: settings.volume,
             isMuted: settings.isMuted,
@@ -789,9 +962,11 @@ final class AppState: ObservableObject {
         isRestoringPlaybackPreferences = true
         volume = preferences.volume
         isMuted = preferences.isMuted
-        quality = preferences.quality
-        isLooping = preferences.isLooping
-        playbackSpeed = preferences.speed
+        quality = runtimeProfile.quality
+        isLooping = runtimeProfile.isLooping
+        playbackSpeed = runtimeProfile.playbackSpeed
+        maxExecutionDuration = runtimeProfile.maxExecutionDuration
+        showVirtualControls = item.showsVirtualControls ?? true
         playerMode = preferences.preferredMode
         isRestoringPlaybackPreferences = false
 
@@ -799,8 +974,29 @@ final class AppState: ObservableObject {
         bridge?.setQuality(quality)
         bridge?.setLooping(isLooping)
         bridge?.setSpeed(playbackSpeed)
-        applyLetterbox(preferences.letterbox)
+        bridge?.setAutoplay(runtimeProfile.autoplay)
+        bridge?.setMaxExecutionDuration(Float(runtimeProfile.maxExecutionDuration))
+        applyLetterbox(runtimeProfile.letterbox)
         applyPlayerModeLayout()
+    }
+
+    private func resolvedRuntimeProfile(for url: URL?) -> RuntimeDefaults {
+        let settings = SettingsPersistence.shared
+        let defaults = RuntimeDefaults(
+            quality: RuffleQuality(rawValue: settings.quality) ?? .high,
+            letterbox: settings.letterbox,
+            playbackSpeed: settings.speed,
+            isLooping: settings.isLooping,
+            autoplay: settings.autoplay,
+            maxExecutionDuration: settings.maxExecutionDuration
+        )
+        guard let url else { return defaults }
+        return LibraryService.shared.effectiveRuntimeProfile(for: url, defaults: defaults)
+    }
+
+    func applyRuntimeProfile(for itemID: UUID) {
+        guard let item = LibraryService.shared.item(with: itemID), item.url == currentFileURL else { return }
+        restorePlaybackPreferences(for: item.url)
     }
 
     private func persistPlaybackPreferences() {
@@ -884,10 +1080,42 @@ final class AppState: ObservableObject {
 
     private func updateIOSOrientations() {
         #if os(iOS)
-        let supportsLandscapeFullscreen = isStageMaximized && stageWidth >= stageHeight
-        IOSOrientationController.update(to: supportsLandscapeFullscreen ? .allButUpsideDown : .portrait)
+        guard isStageMaximized else {
+            IOSOrientationController.update(to: .portrait)
+            return
+        }
+
+        IOSOrientationController.update(to: stageHeight > stageWidth ? .portrait : .landscape)
         #endif
     }
+
+    #if os(iOS)
+    private func setupSystemVolumeObservation() {
+        let audioSession = AVAudioSession.sharedInstance()
+        systemVolumeObservation = audioSession.observe(\AVAudioSession.outputVolume, options: [.initial, .new]) { [weak self] session, _ in
+            let value = session.outputVolume
+            Task { @MainActor [weak self] in
+                guard let self, abs(self.systemVolume - value) > 0.001 else { return }
+                systemVolume = value
+                volume = value
+                bridge?.setVolume(isMuted ? 0 : value)
+                persistPlaybackPreferences()
+            }
+        }
+    }
+
+    func attachSystemVolumeSlider(_ slider: UISlider?) {
+        systemVolumeSlider = slider
+        slider?.setValue(systemVolume, animated: false)
+    }
+
+    func setSystemVolume(_ newVolume: Float) {
+        let value = min(max(newVolume, 0), 1)
+        systemVolumeSlider?.setValue(value, animated: false)
+        systemVolume = value
+        setVolume(value)
+    }
+    #endif
 
     func togglePlayPause() {
         isPlaying.toggle()
@@ -905,20 +1133,6 @@ final class AppState: ObservableObject {
         bridge?.setPlaying(false)
         persistPlaybackPreferences()
         controlBarOnPause()
-    }
-
-    func pausePlaybackForNavigation() {
-        guard isPlaying else { return }
-        pausedForNavigation = true
-        pausePlayback()
-    }
-
-    func resumePlaybackForNavigation() {
-        guard pausedForNavigation, currentFileURL != nil else { return }
-        pausedForNavigation = false
-        isPlaying = true
-        bridge?.setPlaying(true)
-        showControlBarTemporarily()
     }
 
     func setPlayerSurfaceVisible(_ visible: Bool) {
@@ -968,7 +1182,26 @@ final class AppState: ObservableObject {
         currentFileURL != nil && selectedSection == .player
     }
 
+    func removeLibraryItem(_ itemID: UUID) {
+        guard let item = LibraryService.shared.item(with: itemID) else { return }
+
+        if LibraryRemovalPolicy.shouldClosePlayer(currentFileURL: currentFileURL, removing: item) {
+            closeFile()
+        }
+        LibraryService.shared.remove(itemID)
+    }
+
     func closeFile() {
+        inputRouter.releaseAll { [weak self] keyCode, charCode, isDown, modifiers in
+            self?.bridge?.sendKeyEvent(keyCode: keyCode, charCode: charCode, isDown: isDown, modifiers: modifiers)
+        }
+        if let requestID = activeLoadRequestID {
+            _ = loadCoordinator.cancel(requestID)
+            playerLoadState = loadCoordinator.state
+            activeLoadRequestID = nil
+        }
+        loadTimeoutTask?.cancel()
+        loadStatePollingTask?.cancel()
         persistPlaybackPreferences()
         pausePlayback()
         stopTimelinePolling()
@@ -976,6 +1209,86 @@ final class AppState: ObservableObject {
         currentFileURL = nil
         updateIOSRenderLoopAvailability()
         selectedSection = .library
+    }
+
+    func routePlayerKeyEvent(
+        keyCode: UInt32,
+        charCode: UInt32,
+        isDown: Bool,
+        modifiers: UInt32,
+        source: InputSource = .keyboard
+    ) {
+        inputRouter.route(
+            keyCode: keyCode,
+            charCode: charCode,
+            isDown: isDown,
+            modifiers: modifiers,
+            source: source,
+            isInteractive: swfContentType == .interactive,
+            isStageFocused: selectedSection == .player && currentFileURL != nil
+                && (source != .keyboard || stageInputFocused)
+        ) { [weak self] keyCode, charCode, isDown, modifiers in
+            self?.bridge?.sendKeyEvent(keyCode: keyCode, charCode: charCode, isDown: isDown, modifiers: modifiers)
+        }
+    }
+
+    func currentInputProfile() -> InputProfile {
+        guard let url = currentFileURL,
+              let item = LibraryService.shared.item(for: url) else {
+            return InputProfile()
+        }
+        return item.inputProfile ?? InputProfile()
+    }
+
+    func updateInputProfile(_ profile: InputProfile) {
+        guard let url = currentFileURL,
+              let item = LibraryService.shared.item(for: url) else { return }
+        LibraryService.shared.update(item.id) { $0.inputProfile = profile }
+    }
+
+    func sendVirtualGameAction(_ action: GameAction, isDown: Bool) {
+        let profile = currentInputProfile()
+        guard let keyCode = profile.mapping[action] else { return }
+        routePlayerKeyEvent(keyCode: keyCode, charCode: 0, isDown: isDown, modifiers: 0, source: .virtual(action))
+    }
+
+    func toggleVirtualControls() {
+        showVirtualControls.toggle()
+        guard let url = currentFileURL,
+              let item = LibraryService.shared.item(for: url)
+        else { return }
+        LibraryService.shared.update(item.id) { $0.showsVirtualControls = showVirtualControls }
+    }
+
+    func sendControllerGameAction(_ action: GameAction, controllerID: UUID, isDown: Bool) {
+        let profile = currentInputProfile()
+        guard let keyCode = profile.mapping[action] else { return }
+        routePlayerKeyEvent(
+            keyCode: keyCode,
+            charCode: 0,
+            isDown: isDown,
+            modifiers: 0,
+            source: .controller(controllerID, action)
+        )
+    }
+
+    func releasePlayerInput() {
+        inputRouter.releaseAll { [weak self] keyCode, charCode, isDown, modifiers in
+            self?.bridge?.sendKeyEvent(keyCode: keyCode, charCode: charCode, isDown: isDown, modifiers: modifiers)
+        }
+    }
+
+    func setStageInputFocused(_ focused: Bool) {
+        guard stageInputFocused != focused else { return }
+        stageInputFocused = focused
+        if !focused {
+            releasePlayerInput()
+        }
+    }
+
+    func retryCurrentFile() {
+        guard let url = currentFileURL else { return }
+        openFile(url)
     }
 
     func setVolume(_ newVolume: Float) {
@@ -995,12 +1308,13 @@ final class AppState: ObservableObject {
     }
 
     func toggleFullscreen() {
-        isFullscreen.toggle()
-        bridge?.setFullscreen(isFullscreen)
         #if os(macOS)
         if let window = NSApp.keyWindow {
             window.toggleFullScreen(nil)
         }
+        #else
+        isFullscreen.toggle()
+        bridge?.setFullscreen(isFullscreen)
         #endif
     }
 
@@ -1116,6 +1430,20 @@ final class AppState: ObservableObject {
             self?.filePickerService = nil
             if let url {
                 DispatchQueue.main.async { self?.browseDirectory(url) }
+            }
+        }
+        #endif
+    }
+
+    func locateLibraryItem(_ itemID: UUID) {
+        #if os(iOS)
+        let service = IOSFilePickerService()
+        filePickerService = service
+        service.pickSWFFile { [weak self] url in
+            self?.filePickerService = nil
+            guard let url else { return }
+            DispatchQueue.main.async {
+                LibraryService.shared.locateFile(for: itemID, newURL: url)
             }
         }
         #endif
@@ -1432,6 +1760,7 @@ final class AppState: ObservableObject {
     }
 
     private func pollPlaybackInfo() {
+        bridge?.drainPolicyDiagnostics()
         guard let info = bridge?.getPlaybackInfo() else { return }
         currentFrame = info.currentFrame
         totalFrames = info.totalFrames
@@ -1485,26 +1814,7 @@ final class AppState: ObservableObject {
         #endif
         guard let swfFiles = try? ImportService.shared.scanForSWFFiles(in: url) else { return }
 
-        for fileURL in swfFiles {
-            let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-            let recent = RecentFile(
-                id: UUID(),
-                url: fileURL,
-                name: fileURL.lastPathComponent,
-                lastOpened: resourceValues?.contentModificationDate ?? Date(),
-                fileSize: Int64(resourceValues?.fileSize ?? 0)
-            )
-            if !recentFiles.contains(where: { $0.url == fileURL }) {
-                recentFiles.append(recent)
-            }
-            if !LibraryService.shared.contains(fileURL) {
-                LibraryService.shared.add(LibraryItem(
-                    url: fileURL,
-                    fileSize: Int64(resourceValues?.fileSize ?? 0),
-                    lastOpened: resourceValues?.contentModificationDate ?? Date()
-                ))
-            }
-        }
+        _ = LibraryService.shared.importFiles(swfFiles)
         updateLibraryStats()
     }
 

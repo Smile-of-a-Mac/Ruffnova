@@ -30,6 +30,37 @@ enum RuffleQuality: Int32 {
     case high16x16Linear = 7
 }
 
+enum RuffleMovieLoadState {
+    case idle
+    case loading
+    case ready
+    case failed
+}
+
+struct RufflePolicyDiagnostic: Equatable {
+    enum Kind: UInt32 {
+        case filesystemDenied = 0
+        case networkDenied = 1
+        case networkUnsupported = 2
+        case unsupportedScheme = 3
+        case navigationDenied = 4
+        case socketDenied = 5
+    }
+
+    var kind: Kind
+    var target: String
+}
+
+enum RufflePlayerLifecycle {
+    static func shouldRecreateBeforeLoad(hasLoadedMovie: Bool, configurationChanged: Bool) -> Bool {
+        hasLoadedMovie || configurationChanged
+    }
+
+    static func shouldCommitSurfaceInitialization(rendererCreated: Bool) -> Bool {
+        rendererCreated
+    }
+}
+
 /// Bridge between Swift and the Ruffle Rust core.
 /// When RUST_FFI_AVAILABLE is not defined, uses a mock backend
 /// so the entire SwiftUI UI can be tested independently.
@@ -42,8 +73,10 @@ final class RuffleBridge {
     private var viewportHeight: UInt32
     private var viewportScaleFactor: Float
     private var configuredQuality: Int32
-    private let configuredAutoplay: Bool
+    private var configuredAutoplay: Bool
     private var configuredMaxExecutionSecs: Float
+    private var configuredNetworkAccess: UInt32
+    private var configuredFilesystemAccess: UInt32
     private var displayTimer: Timer?
     private var lastFrameTime: UInt64 = 0
     private var renderedFrames: UInt64 = 0
@@ -55,6 +88,7 @@ final class RuffleBridge {
 
     /// Called on each rendered frame with (fps, frameCount).
     var onFrameUpdate: ((Double, UInt64) -> Void)?
+    var onPolicyDiagnostic: ((RufflePolicyDiagnostic) -> Void)?
 
     // MARK: - Speed state (applied to dt in renderFrame)
     private var playbackSpeed: Float = 1.0
@@ -62,10 +96,14 @@ final class RuffleBridge {
     private var currentLetterboxMode: RuffleLetterbox = RuffleLetterbox_Fullscreen
     private var currentBackgroundColor: UInt32 = 0xFF000000
     private var currentFullscreen = false
+    private var sharedObjectStorage: (root: URL, libraryID: UUID)?
+    private var hasLoadedMovie = false
+    private var playerConfigurationChanged = false
 
     // Mock state
     private var mockIsPlaying: Bool = false
     private var mockVolume: Float = 1.0
+    private var mockLoadState: RuffleMovieLoadState = .idle
 
     // Platform-specific display link
     #if os(iOS)
@@ -73,9 +111,13 @@ final class RuffleBridge {
     #endif
 
     init?(metalLayer: CAMetalLayer, width: UInt32, height: UInt32, scaleFactor: Float,
-          quality: Int32 = RuffleQuality.high.rawValue,
-          autoplay: Bool = true,
-          maxExecutionSecs: Float = 15.0) {
+           quality: Int32 = RuffleQuality.high.rawValue,
+           autoplay: Bool = true,
+           maxExecutionSecs: Float = 15.0,
+           networkAccess: UInt32 = 0,
+           filesystemAccess: UInt32 = 0,
+           storageRoot: URL? = nil,
+           storageLibraryID: UUID? = nil) {
         self.metalLayer = metalLayer
         self.viewportWidth = width
         self.viewportHeight = height
@@ -83,6 +125,11 @@ final class RuffleBridge {
         self.configuredQuality = quality
         self.configuredAutoplay = autoplay
         self.configuredMaxExecutionSecs = maxExecutionSecs
+        self.configuredNetworkAccess = networkAccess
+        self.configuredFilesystemAccess = filesystemAccess
+        if let storageRoot, let storageLibraryID {
+            self.sharedObjectStorage = (storageRoot, storageLibraryID)
+        }
         var info = mach_timebase_info_data_t()
         mach_timebase_info(&info)
         self.timeBase = info
@@ -157,6 +204,7 @@ final class RuffleBridge {
         let dt = Float(nanos) / 1_000_000_000.0 * playbackSpeed
         lastFrameTime = now
         let tickResult = ruffle_player_tick(player, dt)
+        drainPolicyDiagnostics()
         let renderResult = ruffle_player_render(player)
         renderedFrames += 1
         fpsFrames += 1
@@ -203,9 +251,19 @@ final class RuffleBridge {
             scale_factor: viewportScaleFactor,
             quality: configuredQuality,
             autoplay: configuredAutoplay,
-            max_execution_secs: configuredMaxExecutionSecs
+            max_execution_secs: configuredMaxExecutionSecs,
+            network_access: RuffleAccessPolicy(rawValue: configuredNetworkAccess),
+            filesystem_access: RuffleAccessPolicy(rawValue: configuredFilesystemAccess)
         )
-        playerPointer = ruffle_player_create_with_renderer(config, rendererPointer)
+        if let sharedObjectStorage {
+            playerPointer = sharedObjectStorage.root.path.withCString { root in
+                sharedObjectStorage.libraryID.uuidString.withCString { libraryID in
+                    ruffle_player_create_with_renderer_and_storage(config, rendererPointer, root, libraryID)
+                }
+            }
+        } else {
+            playerPointer = ruffle_player_create_with_renderer(config, rendererPointer)
+        }
         guard playerPointer != nil else {
             Logger.ruffle.error("Failed to recreate player")
             ruffle_renderer_free(rendererPointer)
@@ -219,6 +277,9 @@ final class RuffleBridge {
         _ = ruffle_player_set_letterbox_mode(playerPointer, currentLetterboxMode)
         _ = ruffle_player_set_background_color(playerPointer, currentBackgroundColor)
         ruffle_player_set_fullscreen(playerPointer, currentFullscreen)
+        ruffle_player_set_viewport(playerPointer, viewportWidth, viewportHeight, viewportScaleFactor)
+        ruffle_player_render(playerPointer)
+        playerConfigurationChanged = false
         lastFrameTime = 0
         return true
     }
@@ -236,22 +297,85 @@ final class RuffleBridge {
         #endif
     }
 
+    func configureSharedObjectStorage(root: URL, libraryID: UUID) {
+        if sharedObjectStorage?.root == root, sharedObjectStorage?.libraryID == libraryID {
+            return
+        }
+        sharedObjectStorage = (root, libraryID)
+        playerConfigurationChanged = true
+    }
+
     @discardableResult
     func loadURL(_ url: URL) -> Bool {
         #if RUST_FFI_AVAILABLE
-        guard recreatePlayer() else { return false }
+        if RufflePlayerLifecycle.shouldRecreateBeforeLoad(
+            hasLoadedMovie: hasLoadedMovie,
+            configurationChanged: playerConfigurationChanged
+        ), !recreatePlayer() {
+            return false
+        }
         guard let player = playerPointer else { return false }
         let result = url.absoluteString.withCString { ruffle_player_load_url(player, $0) }
         if result != RUFFLE_RESULT_OK {
             Logger.ruffle.error("loadURL failed: \(result) \(url.absoluteString)")
             return false
         } else {
+            hasLoadedMovie = true
             Logger.ruffle.debug("loadURL ok url=\(url.absoluteString)")
             return true
         }
         #else
         Logger.ruffle.debug("mock loadURL url=\(url.absoluteString)")
+        mockLoadState = .ready
         return true
+        #endif
+    }
+
+    func loadState() -> RuffleMovieLoadState? {
+        #if RUST_FFI_AVAILABLE
+        guard let player = playerPointer else { return nil }
+        var info = RuffleLoadInfo()
+        guard ruffle_player_get_load_info(player, &info) == RUFFLE_RESULT_OK else { return nil }
+
+        switch info.state {
+        case RuffleLoadState_Idle:
+            return .idle
+        case RuffleLoadState_Loading:
+            return .loading
+        case RuffleLoadState_Ready:
+            return .ready
+        case RuffleLoadState_Failed:
+            return .failed
+        default:
+            return nil
+        }
+        #else
+        return mockLoadState
+        #endif
+    }
+
+    func setAccessPolicies(network: UInt32, filesystem: UInt32) {
+        if configuredNetworkAccess != network || configuredFilesystemAccess != filesystem {
+            playerConfigurationChanged = true
+        }
+        configuredNetworkAccess = network
+        configuredFilesystemAccess = filesystem
+    }
+
+    func drainPolicyDiagnostics() {
+        #if RUST_FFI_AVAILABLE
+        guard let player = playerPointer else { return }
+        while true {
+            var diagnostic = RuffleDiagnostic(
+                kind: RuffleDiagnosticKind_FilesystemDenied,
+                target: RuffleString(data: nil, len: 0)
+            )
+            guard ruffle_player_next_diagnostic(player, &diagnostic) else { return }
+            defer { ruffle_string_free(diagnostic.target) }
+            guard let kind = RufflePolicyDiagnostic.Kind(rawValue: diagnostic.kind.rawValue) else { continue }
+            let target = diagnostic.target.data.map { String(cString: $0) } ?? ""
+            onPolicyDiagnostic?(RufflePolicyDiagnostic(kind: kind, target: target))
+        }
         #endif
     }
 
@@ -275,6 +399,8 @@ final class RuffleBridge {
                 Logger.ruffle.debug("loadData ok bytes=\(buf.count) url=\(url?.absoluteString ?? "<embedded>")")
             }
         }
+        #else
+        mockLoadState = .ready
         #endif
     }
 
@@ -407,6 +533,10 @@ final class RuffleBridge {
 
     func setMaxExecutionDuration(_ seconds: Float) {
         configuredMaxExecutionSecs = seconds
+    }
+
+    func setAutoplay(_ autoplay: Bool) {
+        configuredAutoplay = autoplay
     }
 
     // MARK: - Looping (Phase 1)

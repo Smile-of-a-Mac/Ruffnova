@@ -6,6 +6,8 @@ struct FavoritesGridView: View {
     @EnvironmentObject var locManager: LocalizationManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject private var libraryService = LibraryService.shared
+    @State private var detailsItemID: UUID?
+    @State private var showDetails = false
 
     private var favoriteItems: [LibraryItem] {
         libraryService.filtered(by: .favorites)
@@ -63,15 +65,19 @@ struct FavoritesGridView: View {
                                 .buttonStyle(.plain)
                                 .accessibilityLabel(item.name)
                                 .contextMenu {
-                                    Button(locManager.localized("favorites.remove")) {
-                                        appState.toggleFavorite(for: item.url)
-                                    }
+                                     Button(locManager.localized("favorites.remove")) {
+                                         appState.toggleFavorite(for: item.url)
+                                     }
+                                     Button(locManager.localized("library.details.edit")) {
+                                         detailsItemID = item.id
+                                         showDetails = true
+                                     }
                                     if item.availabilityStatus == .missing {
                                         Button(locManager.localized("library.locateFile")) {
                                             locateFile(item)
                                         }
                                         Button(locManager.localized("library.remove")) {
-                                            libraryService.remove(item.id)
+                                            appState.removeLibraryItem(item.id)
                                         }
                                     }
                                 }
@@ -83,6 +89,13 @@ struct FavoritesGridView: View {
             }
         }
         .accessibilityLabel(locManager.localized("sidebar.favorites"))
+        .sheet(isPresented: $showDetails) {
+            if let detailsItemID {
+                LibraryItemDetailsView(itemID: detailsItemID)
+                    .environmentObject(appState)
+                    .environmentObject(locManager)
+            }
+        }
     }
 
     private func locateFile(_ item: LibraryItem) {
@@ -94,6 +107,8 @@ struct FavoritesGridView: View {
         if panel.runModal() == .OK, let url = panel.url {
             libraryService.locateFile(for: item.id, newURL: url)
         }
+        #elseif os(iOS)
+        appState.locateLibraryItem(item.id)
         #endif
     }
 }

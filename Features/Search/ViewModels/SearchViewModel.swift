@@ -50,7 +50,7 @@ final class SearchViewModel: ObservableObject {
     }
 
     func deleteResult(_ item: LibraryItem) {
-        libraryService.remove(item.id)
+        appState.removeLibraryItem(item.id)
         searchResults.removeAll { $0.id == item.id }
     }
 

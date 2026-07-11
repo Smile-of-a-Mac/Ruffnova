@@ -124,7 +124,7 @@ struct LibraryContentView: View {
         } label: {
             Image(systemName: "ellipsis.circle")
         }
-        .accessibilityLabel(locManager.localized("toolbar.importHelp"))
+        .accessibilityLabel(locManager.localized("library.menu.actions"))
     }
     #endif
 }
@@ -468,7 +468,7 @@ struct LibraryGridView: View {
     private func removeSelectedItems() {
         let ids = selectedIDs
         for id in ids {
-            libraryService.remove(id)
+            appState.removeLibraryItem(id)
         }
         selectedIDs.removeAll()
         isSelecting = false

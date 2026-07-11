@@ -112,6 +112,7 @@ struct SidebarCollectionsView: View {
             }
         }
         .accessibilityLabel(collection.name)
+        .accessibilityAddTraits(isSelected(collection) ? .isSelected : [])
     }
 
     private var renameAlertBinding: Binding<Bool> {

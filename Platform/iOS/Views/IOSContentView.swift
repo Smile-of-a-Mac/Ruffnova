@@ -54,6 +54,27 @@ struct IOSContentView: View {
         .sheet(isPresented: $showingCollectionsSheet) {
             collectionsSheet
         }
+        .sheet(isPresented: $appState.showDiagnostics) {
+            DiagnosticsView()
+                .environmentObject(appState)
+                .environmentObject(locManager)
+        }
+        .alert(permissionPromptTitle, isPresented: permissionPromptPresented) {
+            Button(locManager.localized("permission.allowOnce")) {
+                appState.resolvePendingPermission(with: .allowOnce)
+            }
+            Button(locManager.localized("permission.allowForFile")) {
+                appState.resolvePendingPermission(with: .allowForFile)
+            }
+            Button(locManager.localized("permission.denyForFile"), role: .destructive) {
+                appState.resolvePendingPermission(with: .denyForFile)
+            }
+            Button(locManager.localized("collection.cancel"), role: .cancel) {
+                appState.pendingPermissionRequest = nil
+            }
+        } message: {
+            Text(permissionPromptMessage)
+        }
         .statusBarHidden(hidesStageSystemChrome)
     }
 
@@ -80,10 +101,8 @@ struct IOSContentView: View {
             }
             if newSection == .player {
                 appState.setPlayerSurfaceVisible(appState.isPlayerVisible)
-                appState.resumePlaybackForNavigation()
             } else if appState.currentFileURL != nil {
                 appState.setPlayerSurfaceVisible(false)
-                appState.pausePlaybackForNavigation()
             }
         }
         .onChange(of: appState.selectedCollectionID) { _, collectionID in
@@ -97,6 +116,15 @@ struct IOSContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openSWFFile)) { n in
             if let url = n.userInfo?["url"] as? URL { appState.openFile(url) }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .keyEvent)) { notification in
+            guard let userInfo = notification.userInfo,
+                  let keyCode = userInfo["keyCode"] as? UInt32,
+                  let charCode = userInfo["charCode"] as? UInt32,
+                  let isDown = userInfo["isDown"] as? Bool,
+                  let modifiers = userInfo["modifiers"] as? UInt
+            else { return }
+            appState.routePlayerKeyEvent(keyCode: keyCode, charCode: charCode, isDown: isDown, modifiers: UInt32(modifiers))
+        }
     }
 
     private var iPadSidebar: some View {
@@ -109,14 +137,17 @@ struct IOSContentView: View {
             .listStyle(.sidebar)
             .frame(minHeight: 240, idealHeight: 280, maxHeight: 320)
 
-            SidebarCollectionsView()
-                .environmentObject(appState)
-                .environmentObject(locManager)
-
-            Spacer(minLength: 0)
+            ScrollView {
+                SidebarCollectionsView()
+                    .environmentObject(appState)
+                    .environmentObject(locManager)
+            }
+            .frame(maxHeight: .infinity)
         }
-        .navigationTitle(locManager.localized("app.name"))
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                AppBrandHeader(size: .sidebar)
+            }
             ToolbarItem(placement: .primaryAction) {
                 addContentMenu
             }
@@ -170,10 +201,8 @@ struct IOSContentView: View {
         .onChange(of: appState.selectedSection) { _, newSection in
             if newSection == .player {
                 appState.setPlayerSurfaceVisible(appState.isPlayerVisible)
-                appState.resumePlaybackForNavigation()
             } else if appState.currentFileURL != nil {
                 appState.setPlayerSurfaceVisible(false)
-                appState.pausePlaybackForNavigation()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSWFFile)) { n in
@@ -323,9 +352,11 @@ struct IOSContentView: View {
     private func iPadDetailContent(for section: AppState.Section) -> some View {
         switch section {
         case .settings:
-            SettingsView(settingsActions: SettingsActions(appState: appState))
-                .environmentObject(appState)
-                .environmentObject(locManager)
+            NavigationStack {
+                SettingsView(settingsActions: SettingsActions(appState: appState))
+                    .environmentObject(appState)
+                    .environmentObject(locManager)
+            }
         case .player where appState.isPlayerVisible:
             playerView
         case .player:
@@ -431,25 +462,59 @@ struct IOSContentView: View {
                         .zIndex(3)
                 }
 
-                VStack {
-                    HStack {
-                        Spacer()
-                        glassIconButton(
-                            "arrow.down.right.and.arrow.up.left",
-                            accessibilityLabel: locManager.localized("menu.exitFullscreen")
-                        ) {
-                            withAnimation(.stageFullscreen) { appState.exitStageMaximized() }
+                if let errorMessage = appState.errorMessage {
+                    VStack(spacing: NativeSpacing.md) {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.callout)
+                            .multilineTextAlignment(.center)
+
+                        HStack(spacing: NativeSpacing.sm) {
+                            Button(locManager.localized("menu.reload")) {
+                                appState.retryCurrentFile()
+                            }
+                            .disabled(appState.currentFileURL == nil)
+
+                            Button(locManager.localized("menu.backToWorkspace")) {
+                                appState.closeFile()
+                            }
+
+                            if !appState.playerIssues.isEmpty {
+                                Button(locManager.localized("diagnostics.openDetails")) {
+                                    appState.showDiagnostics = true
+                                }
+                            }
                         }
-                        .padding(.top, max(geo.safeAreaInsets.top, NativeSpacing.md))
-                        .padding(.trailing, max(geo.safeAreaInsets.trailing, NativeSpacing.md))
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
-                    Spacer()
+                    .padding(NativeSpacing.lg)
+                    .nativeLiquidGlass(in: RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous))
+                    .padding(NativeSpacing.lg)
+                    .zIndex(5)
                 }
-                .opacity(usesInlineFullscreen ? 1 : 0)
-                .offset(y: usesInlineFullscreen ? 0 : -10)
-                .allowsHitTesting(usesInlineFullscreen)
-                .accessibilityHidden(!usesInlineFullscreen)
-                .zIndex(4)
+
+            }
+            .overlay(alignment: .bottomLeading) {
+                if appState.swfContentType == .interactive && appState.showVirtualControls {
+                    GameControlsView(profile: appState.currentInputProfile()) { action, isDown in
+                        appState.sendVirtualGameAction(action, isDown: isDown)
+                    }
+                    .scaleEffect(gameControlsScale(for: geo.size.width), anchor: .bottomLeading)
+                    .padding(.leading, max(geo.safeAreaInsets.leading, NativeSpacing.md))
+                    .padding(.bottom, gameControlsBottomInset(in: geo))
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if usesInlineFullscreen {
+                    glassIconButton(
+                        "arrow.down.right.and.arrow.up.left",
+                        accessibilityLabel: locManager.localized("menu.exitFullscreen")
+                    ) {
+                        withAnimation(.stageFullscreen) { appState.exitStageMaximized() }
+                    }
+                    .padding(.top, max(geo.safeAreaInsets.top, NativeSpacing.md))
+                    .padding(.trailing, max(geo.safeAreaInsets.trailing, NativeSpacing.md))
+                }
             }
         }
         .ignoresSafeArea(.container, edges: hidesStageSystemChrome ? .all : [])
@@ -458,6 +523,25 @@ struct IOSContentView: View {
         .toolbar(hidesStageSystemChrome ? .hidden : .visible, for: .tabBar)
         .animation(.stageFullscreen, value: appState.isStageMaximized)
         .animation(.easeInOut(duration: 0.2), value: hidesStageSystemChrome)
+    }
+
+    private func gameControlsScale(for availableWidth: CGFloat) -> CGFloat {
+        min(1, max(0.72, (availableWidth - NativeSpacing.md * 2) / 408))
+    }
+
+    private func gameControlsBottomInset(in geometry: GeometryProxy) -> CGFloat {
+        let safeBottom = max(geometry.safeAreaInsets.bottom, NativeSpacing.md)
+        guard !usesInlineFullscreen else { return safeBottom }
+
+        let stageHeight = max(220, geometry.size.height * 0.58)
+        let minCenterY = stageHeight / 2 + NativeSpacing.md
+        let maxCenterY = max(minCenterY, geometry.size.height - stageHeight / 2 - NativeSpacing.md)
+        let centerY = min(
+            max(geometry.size.height - stageHeight / 2 - (NativeSpacing.xxl + 132), minCenterY),
+            maxCenterY
+        )
+        let stageBottom = centerY + stageHeight / 2
+        return max(safeBottom, geometry.size.height - stageBottom + NativeSpacing.sm)
     }
 
     private var nowPlayingPanel: some View {
@@ -501,7 +585,7 @@ struct IOSContentView: View {
                 .frame(maxWidth: .infinity)
         }
         .padding(NativeSpacing.md)
-        .liquidGlassRounded(cornerRadius: NativeRadius.xl, material: GlassMaterial.light)
+        .nativeLiquidGlass(in: RoundedRectangle(cornerRadius: NativeRadius.xl, style: .continuous))
     }
 
     private func glassIconButton(_ systemName: String, accessibilityLabel: String, action: @escaping () -> Void) -> some View {
@@ -509,12 +593,38 @@ struct IOSContentView: View {
             Image(systemName: systemName)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.primary)
-                .frame(width: 38, height: 38)
+                .frame(width: 44, height: 44)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .modifier(LiquidGlassModifier(shape: Circle(), material: GlassMaterial.ultraLight))
+        .nativeLiquidGlass(in: Circle())
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var permissionPromptPresented: Binding<Bool> {
+        Binding(
+            get: { appState.pendingPermissionRequest != nil },
+            set: { if !$0 { appState.pendingPermissionRequest = nil } }
+        )
+    }
+
+    private var permissionPromptTitle: String {
+        guard let request = appState.pendingPermissionRequest else {
+            return locManager.localized("permission.prompt.title")
+        }
+        return locManager.localized(request.scope == .network
+            ? "permission.prompt.network.title"
+            : "permission.prompt.filesystem.title")
+    }
+
+    private var permissionPromptMessage: String {
+        guard let request = appState.pendingPermissionRequest else { return "" }
+        let fileName = request.fileURL?.lastPathComponent ?? locManager.localized("diagnostics.unavailable")
+        let resource = request.requestedResource ?? locManager.localized("permission.prompt.resource.unspecified")
+        let key = request.scope == .network
+            ? "permission.prompt.network.message"
+            : "permission.prompt.filesystem.message"
+        return String(format: locManager.localized(key), fileName, resource)
     }
 
     private func syncStageBackground() {

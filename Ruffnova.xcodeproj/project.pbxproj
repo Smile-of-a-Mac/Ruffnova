@@ -60,6 +60,7 @@
 		A10054 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = B10059 /* ko.json */; };
 		A10055 /* ko InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10060 /* ko InfoPlist.strings */; };
 		A10056 /* WindowAppearancePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10061 /* WindowAppearancePolicy.swift */; };
+		A10057 /* Ruffnova.icon in Resources */ = {isa = PBXBuildFile; fileRef = B10062 /* Ruffnova.icon */; };
 		A20001 /* LibraryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* LibraryItem.swift */; };
 		A20002 /* LibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002 /* LibraryService.swift */; };
 		A20003 /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20003 /* ImportService.swift */; };
@@ -149,6 +150,7 @@
 		B10059 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ko.json; sourceTree = "<group>"; };
 		B10060 /* ko InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "ko InfoPlist.strings"; path = ko.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B10061 /* WindowAppearancePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowAppearancePolicy.swift; sourceTree = "<group>"; };
+		B10062 /* Ruffnova.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Ruffnova.icon; sourceTree = "<group>"; };
 		B20001 /* LibraryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryItem.swift; sourceTree = "<group>"; };
 		B20002 /* LibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryService.swift; sourceTree = "<group>"; };
 		B20003 /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
@@ -202,6 +204,7 @@
 				G10400 /* Ruffle */,
 				G10700 /* Platform */,
 				B10032 /* Assets.xcassets */,
+				B10062 /* Ruffnova.icon */,
 				B10037 /* RuffleBridgingHeader.h */,
 				B10038 /* Info.plist */,
 				B10049 /* Info-iOS.plist */,
@@ -748,6 +751,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10032 /* Assets.xcassets in Resources */,
+				A10057 /* Ruffnova.icon in Resources */,
 				A10033 /* zh-Hans.json in Resources */,
 				A10035 /* zh-Hant.json in Resources */,
 				A10034 /* en.json in Resources */,
@@ -907,10 +911,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]" = Ruffnova;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = b3;
 				DEVELOPMENT_TEAM = B8NH9LK6K6;
 				ENABLE_DEBUG_DYLIB = NO;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
@@ -929,7 +934,7 @@
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/CRuffleFFI/ios";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/CRuffleFFI/ios-sim";
 				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = "$(SRCROOT)/CRuffleFFI/macos";
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = "1.0 Beta";
 				OTHER_LDFLAGS = "$(inherited)";
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
@@ -975,10 +980,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]" = Ruffnova;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = b3;
 				DEVELOPMENT_TEAM = B8NH9LK6K6;
 				"EXCLUDED_ARCHS[sdk=*]" = x86_64;
 				INFOPLIST_FILE = Info.plist;
@@ -996,7 +1002,7 @@
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/CRuffleFFI/ios";
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/CRuffleFFI/ios-sim";
 				"LIBRARY_SEARCH_PATHS[sdk=macosx*]" = "$(SRCROOT)/CRuffleFFI/macos";
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = "1.0 Beta";
 				OTHER_LDFLAGS = "$(inherited)";
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",

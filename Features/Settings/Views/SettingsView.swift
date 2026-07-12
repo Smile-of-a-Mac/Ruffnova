@@ -658,11 +658,11 @@ struct GeneralSettingsView: View {
             LabeledContent(locManager.localized("settings.general.playback.speed")) {
                 HStack(spacing: NativeSpacing.md) {
                     Slider(value: speedBinding, in: 0.25...4.0, step: 0.25)
-                        .frame(minWidth: 160)
+                        .settingsSliderWidth()
                     Text(String(format: "%.2fx", effectivePlaybackSpeed))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
-                        .frame(width: 56, alignment: .trailing)
+                        .settingsSliderValueWidth(minimumWidth: 56)
                 }
                 .settingsControlColumn()
             }
@@ -751,11 +751,11 @@ struct AdvancedSettingsView: View {
             LabeledContent(locManager.localized("settings.advanced.actionscript.maxDuration")) {
                 HStack(spacing: NativeSpacing.md) {
                     Slider(value: maxExecutionDurationBinding, in: 5...60, step: 1)
-                        .frame(minWidth: 160)
+                        .settingsSliderWidth()
                     Text(String(format: locManager.localized("settings.advanced.actionscript.secondsFormat"), Int(effectiveMaxExecutionDuration)))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
-                        .frame(width: 92, alignment: .trailing)
+                        .settingsSliderValueWidth(minimumWidth: 74)
                 }
                 .settingsControlColumn()
             }
@@ -1040,6 +1040,25 @@ private struct AboutAppIconView: View {
 }
 
 private extension View {
+    @ViewBuilder
+    func settingsSliderWidth() -> some View {
+        #if os(macOS)
+        self.frame(width: 160)
+        #else
+        self.frame(minWidth: 0, maxWidth: .infinity)
+        #endif
+    }
+
+    @ViewBuilder
+    func settingsSliderValueWidth(minimumWidth: CGFloat) -> some View {
+        #if os(macOS)
+        self.frame(width: minimumWidth, alignment: .trailing)
+        #else
+        self.fixedSize(horizontal: true, vertical: false)
+            .frame(minWidth: minimumWidth, alignment: .trailing)
+        #endif
+    }
+
     @ViewBuilder
     func settingsControlColumn() -> some View {
         #if os(macOS)

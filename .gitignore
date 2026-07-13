@@ -9,7 +9,7 @@ xcuserdata/
 **/.DS_Store
 
 # Agent-related docs
-AGENT.md
+AGENTS.md
 RELEASE_AUDIT.md
 docs/
 

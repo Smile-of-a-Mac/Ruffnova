@@ -24,7 +24,19 @@
             }
           ],
           "hidden" : false,
-          "image-name" : "ruffnova.png",
+          "image-name-specializations" : [
+            {
+              "value" : "AppIcon-Light-1024.png"
+            },
+            {
+              "appearance" : "dark",
+              "value" : "AppIcon-Dark-1024.png"
+            },
+            {
+              "appearance" : "tinted",
+              "value" : "AppIcon-Tinted-1024.png"
+            }
+          ],
           "name" : "Ruffnova",
           "position" : {
             "scale" : 1,

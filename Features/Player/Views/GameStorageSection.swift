@@ -21,15 +21,18 @@ struct GameStorageFile: FileDocument {
 
 struct GameStorageSection: View {
     let libraryID: UUID
+    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var locManager: LocalizationManager
 
     @State private var entries = [GameStorageEntry]()
     @State private var usage: GameStorageUsage?
+    @State private var snapshots = [SharedObjectSlot: SharedObjectSnapshot]()
     @State private var pendingImportName: String?
     @State private var exportDocument: GameStorageFile?
     @State private var exportName = "save.sol"
     @State private var showImporter = false
     @State private var showClearConfirmation = false
+    @State private var restoreSlot: SharedObjectSlot?
     @State private var errorMessage: String?
 
     var body: some View {
@@ -40,6 +43,25 @@ struct GameStorageSection: View {
                         .monospacedDigit()
                 }
             }
+
+            ForEach(SharedObjectSlot.allCases) { slot in
+                let snapshot = snapshots[slot]
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(format: locManager.localized("storage.slot"), slot.rawValue))
+                        Text(snapshot.map { $0.createdAt.formatted(date: .abbreviated, time: .shortened) } ?? locManager.localized("storage.slot.empty"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(locManager.localized(snapshot == nil ? "storage.slot.save" : "storage.slot.overwrite")) { save(to: slot) }
+                    if snapshot != nil {
+                        Button(locManager.localized("storage.slot.restore")) { restoreSlot = slot }
+                    }
+                }
+            }
+
+            AutomaticBackupSection(libraryID: libraryID)
 
             if entries.isEmpty {
                 Text(locManager.localized("storage.empty"))
@@ -77,7 +99,7 @@ struct GameStorageSection: View {
                 let url = try result.get()
                 let scoped = url.startAccessingSecurityScopedResource()
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                try GameStorageService.shared.importData(Data(contentsOf: url), named: name, for: libraryID)
+                try appState.importSharedObjectStorage(Data(contentsOf: url), named: name, for: libraryID)
                 reload()
             } catch {
                 errorMessage = locManager.localized("storage.error.import")
@@ -87,10 +109,20 @@ struct GameStorageSection: View {
             if case .failure = result { errorMessage = locManager.localized("storage.error.export") }
             exportDocument = nil
         }
+        .alert(locManager.localized("storage.slot.restore.confirmTitle"), isPresented: Binding(get: { restoreSlot != nil }, set: { if !$0 { restoreSlot = nil } })) {
+            Button(locManager.localized("storage.slot.restore"), role: .destructive) {
+                if let slot = restoreSlot {
+                    restore(slot)
+                }
+                restoreSlot = nil
+            }
+            Button(locManager.localized("collection.cancel"), role: .cancel) { restoreSlot = nil }
+        } message: {
+            Text(locManager.localized("storage.slot.restore.confirmMessage"))
+        }
         .alert(locManager.localized("storage.clear.confirmTitle"), isPresented: $showClearConfirmation) {
             Button(locManager.localized("storage.clear"), role: .destructive) {
-                entries.forEach { try? GameStorageService.shared.delete($0.name, for: libraryID) }
-                reload()
+                clearAll()
             }
             Button(locManager.localized("collection.cancel"), role: .cancel) {}
         } message: {
@@ -103,13 +135,37 @@ struct GameStorageSection: View {
         }
     }
 
+    private func save(to slot: SharedObjectSlot) {
+        do {
+            try appState.saveSharedObjectStorage(to: slot, for: libraryID)
+            reload()
+        } catch {
+            errorMessage = locManager.localized("storage.slot.error.save")
+        }
+    }
+
+    private func restore(_ slot: SharedObjectSlot) {
+        do {
+            try appState.restoreSharedObjectSlot(slot, for: libraryID)
+            reload()
+        } catch {
+            errorMessage = locManager.localized("storage.slot.error.restore")
+        }
+    }
+
     private func reload() {
         do {
             entries = try GameStorageService.shared.entries(for: libraryID)
             usage = try GameStorageService.shared.usage(for: libraryID)
+            snapshots = SharedObjectSlot.allCases.reduce(into: [:]) { result, slot in
+                if let snapshot = try? SharedObjectSnapshotService.shared.snapshot(in: slot, for: libraryID) {
+                    result[slot] = snapshot
+                }
+            }
         } catch {
             entries = []
             usage = nil
+            snapshots = [:]
             errorMessage = locManager.localized("storage.error.load")
         }
     }
@@ -125,7 +181,16 @@ struct GameStorageSection: View {
 
     private func delete(_ entry: GameStorageEntry) {
         do {
-            try GameStorageService.shared.delete(entry.name, for: libraryID)
+            try appState.deleteSharedObjectStorage(named: entry.name, for: libraryID)
+            reload()
+        } catch {
+            errorMessage = locManager.localized("storage.error.delete")
+        }
+    }
+
+    private func clearAll() {
+        do {
+            try appState.clearSharedObjectStorage(for: libraryID)
             reload()
         } catch {
             errorMessage = locManager.localized("storage.error.delete")

@@ -35,7 +35,7 @@ final class GameStorageService {
         let result = call(libraryID) { root, id in
             ruffle_storage_list(root, id, &list)
         }
-        guard result == RUFFLE_RESULT_OK else { throw GameStorageError.unavailable }
+        guard result == RuffleResult_Ok else { throw GameStorageError.unavailable }
         defer { ruffle_string_list_free(list) }
 
         return (0..<Int(list.len)).compactMap { index in
@@ -54,14 +54,14 @@ final class GameStorageService {
         var used: UInt64 = 0
         var quota: UInt64 = 0
         let result = call(libraryID) { root, id in ruffle_storage_get_usage(root, id, &used, &quota) }
-        guard result == RUFFLE_RESULT_OK else { throw GameStorageError.unavailable }
+        guard result == RuffleResult_Ok else { throw GameStorageError.unavailable }
         return GameStorageUsage(usedBytes: Int64(used), quotaBytes: Int64(quota))
     }
 
     func size(of name: String, for libraryID: UUID) throws -> Int64 {
         var size: UInt64 = 0
         let result = call(libraryID, name: name) { root, id, name in ruffle_storage_get_size(root, id, name, &size) }
-        guard result == RUFFLE_RESULT_OK else { throw GameStorageError.unavailable }
+        guard result == RuffleResult_Ok else { throw GameStorageError.unavailable }
         return Int64(size)
     }
 
@@ -70,9 +70,11 @@ final class GameStorageService {
         let result = call(libraryID, name: name) { root, id, name in
             ruffle_storage_read(root, id, name, &bytes)
         }
-        guard result == RUFFLE_RESULT_OK else { throw GameStorageError.unavailable }
+        guard result == RuffleResult_Ok else { throw GameStorageError.unavailable }
         defer { ruffle_bytes_free(bytes) }
-        return Data(bytes: bytes.data!, count: Int(bytes.len))
+        guard bytes.len > 0 else { return Data() }
+        guard let data = bytes.data else { throw GameStorageError.unavailable }
+        return Data(bytes: data, count: Int(bytes.len))
     }
 
     func replace(_ data: Data, named name: String, for libraryID: UUID) throws {
@@ -81,7 +83,7 @@ final class GameStorageService {
                 ruffle_storage_replace(root, id, name, buffer.bindMemory(to: UInt8.self).baseAddress, UInt32(buffer.count))
             }
         }
-        guard result == RUFFLE_RESULT_OK else { throw GameStorageError.invalidEntry }
+        guard result == RuffleResult_Ok else { throw GameStorageError.invalidEntry }
     }
 
     func importData(_ data: Data, named name: String, for libraryID: UUID) throws {
@@ -100,16 +102,16 @@ final class GameStorageService {
         let result = call(libraryID, name: name) { root, id, name in
             ruffle_storage_delete(root, id, name)
         }
-        guard result == RUFFLE_RESULT_OK else { throw GameStorageError.invalidEntry }
+        guard result == RuffleResult_Ok else { throw GameStorageError.invalidEntry }
     }
 
-    private func call(_ libraryID: UUID, _ body: (UnsafePointer<CChar>, UnsafePointer<CChar>) -> Int32) -> Int32 {
+    private func call(_ libraryID: UUID, _ body: (UnsafePointer<CChar>, UnsafePointer<CChar>) -> RuffleResult) -> RuffleResult {
         paths.rootURL.path.withCString { root in
             libraryID.uuidString.withCString { id in body(root, id) }
         }
     }
 
-    private func call(_ libraryID: UUID, name: String, _ body: (UnsafePointer<CChar>, UnsafePointer<CChar>, UnsafePointer<CChar>) -> Int32) -> Int32 {
+    private func call(_ libraryID: UUID, name: String, _ body: (UnsafePointer<CChar>, UnsafePointer<CChar>, UnsafePointer<CChar>) -> RuffleResult) -> RuffleResult {
         paths.rootURL.path.withCString { root in
             libraryID.uuidString.withCString { id in
                 name.withCString { name in body(root, id, name) }

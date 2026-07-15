@@ -41,12 +41,12 @@ struct IOSContentView: View {
             }
         }
         .onAppear {
-            appState.handleSceneActiveStateChanged(scenePhase == .active)
+            appState.handleScenePhaseChanged(scenePhase)
             appState.setPlayerSurfaceVisible(appState.isPlayerVisible)
             hidesStageSystemChrome = appState.isStageMaximized
         }
         .onChange(of: scenePhase) { _, phase in
-            appState.handleSceneActiveStateChanged(phase == .active)
+            appState.handleScenePhaseChanged(phase)
         }
         .onChange(of: appState.isStageMaximized) { _, maximized in
             syncStageSystemChrome(for: maximized)
@@ -58,6 +58,13 @@ struct IOSContentView: View {
             DiagnosticsView()
                 .environmentObject(appState)
                 .environmentObject(locManager)
+        }
+        .sheet(isPresented: libraryDetailsPresented) {
+            if let itemID = appState.libraryDetailsItemID {
+                LibraryItemDetailsView(itemID: itemID, initialSection: appState.libraryDetailsSection)
+                    .environmentObject(appState)
+                    .environmentObject(locManager)
+            }
         }
         .alert(permissionPromptTitle, isPresented: permissionPromptPresented) {
             Button(locManager.localized("permission.allowOnce")) {
@@ -123,8 +130,19 @@ struct IOSContentView: View {
                   let isDown = userInfo["isDown"] as? Bool,
                   let modifiers = userInfo["modifiers"] as? UInt
             else { return }
-            appState.routePlayerKeyEvent(keyCode: keyCode, charCode: charCode, isDown: isDown, modifiers: UInt32(modifiers))
+            appState.routePhysicalKeyboardEvent(physicalHID: keyCode, charCode: charCode, isDown: isDown, modifiers: UInt32(modifiers))
         }
+    }
+
+    private var libraryDetailsPresented: Binding<Bool> {
+        Binding(
+            get: { appState.libraryDetailsItemID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    appState.libraryDetailsItemID = nil
+                }
+            }
+        )
     }
 
     private var iPadSidebar: some View {
@@ -480,7 +498,7 @@ struct IOSContentView: View {
 
                             if !appState.playerIssues.isEmpty {
                                 Button(locManager.localized("diagnostics.openDetails")) {
-                                    appState.showDiagnostics = true
+                                    appState.openCurrentFileDetails(section: .compatibility)
                                 }
                             }
                         }
@@ -496,12 +514,16 @@ struct IOSContentView: View {
             }
             .overlay(alignment: .bottomLeading) {
                 if appState.swfContentType == .interactive && appState.showVirtualControls {
-                    GameControlsView(profile: appState.currentInputProfile()) { action, isDown in
-                        appState.sendVirtualGameAction(action, isDown: isDown)
+                    let orientation: TouchLayoutOrientation = geo.size.width >= geo.size.height ? .landscape : .portrait
+                    GameControlsView(
+                        controls: appState.currentTouchControls(for: orientation),
+                        safeAreaInsets: geo.safeAreaInsets
+                    ) { instanceID, action, isDown in
+                        appState.sendVirtualGameAction(action, instanceID: instanceID, isDown: isDown)
                     }
-                    .scaleEffect(gameControlsScale(for: geo.size.width), anchor: .bottomLeading)
-                    .padding(.leading, max(geo.safeAreaInsets.leading, NativeSpacing.md))
-                    .padding(.bottom, gameControlsBottomInset(in: geo))
+                    .onChange(of: orientation) { _, _ in
+                        appState.releasePlayerInput()
+                    }
                 }
             }
             .overlay(alignment: .topTrailing) {
@@ -523,25 +545,6 @@ struct IOSContentView: View {
         .toolbar(hidesStageSystemChrome ? .hidden : .visible, for: .tabBar)
         .animation(.stageFullscreen, value: appState.isStageMaximized)
         .animation(.easeInOut(duration: 0.2), value: hidesStageSystemChrome)
-    }
-
-    private func gameControlsScale(for availableWidth: CGFloat) -> CGFloat {
-        min(1, max(0.72, (availableWidth - NativeSpacing.md * 2) / 408))
-    }
-
-    private func gameControlsBottomInset(in geometry: GeometryProxy) -> CGFloat {
-        let safeBottom = max(geometry.safeAreaInsets.bottom, NativeSpacing.md)
-        guard !usesInlineFullscreen else { return safeBottom }
-
-        let stageHeight = max(220, geometry.size.height * 0.58)
-        let minCenterY = stageHeight / 2 + NativeSpacing.md
-        let maxCenterY = max(minCenterY, geometry.size.height - stageHeight / 2 - NativeSpacing.md)
-        let centerY = min(
-            max(geometry.size.height - stageHeight / 2 - (NativeSpacing.xxl + 132), minCenterY),
-            maxCenterY
-        )
-        let stageBottom = centerY + stageHeight / 2
-        return max(safeBottom, geometry.size.height - stageBottom + NativeSpacing.sm)
     }
 
     private var nowPlayingPanel: some View {

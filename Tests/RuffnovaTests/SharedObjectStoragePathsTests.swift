@@ -15,4 +15,11 @@ final class SharedObjectStoragePathsTests: XCTestCase {
 
         XCTAssertNotEqual(paths.namespace(for: UUID()), paths.namespace(for: UUID()))
     }
+
+    func testSnapshotStorageIsOutsideActiveSharedObjectStorage() {
+        let paths = SharedObjectStoragePaths(rootURL: URL(fileURLWithPath: "/tmp/RuffleFlashPlayer/SharedObjects"))
+
+        XCTAssertEqual(paths.snapshotRootURL, URL(fileURLWithPath: "/tmp/RuffleFlashPlayer/SharedObjectSnapshots", isDirectory: true))
+        XCTAssertNotEqual(paths.snapshotNamespace(for: UUID()), paths.namespace(for: UUID()))
+    }
 }

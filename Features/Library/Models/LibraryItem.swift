@@ -86,6 +86,8 @@ struct LibraryItem: Identifiable, Codable, Equatable {
     var runtimeProfile: FileRuntimeProfile?
     var showsVirtualControls: Bool?
     var inputProfile: InputProfile?
+    var gameStoragePreferences: GameStoragePreferences?
+    var compatibilityAssessment: PersistedCompatibilityAssessment?
     var contentType: LibraryContentType?
     var compatibilityStatus: CompatibilityStatus
     var availabilityStatus: AvailabilityStatus
@@ -110,6 +112,8 @@ struct LibraryItem: Identifiable, Codable, Equatable {
         runtimeProfile: FileRuntimeProfile? = nil,
         showsVirtualControls: Bool? = nil,
         inputProfile: InputProfile? = nil,
+        gameStoragePreferences: GameStoragePreferences? = nil,
+        compatibilityAssessment: PersistedCompatibilityAssessment? = nil,
         contentType: LibraryContentType? = nil,
         compatibilityStatus: CompatibilityStatus = .unknown,
         availabilityStatus: AvailabilityStatus = .available
@@ -133,6 +137,8 @@ struct LibraryItem: Identifiable, Codable, Equatable {
         self.runtimeProfile = runtimeProfile
         self.showsVirtualControls = showsVirtualControls
         self.inputProfile = inputProfile
+        self.gameStoragePreferences = gameStoragePreferences
+        self.compatibilityAssessment = compatibilityAssessment
         self.contentType = contentType
         self.compatibilityStatus = compatibilityStatus
         self.availabilityStatus = availabilityStatus
@@ -163,6 +169,35 @@ enum LibraryContentType: String, Codable, CaseIterable {
 enum AvailabilityStatus: String, Codable, CaseIterable {
     case available
     case missing
+}
+
+enum LibraryItemDetailsSection: String, CaseIterable, Hashable, Identifiable {
+    case overview
+    case compatibility
+    case controls
+    case storage
+    case permissions
+
+    var id: String { rawValue }
+
+    var localizedKey: String {
+        "library.details.section.\(rawValue)"
+    }
+
+    var systemImage: String {
+        switch self {
+        case .overview:
+            return "doc.text"
+        case .compatibility:
+            return "stethoscope"
+        case .controls:
+            return "gamecontroller"
+        case .storage:
+            return "externaldrive"
+        case .permissions:
+            return "lock.shield"
+        }
+    }
 }
 
 enum LibrarySortOrder: String, Codable, CaseIterable {

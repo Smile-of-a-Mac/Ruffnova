@@ -3,58 +3,221 @@ import SwiftUI
 struct LibraryItemDetailsView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject private var libraryService = LibraryService.shared
     @ObservedObject private var collectionService = CollectionService.shared
     @ObservedObject private var permissionPolicyService = PermissionPolicyService.shared
 
     let itemID: UUID
+    let initialSection: LibraryItemDetailsSection
     @State private var tagsText = ""
     @State private var notesText = ""
+    @State private var selectedSection: LibraryItemDetailsSection?
+    @State private var showInputMappingEditor = false
+    @State private var showTouchLayoutEditor = false
+
+    init(itemID: UUID, initialSection: LibraryItemDetailsSection = .overview) {
+        self.itemID = itemID
+        self.initialSection = initialSection
+        _selectedSection = State(initialValue: initialSection)
+    }
 
     var body: some View {
-        Form {
-            if let item = libraryService.item(with: itemID) {
-                Section(locManager.localized("library.details.file")) {
-                    LabeledContent(locManager.localized("diagnostics.report.fileName"), value: item.name)
-                    LabeledContent(locManager.localized("diagnostics.report.path"), value: item.url.path)
+        NavigationSplitView {
+            List {
+                ForEach(LibraryItemDetailsSection.allCases) { section in
+                    Button {
+                        selectedSection = section
+                    } label: {
+                        Label(
+                            locManager.localized(section.localizedKey),
+                            systemImage: section.systemImage
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                    .listRowBackground(
+                        (selectedSection ?? initialSection) == section
+                            ? Color.accentColor.opacity(0.18)
+                            : Color.clear
+                    )
+                    .accessibilityAddTraits(
+                        (selectedSection ?? initialSection) == section ? .isSelected : []
+                    )
                 }
+            }
+            .listStyle(.sidebar)
+            .navigationTitle(locManager.localized("library.details.title"))
+        } detail: {
+            VStack(spacing: 0) {
+                detailContent
+                detailActionBar
+            }
+            .navigationTitle(locManager.localized((selectedSection ?? initialSection).localizedKey))
+        }
+        #if os(macOS)
+        .frame(width: 640, height: 480)
+        #else
+        .frame(minHeight: 500)
+        #endif
+        .onAppear(perform: loadDraft)
+        .sheet(isPresented: $showInputMappingEditor) {
+            InputMappingEditorView(itemID: itemID, profile: libraryService.item(with: itemID)?.inputProfile ?? InputProfile())
+                .environmentObject(appState)
+                .environmentObject(locManager)
+        }
+        .sheet(isPresented: $showTouchLayoutEditor) {
+            TouchLayoutEditorView(itemID: itemID, layoutSet: libraryService.item(with: itemID)?.inputProfile?.touchLayouts ?? TouchLayoutSet())
+                .environmentObject(appState)
+                .environmentObject(locManager)
+        }
+    }
 
-                Section(locManager.localized("library.details.organization")) {
-                    Toggle(locManager.localized(item.isFavorite ? "favorites.remove" : "favorites.add"), isOn: favoriteBinding(item))
-                    TextField(locManager.localized("library.details.tags.placeholder"), text: $tagsText)
-                        .onSubmit { saveTags() }
-                    TextEditor(text: $notesText)
-                        .frame(minHeight: 96)
-                        .accessibilityLabel(locManager.localized("library.details.notes"))
-                }
-
-                runtimeSettingsSection(item)
-
-                permissionSettingsSection(item)
-
-                GameStorageSection(libraryID: item.id)
-
-                Section(locManager.localized("sidebar.collections")) {
-                    if collectionService.collections.isEmpty {
-                        Text(locManager.localized("collection.noCollections"))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(collectionService.collections) { collection in
-                            Toggle(collection.name, isOn: collectionBinding(itemID: item.id, collectionID: collection.id))
-                        }
+    @ViewBuilder
+    private var detailContent: some View {
+        if let item = libraryService.item(with: itemID) {
+            ScrollView(.vertical) {
+                LazyVStack(alignment: .leading, spacing: NativeSpacing.xxl) {
+                    switch selectedSection ?? initialSection {
+                    case .overview:
+                        fileSection(item)
+                        organizationSection(item)
+                        runtimeSettingsSection(item)
+                    case .compatibility:
+                        compatibilitySection(item)
+                    case .controls:
+                        controlsSection(item)
+                    case .storage:
+                        GameStorageSection(libraryID: item.id)
+                    case .permissions:
+                        permissionSettingsSection(item)
                     }
                 }
+                .padding(.horizontal, NativeSpacing.lg)
+                .padding(.vertical, NativeSpacing.xl)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollIndicators(.visible)
+        } else {
+            VStack(spacing: NativeSpacing.md) {
+                Image(systemName: "questionmark.folder")
+                    .font(.system(size: 32, weight: .light))
+                    .foregroundStyle(.secondary)
+                Text(locManager.localized("library.details.missing"))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private var detailActionBar: some View {
+        HStack {
+            Spacer()
+
+            Button(locManager.localized("menu.close")) {
+                saveDraft()
+                dismiss()
+            }
+            .keyboardShortcut(.defaultAction)
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(.horizontal, NativeSpacing.lg)
+        .padding(.vertical, NativeSpacing.sm)
+        .background(.regularMaterial)
+        .overlay(alignment: .top) {
+            Divider()
+        }
+    }
+
+    private func fileSection(_ item: LibraryItem) -> some View {
+        Section(locManager.localized("library.details.file")) {
+            LabeledContent(locManager.localized("diagnostics.report.fileName"), value: item.name)
+            LabeledContent(locManager.localized("diagnostics.report.path"), value: item.url.path)
+        }
+    }
+
+    private func organizationSection(_ item: LibraryItem) -> some View {
+        Section(locManager.localized("library.details.organization")) {
+            Toggle(locManager.localized(item.isFavorite ? "favorites.remove" : "favorites.add"), isOn: favoriteBinding(item))
+            TextField(locManager.localized("library.details.tags.placeholder"), text: $tagsText)
+                .onSubmit { saveTags() }
+            TextEditor(text: $notesText)
+                .frame(minHeight: 96)
+                .accessibilityLabel(locManager.localized("library.details.notes"))
+
+            if collectionService.collections.isEmpty {
+                Text(locManager.localized("collection.noCollections"))
+                    .foregroundStyle(.secondary)
             } else {
-                Section {
-                    Label(locManager.localized("library.details.missing"), systemImage: "questionmark.folder")
-                        .foregroundStyle(.secondary)
+                ForEach(collectionService.collections) { collection in
+                    Toggle(collection.name, isOn: collectionBinding(itemID: item.id, collectionID: collection.id))
                 }
             }
         }
-        .formStyle(.grouped)
-        .frame(minWidth: 420, minHeight: 420)
-        .onAppear(perform: loadDraft)
-        .onDisappear(perform: saveDraft)
+    }
+
+    private func compatibilitySection(_ item: LibraryItem) -> some View {
+        CompatibilityDetailsView(itemID: item.id) { section in
+            selectedSection = section
+        }
+    }
+
+    private func controlsSection(_ item: LibraryItem) -> some View {
+        Section {
+            Toggle(
+                locManager.localized("player.virtualControls.show"),
+                isOn: Binding(
+                    get: { libraryService.item(with: item.id)?.showsVirtualControls ?? true },
+                    set: { appState.setVirtualControls($0, for: item.id) }
+                )
+            )
+
+            LabeledContent(
+                locManager.localized("library.details.controls.profile"),
+                value: String(format: locManager.localized("library.details.controls.actionCount"), item.inputProfile?.mapping.count ?? GameAction.allCases.count)
+            )
+            Button(locManager.localized("input.editor.open")) {
+                showInputMappingEditor = true
+            }
+            #if os(iOS)
+            Button(locManager.localized("touchLayout.editor.open")) {
+                showTouchLayoutEditor = true
+            }
+            #endif
+            Text(locManager.localized("input.editor.controlsNote"))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text(locManager.localized("library.details.controls.title"))
+        }
+    }
+
+    private func compatibilityStatusTitle(_ status: CompatibilityStatus) -> String {
+        switch status {
+        case .compatible:
+            return locManager.localized("library.details.compatibility.status.compatible")
+        case .unknown:
+            return locManager.localized("library.details.compatibility.status.unknown")
+        case .unsupported:
+            return locManager.localized("library.details.compatibility.status.unsupported")
+        }
+    }
+
+    private func compatibilityStatusIcon(_ status: CompatibilityStatus) -> String {
+        switch status {
+        case .compatible: return "checkmark.circle"
+        case .unknown: return "questionmark.circle"
+        case .unsupported: return "xmark.octagon"
+        }
+    }
+
+    private func compatibilityStatusColor(_ status: CompatibilityStatus) -> Color {
+        switch status {
+        case .compatible: return .green
+        case .unknown: return .secondary
+        case .unsupported: return .red
+        }
     }
 
     private func favoriteBinding(_ item: LibraryItem) -> Binding<Bool> {

@@ -15,22 +15,65 @@ enum GameAction: String, Codable, CaseIterable, Identifiable {
 
 struct InputProfile: Codable, Equatable {
     var version: Int
-    var mapping: [GameAction: UInt32]
+    var actionOutputs: [GameAction: GameKeyOutput]
+    var keyboardBindings: [KeyboardBinding]
+    var controllerBindings: [ControllerBinding]
+    var touchLayouts: TouchLayoutSet
 
-    init(version: Int = 1, mapping: [GameAction: UInt32] = Self.defaultMapping) {
+    init(version: Int = 2, mapping: [GameAction: UInt32] = Self.defaultMapping) {
         self.version = version
-        self.mapping = mapping
+        self.actionOutputs = Self.outputs(from: mapping)
+        self.keyboardBindings = Self.defaultKeyboardBindings
+        self.controllerBindings = []
+        self.touchLayouts = TouchLayoutSet()
     }
 
     private enum CodingKeys: String, CodingKey {
         case version
         case mapping
+        case actionOutputs
+        case keyboardBindings
+        case controllerBindings
+        case touchLayouts
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
-        mapping = try container.decodeIfPresent([GameAction: UInt32].self, forKey: .mapping) ?? Self.defaultMapping
+        let decodedVersion = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        if let actionOutputs = try container.decodeIfPresent([GameAction: GameKeyOutput].self, forKey: .actionOutputs) {
+            version = max(decodedVersion, 2)
+            self.actionOutputs = actionOutputs
+            keyboardBindings = try container.decodeIfPresent([KeyboardBinding].self, forKey: .keyboardBindings) ?? Self.defaultKeyboardBindings
+            controllerBindings = try container.decodeIfPresent([ControllerBinding].self, forKey: .controllerBindings) ?? []
+            touchLayouts = try container.decodeIfPresent(TouchLayoutSet.self, forKey: .touchLayouts) ?? TouchLayoutSet()
+        } else {
+            version = 2
+            let mapping = try container.decodeIfPresent([GameAction: UInt32].self, forKey: .mapping) ?? Self.defaultMapping
+            self.actionOutputs = Self.outputs(from: mapping)
+            keyboardBindings = Self.defaultKeyboardBindings
+            controllerBindings = []
+            touchLayouts = TouchLayoutSet()
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if version < 2 {
+            try container.encode(version, forKey: .version)
+            try container.encode(mapping, forKey: .mapping)
+            return
+        }
+
+        try container.encode(2, forKey: .version)
+        try container.encode(actionOutputs, forKey: .actionOutputs)
+        try container.encode(keyboardBindings, forKey: .keyboardBindings)
+        try container.encode(controllerBindings, forKey: .controllerBindings)
+        try container.encode(touchLayouts, forKey: .touchLayouts)
+    }
+
+    var mapping: [GameAction: UInt32] {
+        get { actionOutputs.mapValues(\.keyCode) }
+        set { actionOutputs = Self.outputs(from: newValue) }
     }
 
     static let defaultMapping: [GameAction: UInt32] = [
@@ -43,6 +86,203 @@ struct InputProfile: Codable, Equatable {
         .primary: 0x04,
         .secondary: 0x16,
     ]
+
+    private static let defaultKeyboardBindings: [KeyboardBinding] = GameAction.allCases.compactMap { action in
+        guard let hidUsage = defaultMapping[action] else { return nil }
+        return KeyboardBinding(
+            trigger: KeyboardTrigger(hidUsage: hidUsage),
+            action: action
+        )
+    }
+
+    private static func outputs(from mapping: [GameAction: UInt32]) -> [GameAction: GameKeyOutput] {
+        mapping.mapValues { GameKeyOutput(keyCode: $0) }
+    }
+}
+
+struct GameKeyOutput: Codable, Equatable {
+    var keyCode: UInt32
+    var charCode: UInt32
+    var modifiers: UInt32
+
+    init(keyCode: UInt32, charCode: UInt32 = 0, modifiers: UInt32 = 0) {
+        self.keyCode = keyCode
+        self.charCode = charCode
+        self.modifiers = modifiers
+    }
+}
+
+struct KeyboardTrigger: Codable, Equatable {
+    var hidUsage: UInt32
+    var requiredModifiers: UInt32
+
+    init(hidUsage: UInt32, requiredModifiers: UInt32 = 0) {
+        self.hidUsage = hidUsage
+        self.requiredModifiers = requiredModifiers
+    }
+}
+
+struct KeyboardBinding: Codable, Equatable, Identifiable {
+    var trigger: KeyboardTrigger
+    var action: GameAction
+    var isEnabled: Bool
+
+    var id: String {
+        "\(trigger.hidUsage)-\(trigger.requiredModifiers)-\(action.rawValue)"
+    }
+
+    init(trigger: KeyboardTrigger, action: GameAction, isEnabled: Bool = true) {
+        self.trigger = trigger
+        self.action = action
+        self.isEnabled = isEnabled
+    }
+}
+
+enum ControllerElement: String, Codable, CaseIterable {
+    case dpadUp
+    case dpadDown
+    case dpadLeft
+    case dpadRight
+    case a
+    case b
+    case x
+    case y
+    case menu
+    case options
+    case leftShoulder
+    case rightShoulder
+    case leftTrigger
+    case rightTrigger
+    case leftThumbstickButton
+    case rightThumbstickButton
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let rawValue = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: rawValue) ?? .unknown
+    }
+}
+
+struct ControllerBinding: Codable, Equatable, Identifiable {
+    var element: ControllerElement
+    var action: GameAction
+    var pressThreshold: Float
+    var releaseThreshold: Float
+    var isEnabled: Bool
+
+    var id: String { "\(element.rawValue)-\(action.rawValue)" }
+
+    init(
+        element: ControllerElement,
+        action: GameAction,
+        pressThreshold: Float = 0.5,
+        releaseThreshold: Float = 0.4,
+        isEnabled: Bool = true
+    ) {
+        self.element = element
+        self.action = action
+        self.pressThreshold = pressThreshold
+        self.releaseThreshold = releaseThreshold
+        self.isEnabled = isEnabled
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case element
+        case action
+        case pressThreshold
+        case releaseThreshold
+        case isEnabled
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        element = try container.decode(ControllerElement.self, forKey: .element)
+        action = try container.decode(GameAction.self, forKey: .action)
+        pressThreshold = try container.decodeIfPresent(Float.self, forKey: .pressThreshold) ?? 0.5
+        releaseThreshold = try container.decodeIfPresent(Float.self, forKey: .releaseThreshold) ?? 0.4
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(element, forKey: .element)
+        try container.encode(action, forKey: .action)
+        try container.encode(pressThreshold, forKey: .pressThreshold)
+        try container.encode(releaseThreshold, forKey: .releaseThreshold)
+        try container.encode(isEnabled, forKey: .isEnabled)
+    }
+}
+
+enum TouchControlKind: String, Codable, CaseIterable {
+    case button
+    case directionalPad
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let rawValue = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: rawValue) ?? .unknown
+    }
+}
+
+struct NormalizedPoint: Codable, Equatable {
+    var x: Double
+    var y: Double
+
+    init(x: Double = 0.5, y: Double = 0.5) {
+        self.x = x
+        self.y = y
+    }
+}
+
+struct NormalizedSize: Codable, Equatable {
+    var width: Double
+    var height: Double
+
+    init(width: Double = 0.1, height: Double = 0.1) {
+        self.width = width
+        self.height = height
+    }
+}
+
+struct TouchControlInstance: Codable, Equatable, Identifiable {
+    var id: UUID
+    var kind: TouchControlKind
+    var actions: [GameAction]
+    var center: NormalizedPoint
+    var size: NormalizedSize
+    var opacity: Double
+    var isEnabled: Bool
+    var zIndex: Int
+
+    init(
+        id: UUID = UUID(),
+        kind: TouchControlKind,
+        actions: [GameAction],
+        center: NormalizedPoint = NormalizedPoint(),
+        size: NormalizedSize = NormalizedSize(),
+        opacity: Double = 1,
+        isEnabled: Bool = true,
+        zIndex: Int = 0
+    ) {
+        self.id = id
+        self.kind = kind
+        self.actions = actions
+        self.center = center
+        self.size = size
+        self.opacity = opacity
+        self.isEnabled = isEnabled
+        self.zIndex = zIndex
+    }
+}
+
+struct TouchLayoutSet: Codable, Equatable {
+    var portrait: [TouchControlInstance]
+    var landscape: [TouchControlInstance]
+
+    init(portrait: [TouchControlInstance] = [], landscape: [TouchControlInstance] = []) {
+        self.portrait = portrait
+        self.landscape = landscape
+    }
 }
 
 enum HIDKeyMapper {

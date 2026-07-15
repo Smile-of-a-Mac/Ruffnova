@@ -63,7 +63,7 @@ final class LibraryMigrationTests: XCTestCase {
         XCTAssertEqual(try readLibraryStore(from: directory).items.first?.thumbnailIdentifier, identifier)
     }
 
-    func testMigratesSchemaTwoLibraryWithoutRuntimeProfileToSchemaThree() throws {
+    func testMigratesSchemaTwoLibraryWithoutRuntimeProfileToSchemaFour() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -77,8 +77,81 @@ final class LibraryMigrationTests: XCTestCase {
 
         XCTAssertTrue(report.failures.isEmpty)
         XCTAssertNil(service.items.first?.runtimeProfile)
-        XCTAssertEqual(try readLibraryStore(from: directory).schemaVersion, 3)
-        XCTAssertEqual(try readLibraryVersion(from: directory), 3)
+        XCTAssertEqual(try readLibraryStore(from: directory).schemaVersion, 4)
+        XCTAssertEqual(try readLibraryVersion(from: directory), 4)
+    }
+
+    func testMigratesSchemaThreeFixtureToSchemaFourAndNormalizesInputProfile() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let item = LibraryItem(
+            url: directory.appendingPathComponent("legacy.swf"),
+            inputProfile: InputProfile(version: 1, mapping: [.primary: 4])
+        )
+        try JSONEncoder().encode(LibraryStore(schemaVersion: 3, items: [item]))
+            .write(to: directory.appendingPathComponent("library.json"))
+        try JSONEncoder().encode(3).write(to: directory.appendingPathComponent("library.version"))
+
+        let service = LibraryService(directory: directory, thumbnailService: ThumbnailService(cacheDirectory: directory.appendingPathComponent("Thumbnails")))
+
+        let firstReport = service.migrateIfNeeded()
+        let firstStore = try readLibraryStore(from: directory)
+        let secondReport = service.migrateIfNeeded()
+        let secondStore = try readLibraryStore(from: directory)
+
+        XCTAssertTrue(firstReport.failures.isEmpty)
+        XCTAssertTrue(secondReport.failures.isEmpty)
+        XCTAssertEqual(firstStore.schemaVersion, 4)
+        XCTAssertEqual(secondStore.schemaVersion, 4)
+        XCTAssertEqual(service.items.first?.inputProfile?.version, 2)
+        XCTAssertEqual(service.items.first?.inputProfile?.mapping[.primary], 4)
+        XCTAssertEqual(firstStore.items, secondStore.items)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("library.json.schema-3.backup").path))
+        XCTAssertEqual(try readLibraryVersion(from: directory), 4)
+    }
+
+    func testMigrationWriteFailureDoesNotAdvanceSchemaVersion() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let libraryURL = directory.appendingPathComponent("library.json", isDirectory: true)
+        try FileManager.default.createDirectory(at: libraryURL, withIntermediateDirectories: false)
+
+        let service = LibraryService(directory: directory, thumbnailService: ThumbnailService(cacheDirectory: directory.appendingPathComponent("Thumbnails")))
+        let report = service.migrateIfNeeded()
+
+        XCTAssertTrue(report.failures.contains { $0.store == "library.json" })
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("library.version").path))
+    }
+
+    func testSchemaFourPersistsNewLibraryConfigurationFields() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let assessment = PersistedCompatibilityAssessment(
+            status: .compatible,
+            inputFingerprint: "input",
+            engineBuildIdentifier: "engine",
+            appBuildIdentifier: "app",
+            isCompleteObservation: true
+        )
+        let item = LibraryItem(
+            url: directory.appendingPathComponent("configured.swf"),
+            inputProfile: InputProfile(version: 2, mapping: [.primary: 7]),
+            gameStoragePreferences: GameStoragePreferences(automaticBackupEnabled: false),
+            compatibilityAssessment: assessment
+        )
+        try JSONEncoder().encode(LibraryStore(schemaVersion: 4, items: [item]))
+            .write(to: directory.appendingPathComponent("library.json"))
+        try JSONEncoder().encode(4).write(to: directory.appendingPathComponent("library.version"))
+
+        let service = LibraryService(directory: directory, thumbnailService: ThumbnailService(cacheDirectory: directory.appendingPathComponent("Thumbnails")))
+
+        XCTAssertEqual(service.items.first?.gameStoragePreferences?.automaticBackupEnabled, false)
+        XCTAssertEqual(service.items.first?.compatibilityAssessment?.status, .compatible)
+        XCTAssertEqual(service.items.first?.compatibilityAssessment?.schemaVersion, 1)
+        XCTAssertEqual(service.items.first?.inputProfile?.mapping[.primary], 7)
     }
 
     func testCorruptLibraryDoesNotCrashAndReportsRecoveryFailure() throws {

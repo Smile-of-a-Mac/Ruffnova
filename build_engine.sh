@@ -11,6 +11,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENGINE_DIR="${SCRIPT_DIR}/engine"
 OUTPUT_DIR="${SCRIPT_DIR}/CRuffleFFI"
+GENERATED_HEADER="${ENGINE_DIR}/ffi/include/ruffle_ffi.h"
+PUBLIC_HEADER="${OUTPUT_DIR}/ruffle_ffi.h"
 
 TARGET="${1:---target}"
 TARGET_VALUE="${2:-all}"
@@ -34,6 +36,15 @@ build_target() {
     echo "  -> ${OUTPUT_DIR}/${output_subdir}/libruffle_ffi.a"
 }
 
+sync_header() {
+    if [[ ! -f "${GENERATED_HEADER}" ]]; then
+        echo "Error: cbindgen did not generate ${GENERATED_HEADER}" >&2
+        exit 1
+    fi
+    cp "${GENERATED_HEADER}" "${PUBLIC_HEADER}"
+    echo "  -> ${PUBLIC_HEADER}"
+}
+
 case "${TARGET_VALUE}" in
     macos)
         build_target "aarch64-apple-darwin" "macos"
@@ -55,5 +66,7 @@ case "${TARGET_VALUE}" in
         exit 1
         ;;
 esac
+
+sync_header
 
 echo "Done."

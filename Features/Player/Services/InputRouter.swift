@@ -1,9 +1,20 @@
 import Foundation
 
+/// Identifies which physical or virtual input produced a key event.
+/// Fine-grained identity ensures that two different sources pressing the same
+/// output key are tracked independently — the router only releases the key when
+/// the last source lets go.
 enum InputSource: Hashable {
-    case keyboard
-    case virtual(GameAction)
-    case controller(UUID, GameAction)
+    /// A physical keyboard key, identified by its USB HID usage code and active modifiers.
+    case keyboard(physicalHID: UInt32, modifiers: UInt32)
+    /// A touch control instance on screen, identified by its stable UUID and the action it represents.
+    case virtual(controlInstanceID: UUID, action: GameAction)
+    /// A specific element on a connected game controller.
+    case controller(controllerID: UUID, element: ControllerElement)
+    var isKeyboard: Bool {
+        if case .keyboard = self { return true }
+        return false
+    }
 }
 
 @MainActor
@@ -15,7 +26,7 @@ final class InputRouter {
         charCode: UInt32,
         isDown: Bool,
         modifiers: UInt32,
-        source: InputSource = .keyboard,
+        source: InputSource,
         isInteractive: Bool,
         isStageFocused: Bool,
         send: (UInt32, UInt32, Bool, UInt32) -> Void

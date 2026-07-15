@@ -5,6 +5,7 @@ import MetalKit
 import UniformTypeIdentifiers
 import OSLog
 import ImageIO
+import CryptoKit
 #if os(macOS)
 import AppKit
 #elseif os(iOS)
@@ -161,14 +162,19 @@ final class AppState: ObservableObject {
             showTraceConsole = false
         }
     }
+    @Published var libraryDetailsItemID: UUID?
+    @Published var libraryDetailsSection: LibraryItemDetailsSection = .overview
+    @Published var isCapturingInputBinding = false
     @Published var playerIssues: [PlayerIssue] = []
     @Published private(set) var policyDiagnostics: [RufflePolicyDiagnostic] = []
     @Published var pendingPermissionRequest: PermissionRequestContext?
+    @Published private(set) var automaticBackupRefreshToken = 0
     private let playerInputCoordinator = PlayerInputCoordinator()
     private let inputRouter = InputRouter()
+    private let resolver = InputProfileResolver()
     private var stageInputFocused = false
-    private lazy var controllerInputService = GameControllerInputService { [weak self] controllerID, action, isDown in
-        self?.sendControllerGameAction(action, controllerID: controllerID, isDown: isDown)
+    private lazy var controllerInputService = GameControllerInputService { [weak self] controllerID, element, isDown in
+        self?.sendControllerGameAction(element, controllerID: controllerID, isDown: isDown)
     }
     private var isRestoringPlaybackPreferences = false
     private var pendingStageMaximizedExitIntent: StageMaximizedExitIntent?
@@ -219,6 +225,9 @@ final class AppState: ObservableObject {
     private var loadCoordinator = PlayerLoadCoordinator()
     private var activeLoadRequestID: UUID?
     private var pendingStorageLibraryID: UUID?
+    private let automaticBackupService = AutomaticBackupService.shared
+    private var automaticBackupTask: Task<Void, Never>?
+    private var automaticBackupLibraryID: UUID?
     private var cancellables = Set<AnyCancellable>()
     #if os(iOS)
     private var pausedForSystemInterruption = false
@@ -320,6 +329,12 @@ final class AppState: ObservableObject {
             name: .openSWFFile,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAutomaticBackupRequest),
+            name: .automaticBackupRequested,
+            object: nil
+        )
     }
 
     private func setupFullscreenObserver() {
@@ -356,6 +371,10 @@ final class AppState: ObservableObject {
     @objc private func handleOpenSWF(_ notification: Notification) {
         guard let url = notification.userInfo?["url"] as? URL else { return }
         openFile(url)
+    }
+
+    @objc private func handleAutomaticBackupRequest() {
+        requestAutomaticBackupForCurrentFile()
     }
 
     @discardableResult
@@ -420,6 +439,8 @@ final class AppState: ObservableObject {
 
     func openFile(_ url: URL) {
         if currentFileURL != url {
+            requestAutomaticBackupForCurrentFile()
+            stopAutomaticBackups()
             PermissionPolicyService.shared.clearSessionAllowances(for: currentFileURL)
         }
         #if os(iOS)
@@ -524,6 +545,10 @@ final class AppState: ObservableObject {
         #endif
         adoptStageSize()
         persistCurrentMetadata()
+        refreshCurrentCompatibilityAssessment()
+        if let url = currentFileURL, let item = LibraryService.shared.item(for: url) {
+            startAutomaticBackups(for: item.id)
+        }
         NotificationCenter.default.post(name: .swfLoaded, object: nil)
         scheduleThumbnailCapture(for: currentFileURL)
         scheduleControlBarHide()
@@ -666,6 +691,7 @@ final class AppState: ObservableObject {
         if let url = currentFileURL {
             markLibraryItem(for: url, issue: issue)
         }
+        refreshCurrentCompatibilityAssessment()
     }
 
     private func markLibraryItem(for url: URL, issue: PlayerIssue) {
@@ -674,8 +700,10 @@ final class AppState: ObservableObject {
             switch issue {
             case .fileMissing:
                 $0.availabilityStatus = .missing
-            case .fileDamaged, .ruffleLoadFailure, .unsupportedAPI, .scriptTimeout, .networkBlocked, .filesystemBlocked:
+            case .fileDamaged, .ruffleLoadFailure, .unsupportedAPI, .renderInitFailure:
                 $0.compatibilityStatus = .unsupported
+            case .scriptTimeout, .networkBlocked, .filesystemBlocked:
+                $0.compatibilityStatus = .unknown
             default:
                 break
             }
@@ -698,6 +726,130 @@ final class AppState: ObservableObject {
             traceMessages: traceMessages,
             engineVersion: engineVersion
         )
+    }
+
+    @discardableResult
+    func refreshCurrentCompatibilityAssessment() -> PersistedCompatibilityAssessment? {
+        guard let url = currentFileURL,
+              let item = LibraryService.shared.item(for: url)
+        else { return nil }
+
+        let assessment = CompatibilityRuleEngine().evaluate(
+            CompatibilityContext(
+                availabilityStatus: item.availabilityStatus,
+                isFileReadable: FileManager.default.isReadableFile(atPath: url.path),
+                loadFailure: compatibilityLoadFailure,
+                issues: playerIssues,
+                policySignals: policyDiagnostics.map(compatibilityPolicySignal),
+                metadata: currentMetadataForDiagnostics(),
+                isInteractive: swfContentType == .interactive,
+                usesDefaultInputProfile: item.inputProfile == nil,
+                storageUsage: compatibilityStorageUsage(for: item.id),
+                expectedFrameRate: currentMetadataForDiagnostics().map { Double($0.frameRate) },
+                runtimeProfile: item.runtimeProfile ?? FileRuntimeProfile(),
+                runtimeDefaults: applicationRuntimeDefaults,
+                inputFingerprint: inputFingerprint(for: item.inputProfile),
+                engineBuildIdentifier: currentMetadataForDiagnostics().map { String($0.playerVersion) } ?? "",
+                appBuildIdentifier: appBuildIdentifier,
+                isCompleteObservation: playerLoadState == .ready
+            )
+        )
+
+        LibraryService.shared.update(item.id) {
+            $0.compatibilityAssessment = assessment
+            $0.compatibilityStatus = libraryCompatibilityStatus(for: assessment.status)
+        }
+        return assessment
+    }
+
+    @discardableResult
+    func recheckCompatibility(for itemID: UUID) -> PersistedCompatibilityAssessment? {
+        guard let item = LibraryService.shared.item(with: itemID), item.url == currentFileURL else { return nil }
+        return refreshCurrentCompatibilityAssessment()
+    }
+
+    @discardableResult
+    func applyCompatibilityRuntimeRecommendations(
+        for itemID: UUID,
+        recommendationIDs: Set<String>? = nil
+    ) -> Bool {
+        guard let item = LibraryService.shared.item(with: itemID),
+              let application = compatibilityRuntimeApplication(for: itemID, recommendationIDs: recommendationIDs)
+        else { return false }
+
+        let previousProfile = item.runtimeProfile
+        let record = AppliedCompatibilityRecommendation(
+            id: UUID().uuidString,
+            recommendationID: application.recommendationIDs.joined(separator: ","),
+            appliedAt: Date(),
+            previousRuntimeProfile: previousProfile
+        )
+        LibraryService.shared.update(itemID) {
+            $0.runtimeProfile = application.updatedProfile
+            guard var updatedAssessment = $0.compatibilityAssessment else { return }
+            updatedAssessment.recommendations = updatedAssessment.recommendations.map { recommendation in
+                var recommendation = recommendation
+                if application.recommendationIDs.contains(recommendation.id) {
+                    recommendation.alreadyApplied = true
+                }
+                return recommendation
+            }
+            updatedAssessment.appliedRecommendationRecords.append(record)
+            updatedAssessment.isCompleteObservation = false
+            $0.compatibilityAssessment = updatedAssessment
+        }
+        reloadCurrentFileAfterCompatibilityChange(item)
+        return true
+    }
+
+    func compatibilityRuntimeApplication(
+        for itemID: UUID,
+        recommendationIDs: Set<String>? = nil
+    ) -> CompatibilityRuntimeApplication? {
+        guard let item = LibraryService.shared.item(with: itemID),
+              let assessment = item.compatibilityAssessment else { return nil }
+        return CompatibilityActionService().safeRuntimeApplication(
+            for: assessment,
+            currentProfile: item.runtimeProfile ?? FileRuntimeProfile(),
+            defaults: applicationRuntimeDefaults,
+            limitedTo: recommendationIDs
+        )
+    }
+
+    @discardableResult
+    func undoLatestCompatibilityRuntimeRecommendation(for itemID: UUID) -> Bool {
+        guard let item = LibraryService.shared.item(with: itemID),
+              var assessment = item.compatibilityAssessment,
+              let record = assessment.appliedRecommendationRecords.last
+        else { return false }
+
+        let recommendationIDs = record.recommendationID.split(separator: ",").map(String.init)
+        assessment.appliedRecommendationRecords.removeLast()
+        assessment.recommendations = assessment.recommendations.map { recommendation in
+            var recommendation = recommendation
+            if recommendationIDs.contains(recommendation.id) {
+                recommendation.alreadyApplied = false
+            }
+            return recommendation
+        }
+        assessment.isCompleteObservation = false
+        LibraryService.shared.update(itemID) {
+            $0.runtimeProfile = record.previousRuntimeProfile
+            $0.compatibilityAssessment = assessment
+        }
+        reloadCurrentFileAfterCompatibilityChange(item)
+        return true
+    }
+
+    func isCompatibilityAssessmentStale(for itemID: UUID) -> Bool {
+        guard let item = LibraryService.shared.item(with: itemID),
+              let assessment = item.compatibilityAssessment
+        else { return true }
+        guard assessment.rulesetVersion == CompatibilityRuleEngine.rulesetVersion,
+              assessment.appBuildIdentifier == appBuildIdentifier,
+              assessment.inputFingerprint == inputFingerprint(for: item.inputProfile)
+        else { return true }
+        return !assessment.isCompleteObservation
     }
 
     func requestPermission(scope: PermissionScope, requestedResource: String? = nil) -> Bool {
@@ -737,7 +889,7 @@ final class AppState: ObservableObject {
         case .networkDenied, .navigationDenied, .socketDenied:
             handleEnginePermissionDenial(scope: .network, target: diagnostic.target, issue: .networkBlocked)
         case .networkUnsupported, .unsupportedScheme:
-            break
+            refreshCurrentCompatibilityAssessment()
         }
     }
 
@@ -981,8 +1133,14 @@ final class AppState: ObservableObject {
     }
 
     private func resolvedRuntimeProfile(for url: URL?) -> RuntimeDefaults {
+        let defaults = applicationRuntimeDefaults
+        guard let url else { return defaults }
+        return LibraryService.shared.effectiveRuntimeProfile(for: url, defaults: defaults)
+    }
+
+    private var applicationRuntimeDefaults: RuntimeDefaults {
         let settings = SettingsPersistence.shared
-        let defaults = RuntimeDefaults(
+        return RuntimeDefaults(
             quality: RuffleQuality(rawValue: settings.quality) ?? .high,
             letterbox: settings.letterbox,
             playbackSpeed: settings.speed,
@@ -990,8 +1148,66 @@ final class AppState: ObservableObject {
             autoplay: settings.autoplay,
             maxExecutionDuration: settings.maxExecutionDuration
         )
-        guard let url else { return defaults }
-        return LibraryService.shared.effectiveRuntimeProfile(for: url, defaults: defaults)
+    }
+
+    private var compatibilityLoadFailure: CompatibilityLoadFailure? {
+        guard case let .failed(failure) = playerLoadState else { return nil }
+        switch failure {
+        case .engineLoadFailed:
+            return .engineLoadFailed
+        case .timedOut:
+            return .timedOut
+        }
+    }
+
+    private func compatibilityPolicySignal(_ diagnostic: RufflePolicyDiagnostic) -> CompatibilityPolicySignal {
+        switch diagnostic.kind {
+        case .filesystemDenied:
+            return .filesystemDenied
+        case .networkDenied:
+            return .networkDenied
+        case .networkUnsupported:
+            return .networkUnsupported
+        case .unsupportedScheme:
+            return .unsupportedScheme
+        case .navigationDenied:
+            return .navigationDenied
+        case .socketDenied:
+            return .socketDenied
+        }
+    }
+
+    private func compatibilityStorageUsage(for libraryID: UUID) -> CompatibilityStorageUsage? {
+        guard let usage = try? GameStorageService.shared.usage(for: libraryID) else { return nil }
+        return CompatibilityStorageUsage(usedBytes: usage.usedBytes, quotaBytes: usage.quotaBytes)
+    }
+
+    private func inputFingerprint(for profile: InputProfile?) -> String {
+        guard let profile,
+              let data = try? JSONEncoder().encode(profile) else { return "default" }
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private var appBuildIdentifier: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        return [version, build].filter { !$0.isEmpty }.joined(separator: "-")
+    }
+
+    private func libraryCompatibilityStatus(for status: CompatibilityAssessmentStatus) -> CompatibilityStatus {
+        switch status {
+        case .compatible:
+            return .compatible
+        case .blocked:
+            return .unsupported
+        case .unknown, .degraded:
+            return .unknown
+        }
+    }
+
+    private func reloadCurrentFileAfterCompatibilityChange(_ item: LibraryItem) {
+        guard item.url == currentFileURL else { return }
+        retryCurrentFile()
     }
 
     func applyRuntimeProfile(for itemID: UUID) {
@@ -1137,6 +1353,9 @@ final class AppState: ObservableObject {
 
     func setPlayerSurfaceVisible(_ visible: Bool) {
         #if os(iOS)
+        if !visible {
+            releasePlayerInput()
+        }
         playerSurfaceVisible = visible
         updateIOSRenderLoopAvailability()
         #endif
@@ -1155,6 +1374,7 @@ final class AppState: ObservableObject {
                 showControlBarTemporarily()
             }
         } else {
+            releasePlayerInput()
             if isPlaying {
                 pausedForSystemInterruption = true
                 isPlaying = false
@@ -1162,6 +1382,15 @@ final class AppState: ObservableObject {
                 controlBarOnPause()
             }
             updateIOSRenderLoopAvailability()
+        }
+        #endif
+    }
+
+    func handleScenePhaseChanged(_ phase: ScenePhase) {
+        #if os(iOS)
+        handleSceneActiveStateChanged(phase == .active)
+        if phase == .background {
+            requestAutomaticBackupForCurrentFile()
         }
         #endif
     }
@@ -1192,6 +1421,8 @@ final class AppState: ObservableObject {
     }
 
     func closeFile() {
+        requestAutomaticBackupForCurrentFile()
+        stopAutomaticBackups()
         inputRouter.releaseAll { [weak self] keyCode, charCode, isDown, modifiers in
             self?.bridge?.sendKeyEvent(keyCode: keyCode, charCode: charCode, isDown: isDown, modifiers: modifiers)
         }
@@ -1211,12 +1442,110 @@ final class AppState: ObservableObject {
         selectedSection = .library
     }
 
+    func isAutomaticBackupEnabled(for itemID: UUID) -> Bool {
+        LibraryService.shared.item(with: itemID)?.gameStoragePreferences?.automaticBackupEnabled != false
+    }
+
+    func setAutomaticBackupEnabled(_ isEnabled: Bool, for itemID: UUID) {
+        guard LibraryService.shared.item(with: itemID) != nil else { return }
+        LibraryService.shared.update(itemID) {
+            var preferences = $0.gameStoragePreferences ?? GameStoragePreferences()
+            preferences.automaticBackupEnabled = isEnabled
+            $0.gameStoragePreferences = preferences
+        }
+
+        guard let currentItem = currentFileURL.flatMap({ LibraryService.shared.item(for: $0) }),
+              currentItem.id == itemID
+        else {
+            return
+        }
+
+        if isEnabled {
+            startAutomaticBackups(for: itemID)
+        } else {
+            stopAutomaticBackups(for: itemID)
+        }
+    }
+
+    private func startAutomaticBackups(for libraryID: UUID) {
+        stopAutomaticBackups()
+        guard isAutomaticBackupEnabled(for: libraryID) else { return }
+
+        automaticBackupLibraryID = libraryID
+        requestAutomaticBackup(for: libraryID)
+        automaticBackupTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: 300_000_000_000)
+                } catch {
+                    return
+                }
+
+                guard let self,
+                      self.automaticBackupLibraryID == libraryID,
+                      self.isAutomaticBackupEnabled(for: libraryID)
+                else {
+                    return
+                }
+                self.requestAutomaticBackup(for: libraryID)
+            }
+        }
+    }
+
+    private func stopAutomaticBackups(for libraryID: UUID? = nil) {
+        guard libraryID == nil || automaticBackupLibraryID == libraryID else { return }
+        automaticBackupTask?.cancel()
+        automaticBackupTask = nil
+        automaticBackupLibraryID = nil
+    }
+
+    private func requestAutomaticBackupForCurrentFile() {
+        guard let url = currentFileURL,
+              let item = LibraryService.shared.item(for: url)
+        else {
+            return
+        }
+        requestAutomaticBackup(for: item.id)
+    }
+
+    private func requestAutomaticBackup(for libraryID: UUID) {
+        guard isAutomaticBackupEnabled(for: libraryID) else { return }
+        Task(priority: .utility) { @MainActor [weak self, automaticBackupService] in
+            do {
+                _ = try await automaticBackupService.createIfNeeded(for: libraryID)
+                self?.automaticBackupRefreshToken &+= 1
+            } catch {
+                Logger.appState.warning("Automatic SharedObject backup failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    /// Routes a physical keyboard event through the resolver, then the input router.
+    /// Called by ContentView / IOSContentView when a hardware key event arrives.
+    func routePhysicalKeyboardEvent(physicalHID: UInt32, charCode: UInt32, isDown: Bool, modifiers: UInt32) {
+        guard !isCapturingInputBinding else { return }
+        let profile = currentInputProfile()
+        let resolved = resolver.resolveKeyboard(
+            physicalHID: physicalHID,
+            charCode: charCode,
+            modifiers: modifiers,
+            profile: profile
+        )
+        routePlayerKeyEvent(
+            keyCode: resolved.keyCode,
+            charCode: resolved.charCode,
+            isDown: isDown,
+            modifiers: resolved.modifiers,
+            source: resolved.source
+        )
+    }
+
     func routePlayerKeyEvent(
         keyCode: UInt32,
         charCode: UInt32,
         isDown: Bool,
         modifiers: UInt32,
-        source: InputSource = .keyboard
+        source: InputSource
     ) {
         inputRouter.route(
             keyCode: keyCode,
@@ -1226,7 +1555,7 @@ final class AppState: ObservableObject {
             source: source,
             isInteractive: swfContentType == .interactive,
             isStageFocused: selectedSection == .player && currentFileURL != nil
-                && (source != .keyboard || stageInputFocused)
+                && (!source.isKeyboard || stageInputFocused)
         ) { [weak self] keyCode, charCode, isDown, modifiers in
             self?.bridge?.sendKeyEvent(keyCode: keyCode, charCode: charCode, isDown: isDown, modifiers: modifiers)
         }
@@ -1240,35 +1569,84 @@ final class AppState: ObservableObject {
         return item.inputProfile ?? InputProfile()
     }
 
-    func updateInputProfile(_ profile: InputProfile) {
+    func updateInputProfile(_ profile: InputProfile, for itemID: UUID? = nil) {
+        releasePlayerInput()
+        if let itemID {
+            LibraryService.shared.update(itemID) { $0.inputProfile = profile }
+            return
+        }
         guard let url = currentFileURL,
               let item = LibraryService.shared.item(for: url) else { return }
         LibraryService.shared.update(item.id) { $0.inputProfile = profile }
     }
 
-    func sendVirtualGameAction(_ action: GameAction, isDown: Bool) {
+    func beginInputBindingCapture() {
+        releasePlayerInput()
+        isCapturingInputBinding = true
+    }
+
+    func endInputBindingCapture() {
+        isCapturingInputBinding = false
+        controllerInputService.cancelCapture()
+    }
+
+    func captureNextControllerElement(_ handler: @escaping (ControllerElement) -> Void) {
+        beginInputBindingCapture()
+        controllerInputService.captureNextInput { [weak self] element in
+            handler(element)
+            self?.endInputBindingCapture()
+        }
+    }
+
+    func sendVirtualGameAction(_ action: GameAction, instanceID: UUID? = nil, isDown: Bool) {
         let profile = currentInputProfile()
-        guard let keyCode = profile.mapping[action] else { return }
-        routePlayerKeyEvent(keyCode: keyCode, charCode: 0, isDown: isDown, modifiers: 0, source: .virtual(action))
+        let id = instanceID ?? InputProfileResolver.stableVirtualControlID(for: action)
+        guard let resolved = resolver.resolveTouchControl(instanceID: id, action: action, profile: profile) else { return }
+        routePlayerKeyEvent(
+            keyCode: resolved.keyCode,
+            charCode: resolved.charCode,
+            isDown: isDown,
+            modifiers: resolved.modifiers,
+            source: resolved.source
+        )
+    }
+
+    func currentTouchControls(for orientation: TouchLayoutOrientation) -> [TouchControlInstance] {
+        currentInputProfile().touchLayouts.resolvedControls(for: orientation)
     }
 
     func toggleVirtualControls() {
-        showVirtualControls.toggle()
+        setVirtualControls(!showVirtualControls)
+    }
+
+    func setVirtualControls(_ isVisible: Bool, for itemID: UUID? = nil) {
+        if let itemID {
+            guard let item = LibraryService.shared.item(with: itemID) else { return }
+            LibraryService.shared.update(itemID) { $0.showsVirtualControls = isVisible }
+            if item.url == currentFileURL, showVirtualControls != isVisible {
+                releasePlayerInput()
+                showVirtualControls = isVisible
+            }
+            return
+        }
+        guard showVirtualControls != isVisible else { return }
+        releasePlayerInput()
+        showVirtualControls = isVisible
         guard let url = currentFileURL,
               let item = LibraryService.shared.item(for: url)
         else { return }
-        LibraryService.shared.update(item.id) { $0.showsVirtualControls = showVirtualControls }
+        LibraryService.shared.update(item.id) { $0.showsVirtualControls = isVisible }
     }
 
-    func sendControllerGameAction(_ action: GameAction, controllerID: UUID, isDown: Bool) {
+    func sendControllerGameAction(_ element: ControllerElement, controllerID: UUID, isDown: Bool) {
         let profile = currentInputProfile()
-        guard let keyCode = profile.mapping[action] else { return }
+        guard let resolved = resolver.resolveController(element: element, controllerID: controllerID, profile: profile) else { return }
         routePlayerKeyEvent(
-            keyCode: keyCode,
-            charCode: 0,
+            keyCode: resolved.keyCode,
+            charCode: resolved.charCode,
             isDown: isDown,
-            modifiers: 0,
-            source: .controller(controllerID, action)
+            modifiers: resolved.modifiers,
+            source: resolved.source
         )
     }
 
@@ -1289,6 +1667,103 @@ final class AppState: ObservableObject {
     func retryCurrentFile() {
         guard let url = currentFileURL else { return }
         openFile(url)
+    }
+
+    func restoreSharedObjectSlot(_ slot: SharedObjectSlot, for libraryID: UUID) throws {
+        let isCurrentFile = currentFileURL.flatMap { LibraryService.shared.item(for: $0)?.id } == libraryID
+        let shouldResumePlayback = isPlaying
+
+        if isCurrentFile {
+            releasePlayerInput()
+            pausePlayback()
+            stopTimelinePolling()
+            bridge?.setRenderLoopActive(false)
+        }
+
+        do {
+            _ = try SharedObjectSnapshotService.shared.createSnapshot(for: libraryID, kind: .safety)
+            try SharedObjectSnapshotService.shared.restore(slot: slot, for: libraryID)
+        } catch {
+            if isCurrentFile {
+                bridge?.setRenderLoopActive(true)
+                if shouldResumePlayback {
+                    isPlaying = true
+                    bridge?.setPlaying(true)
+                }
+                startTimelinePolling()
+            }
+            throw error
+        }
+
+        guard isCurrentFile, let url = currentFileURL else { return }
+        bridge?.invalidatePlayerStorage()
+        openFile(url)
+        if shouldResumePlayback {
+            isPlaying = true
+        }
+    }
+
+    func restoreAutomaticSharedObjectSnapshot(_ snapshot: SharedObjectSnapshot) async throws {
+        let isCurrentFile = currentFileURL.flatMap { LibraryService.shared.item(for: $0)?.id } == snapshot.libraryID
+        let shouldResumePlayback = isPlaying
+
+        if isCurrentFile {
+            releasePlayerInput()
+            pausePlayback()
+            stopTimelinePolling()
+            bridge?.setRenderLoopActive(false)
+        }
+
+        do {
+            try await automaticBackupService.restore(snapshot)
+        } catch {
+            if isCurrentFile {
+                bridge?.setRenderLoopActive(true)
+                if shouldResumePlayback {
+                    isPlaying = true
+                    bridge?.setPlaying(true)
+                }
+                startTimelinePolling()
+            }
+            throw error
+        }
+
+        guard isCurrentFile, let url = currentFileURL else { return }
+        bridge?.invalidatePlayerStorage()
+        openFile(url)
+        if shouldResumePlayback {
+            isPlaying = true
+        }
+    }
+
+    func saveSharedObjectStorage(to slot: SharedObjectSlot, for libraryID: UUID) throws {
+        _ = try SharedObjectSnapshotService.shared.createSnapshot(for: libraryID, kind: .safety)
+        _ = try SharedObjectSnapshotService.shared.saveCurrentStorage(to: slot, for: libraryID)
+    }
+
+    func importSharedObjectStorage(_ data: Data, named name: String, for libraryID: UUID) throws {
+        _ = try SharedObjectSnapshotService.shared.createSnapshot(for: libraryID, kind: .safety)
+        try GameStorageService.shared.importData(data, named: name, for: libraryID)
+    }
+
+    func deleteSharedObjectStorage(named name: String, for libraryID: UUID) throws {
+        _ = try SharedObjectSnapshotService.shared.createSnapshot(for: libraryID, kind: .safety)
+        try GameStorageService.shared.delete(name, for: libraryID)
+    }
+
+    func clearSharedObjectStorage(for libraryID: UUID) throws {
+        _ = try SharedObjectSnapshotService.shared.createSnapshot(for: libraryID, kind: .safety)
+        for entry in try GameStorageService.shared.entries(for: libraryID) {
+            try GameStorageService.shared.delete(entry.name, for: libraryID)
+        }
+    }
+
+    func openCurrentFileDetails(section: LibraryItemDetailsSection = .overview) {
+        guard let url = currentFileURL,
+              let item = LibraryService.shared.item(for: url)
+        else { return }
+        libraryDetailsSection = section
+        libraryDetailsItemID = item.id
     }
 
     func setVolume(_ newVolume: Float) {

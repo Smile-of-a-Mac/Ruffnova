@@ -4,7 +4,7 @@ import OSLog
 @MainActor
 final class LibraryService: ObservableObject {
     static let shared = LibraryService()
-    static let currentSchemaVersion = 3
+    static let currentSchemaVersion = 4
 
     @Published private(set) var items: [LibraryItem] = []
     @Published private(set) var migrationFailures: [PersistenceMigrationFailure] = []
@@ -16,6 +16,7 @@ final class LibraryService: ObservableObject {
     private let logger = Logger(subsystem: "com.ruffnova", category: "library")
     private let fileManager = FileManager.default
     private let thumbnailService: ThumbnailService
+    private var libraryLoadFailed = false
 
     convenience init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -238,16 +239,25 @@ final class LibraryService: ObservableObject {
     @discardableResult
     func migrateIfNeeded() -> PersistenceMigrationReport {
         var report = PersistenceMigrationReport(failures: migrationFailures)
-        let currentVersion = readSchemaVersion()
+        guard !libraryLoadFailed else { return report }
+        let currentVersion = max(readSchemaVersion(), readLibraryStoreSchemaVersion())
         guard currentVersion < schemaVersion else { return report }
         logger.info("Starting library migration (schema \(currentVersion) -> \(self.schemaVersion))")
 
+        let originalItems = items
+        guard backupLibraryIfNeeded(for: currentVersion, into: &report) else {
+            migrationFailures = report.failures
+            return report
+        }
+
         migrateFromRecentFiles(into: &report)
         migrateFromBookmarks(into: &report)
-        if migrateLegacyThumbnails(in: &items, report: &report) {
-            save(into: &report)
-        } else if !items.isEmpty || fileManager.fileExists(atPath: storageURL.path) {
-            save(into: &report)
+        _ = migrateLegacyThumbnails(in: &items, report: &report)
+
+        guard save(into: &report) else {
+            items = originalItems
+            migrationFailures = report.failures
+            return report
         }
 
         if writeSchemaVersion(schemaVersion, into: &report) {
@@ -348,6 +358,38 @@ final class LibraryService: ObservableObject {
         return version
     }
 
+    private func readLibraryStoreSchemaVersion() -> Int {
+        guard let data = try? Data(contentsOf: storageURL),
+              let store = try? JSONDecoder().decode(LibraryStore.self, from: data)
+        else { return 0 }
+        return store.schemaVersion
+    }
+
+    private func backupLibraryIfNeeded(for version: Int, into report: inout PersistenceMigrationReport) -> Bool {
+        guard fileManager.fileExists(atPath: storageURL.path) else { return true }
+
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: storageURL.path, isDirectory: &isDirectory), !isDirectory.boolValue else {
+            recordFailure(
+                store: "library.json",
+                message: "Library storage is not a regular file.",
+                requiresUserAction: true,
+                into: &report
+            )
+            return false
+        }
+
+        let backupURL = directoryURL.appendingPathComponent("library.json.schema-\(version).backup")
+        guard !fileManager.fileExists(atPath: backupURL.path) else { return true }
+        do {
+            try fileManager.copyItem(at: storageURL, to: backupURL)
+            return true
+        } catch {
+            recordFailure(store: "library.json.backup", error: error, requiresUserAction: true, into: &report)
+            return false
+        }
+    }
+
     @discardableResult
     private func writeSchemaVersion(_ version: Int, into report: inout PersistenceMigrationReport) -> Bool {
         do {
@@ -375,6 +417,7 @@ final class LibraryService: ObservableObject {
             migrationFailures = report.failures
             logger.info("Loaded \(decoded.count) library items")
         } catch {
+            libraryLoadFailed = true
             var report = PersistenceMigrationReport()
             recordFailure(store: "library.json", error: error, requiresUserAction: true, into: &report)
             migrationFailures = report.failures
@@ -419,16 +462,19 @@ final class LibraryService: ObservableObject {
 
     private func save() {
         var report = PersistenceMigrationReport()
-        save(into: &report)
+        _ = save(into: &report)
         migrationFailures.append(contentsOf: report.failures)
     }
 
-    private func save(into report: inout PersistenceMigrationReport) {
+    @discardableResult
+    private func save(into report: inout PersistenceMigrationReport) -> Bool {
         do {
             let data = try JSONEncoder().encode(LibraryStore(schemaVersion: schemaVersion, items: items))
             try data.write(to: storageURL, options: .atomic)
+            return true
         } catch {
             recordFailure(store: "library.json", error: error, requiresUserAction: false, into: &report)
+            return false
         }
     }
 

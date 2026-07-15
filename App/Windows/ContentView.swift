@@ -73,7 +73,7 @@ struct ContentView: View {
             guard let i = n.userInfo,
                   let kc = i["keyCode"] as? UInt32, let cc = i["charCode"] as? UInt32,
                   let dn = i["isDown"] as? Bool, let mod = i["modifiers"] as? UInt else { return }
-            appState.routePlayerKeyEvent(keyCode: kc, charCode: cc, isDown: dn, modifiers: UInt32(mod))
+            appState.routePhysicalKeyboardEvent(physicalHID: kc, charCode: cc, isDown: dn, modifiers: UInt32(mod))
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleSWFInfo)) { _ in
             appState.showSWFInfoPanel.toggle()
@@ -112,7 +112,14 @@ struct ContentView: View {
                 DiagnosticsView()
                     .environmentObject(appState)
                     .environmentObject(locManager)
-                    .frame(width: 560, height: 560)
+                .frame(width: 560, height: 560)
+            }
+        }
+        .sheet(isPresented: libraryDetailsPresented) {
+            if let itemID = appState.libraryDetailsItemID {
+                LibraryItemDetailsView(itemID: itemID, initialSection: appState.libraryDetailsSection)
+                    .environmentObject(appState)
+                    .environmentObject(locManager)
             }
         }
         .alert(permissionPromptTitle, isPresented: permissionPromptPresented) {
@@ -155,6 +162,17 @@ struct ContentView: View {
             set: { isPresented in
                 if !isPresented {
                     appState.pendingPermissionRequest = nil
+                }
+            }
+        )
+    }
+
+    private var libraryDetailsPresented: Binding<Bool> {
+        Binding(
+            get: { appState.libraryDetailsItemID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    appState.libraryDetailsItemID = nil
                 }
             }
         )
@@ -522,7 +540,7 @@ struct ContentView: View {
             Spacer()
             if !appState.playerIssues.isEmpty {
                 Button(locManager.localized("diagnostics.openDetails")) {
-                    appState.showDiagnostics = true
+                    appState.openCurrentFileDetails(section: .compatibility)
                 }
                 .controlSize(.small)
             }

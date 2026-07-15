@@ -34,6 +34,13 @@ final class GameStorageServiceTests: XCTestCase {
         XCTAssertTrue(try service.entries(for: UUID()).isEmpty)
     }
 
+    func testReadsEmptyEntry() throws {
+        let libraryID = UUID()
+        try service.replace(Data(), named: "empty", for: libraryID)
+
+        XCTAssertEqual(try service.read("empty", for: libraryID), Data())
+    }
+
     func testRejectsParentDirectoryEntryName() {
         XCTAssertThrowsError(try service.replace(Data(), named: "../outside", for: UUID()))
     }

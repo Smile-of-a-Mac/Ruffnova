@@ -217,7 +217,7 @@ final class RuffleBridge {
             fpsLastTime = now
         }
         if renderedFrames == 1 || renderedFrames % 120 == 0 {
-            Logger.ruffle.debug("frame=\(self.renderedFrames) dt=\(String(format: "%.4f", dt)) playing=\(ruffle_player_is_playing(player)) tick=\(tickResult) render=\(renderResult)")
+            Logger.ruffle.debug("frame=\(self.renderedFrames) dt=\(String(format: "%.4f", dt)) playing=\(ruffle_player_is_playing(player)) tick=\(tickResult.rawValue) render=\(renderResult.rawValue)")
         }
         onFrameUpdate?(currentFPS, renderedFrames)
         #endif
@@ -305,6 +305,10 @@ final class RuffleBridge {
         playerConfigurationChanged = true
     }
 
+    func invalidatePlayerStorage() {
+        playerConfigurationChanged = true
+    }
+
     @discardableResult
     func loadURL(_ url: URL) -> Bool {
         #if RUST_FFI_AVAILABLE
@@ -316,8 +320,8 @@ final class RuffleBridge {
         }
         guard let player = playerPointer else { return false }
         let result = url.absoluteString.withCString { ruffle_player_load_url(player, $0) }
-        if result != RUFFLE_RESULT_OK {
-            Logger.ruffle.error("loadURL failed: \(result) \(url.absoluteString)")
+        if result != RuffleResult_Ok {
+            Logger.ruffle.error("loadURL failed: \(result.rawValue) \(url.absoluteString)")
             return false
         } else {
             hasLoadedMovie = true
@@ -335,7 +339,7 @@ final class RuffleBridge {
         #if RUST_FFI_AVAILABLE
         guard let player = playerPointer else { return nil }
         var info = RuffleLoadInfo()
-        guard ruffle_player_get_load_info(player, &info) == RUFFLE_RESULT_OK else { return nil }
+        guard ruffle_player_get_load_info(player, &info) == RuffleResult_Ok else { return nil }
 
         switch info.state {
         case RuffleLoadState_Idle:
@@ -393,8 +397,8 @@ final class RuffleBridge {
             } else {
                 result = ruffle_player_load_data(player, ptr, UInt32(buf.count))
             }
-            if result != RUFFLE_RESULT_OK {
-                Logger.ruffle.error("loadData failed: \(result) bytes=\(buf.count)")
+            if result != RuffleResult_Ok {
+                Logger.ruffle.error("loadData failed: \(result.rawValue) bytes=\(buf.count)")
             } else {
                 Logger.ruffle.debug("loadData ok bytes=\(buf.count) url=\(url?.absoluteString ?? "<embedded>")")
             }
@@ -448,7 +452,7 @@ final class RuffleBridge {
         guard let p = playerPointer else { return nil }
         var info = RufflePlaybackInfo()
         let result = ruffle_player_get_playback_info(p, &info)
-        guard result == RUFFLE_RESULT_OK else { return nil }
+        guard result == RuffleResult_Ok else { return nil }
         return (info.current_frame, info.total_frames, info.frame_rate, info.is_playing)
         #else
         return (1, 100, 30.0, mockIsPlaying)
@@ -583,8 +587,8 @@ final class RuffleBridge {
             Unmanaged.passUnretained(metalLayer).toOpaque(),
             width, height
         )
-        if result != RUFFLE_RESULT_OK {
-            Logger.ruffle.error("updateSurface failed: \(result)")
+        if result != RuffleResult_Ok {
+            Logger.ruffle.error("updateSurface failed: \(result.rawValue)")
         }
         #endif
     }
@@ -621,8 +625,8 @@ final class RuffleBridge {
         // Use available playback info for dynamic fields
         var info = RufflePlaybackInfo()
         let result = ruffle_player_get_playback_info(p, &info)
-        let fps = result == RUFFLE_RESULT_OK ? info.frame_rate : 0
-        let total = result == RUFFLE_RESULT_OK ? info.total_frames : 0
+        let fps = result == RuffleResult_Ok ? info.frame_rate : 0
+        let total = result == RuffleResult_Ok ? info.total_frames : 0
         // SWF version, player version, and AS version are not yet exposed via FFI
         return (
             swfVersion: 0,
@@ -645,7 +649,7 @@ final class RuffleBridge {
         let result = ruffle_player_mouse_event(p, ev)
         #if DEBUG
         if eventType == 1 || eventType == 2 {
-            Logger.ruffle.debug("mouse type=\(eventType) x=\(Int(x)) y=\(Int(y)) result=\(result)")
+            Logger.ruffle.debug("mouse type=\(eventType) x=\(Int(x)) y=\(Int(y)) result=\(result.rawValue)")
         }
         #endif
         #endif

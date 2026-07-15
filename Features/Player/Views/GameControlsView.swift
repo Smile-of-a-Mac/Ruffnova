@@ -1,49 +1,49 @@
 import SwiftUI
 
 struct GameControlsView: View {
-    let profile: InputProfile
-    let send: (GameAction, Bool) -> Void
-
-    private let layoutWidth: CGFloat = 408
+    let controls: [TouchControlInstance]
+    var safeAreaInsets: EdgeInsets = EdgeInsets()
+    let send: (UUID, GameAction, Bool) -> Void
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 24) {
-            VStack(spacing: 4) {
-                controlButton(.up, systemName: "chevron.up")
-                HStack(spacing: 4) {
-                    controlButton(.left, systemName: "chevron.left")
-                    controlButton(.down, systemName: "chevron.down")
-                    controlButton(.right, systemName: "chevron.right")
+        GeometryReader { geometry in
+            let canvasSize = CGSize(
+                width: max(0, geometry.size.width - safeAreaInsets.leading - safeAreaInsets.trailing),
+                height: max(0, geometry.size.height - safeAreaInsets.top - safeAreaInsets.bottom)
+            )
+
+            ZStack {
+                ForEach(controls.filter(\.isEnabled).sorted { $0.zIndex < $1.zIndex }) { control in
+                    controlView(for: control, canvasSize: canvasSize)
                 }
             }
-
-            HStack(spacing: 12) {
-                controlButton(.cancel, systemName: "xmark")
-                controlButton(.confirm, systemName: "circle")
-            }
-
-            HStack(spacing: 12) {
-                controlButton(.secondary, systemName: "b.circle")
-                controlButton(.primary, systemName: "a.circle")
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(10)
-        .frame(width: layoutWidth, alignment: .leading)
         .accessibilityElement(children: .contain)
     }
 
-    private func controlButton(_ action: GameAction, systemName: String) -> some View {
-        Image(systemName: systemName)
-            .font(.headline.weight(.semibold))
-            .foregroundStyle(.primary.opacity(0.9))
-            .frame(width: 44, height: 44)
-            .contentShape(Rectangle())
-            .background(Color.primary.opacity(0.12), in: Circle())
-            .accessibilityLabel(Text(action.rawValue.capitalized))
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in send(action, true) }
-                    .onEnded { _ in send(action, false) }
-            )
+    @ViewBuilder
+    private func controlView(for control: TouchControlInstance, canvasSize: CGSize) -> some View {
+        let clampedControl = TouchLayoutMetrics.clamped(control, in: canvasSize)
+        let frame = TouchLayoutMetrics.frame(for: clampedControl, in: canvasSize)
+        let position = CGPoint(
+            x: safeAreaInsets.leading + frame.midX,
+            y: safeAreaInsets.top + frame.midY
+        )
+
+        switch control.kind {
+        case .button:
+            if let action = control.actions.first {
+                TouchControlView(control: clampedControl, action: action, send: send)
+                    .frame(width: frame.width, height: frame.height)
+                    .position(position)
+            }
+        case .directionalPad:
+            TouchDirectionalPadView(control: clampedControl, send: send)
+                .frame(width: frame.width, height: frame.height)
+                .position(position)
+        case .unknown:
+            EmptyView()
+        }
     }
 }

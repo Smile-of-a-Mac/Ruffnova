@@ -33,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Ensure any pending state is saved
+        NotificationCenter.default.post(name: .automaticBackupRequested, object: nil)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

@@ -88,6 +88,28 @@
 		A20025 /* GameControllerInputService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20025 /* GameControllerInputService.swift */; };
 		A20026 /* GameStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20026 /* GameStorageService.swift */; };
 		A20027 /* GameStorageSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20027 /* GameStorageSection.swift */; };
+		A20028 /* GameStoragePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20028 /* GameStoragePreferences.swift */; };
+		A20029 /* CompatibilityAssessment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20029 /* CompatibilityAssessment.swift */; };
+		A20030 /* InputProfileResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20030 /* InputProfileResolver.swift */; };
+		A20031 /* InputProfileEditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20031 /* InputProfileEditorViewModel.swift */; };
+		A20032 /* InputMappingEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20032 /* InputMappingEditorView.swift */; };
+		A20033 /* TouchControlLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20033 /* TouchControlLayout.swift */; };
+		A20034 /* InputPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20034 /* InputPreset.swift */; };
+		A20035 /* TouchLayoutEditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20035 /* TouchLayoutEditorViewModel.swift */; };
+		A20036 /* TouchLayoutEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20036 /* TouchLayoutEditorView.swift */; };
+		A20037 /* TouchLayoutEditorCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20037 /* TouchLayoutEditorCanvas.swift */; };
+		A20038 /* TouchControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20038 /* TouchControlView.swift */; };
+		A20039 /* TouchDirectionalPadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20039 /* TouchDirectionalPadView.swift */; };
+		A20040 /* PlatformKeyCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20040 /* PlatformKeyCaptureView.swift */; };
+		A20041 /* SharedObjectSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20041 /* SharedObjectSnapshot.swift */; };
+		A20042 /* SharedObjectSnapshotService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20042 /* SharedObjectSnapshotService.swift */; };
+		A20043 /* RuntimeRecommendation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20043 /* RuntimeRecommendation.swift */; };
+		A20044 /* CompatibilityRuleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20044 /* CompatibilityRuleEngine.swift */; };
+		A20045 /* CompatibilityActionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20045 /* CompatibilityActionService.swift */; };
+		A20046 /* CompatibilityDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20046 /* CompatibilityDetailsView.swift */; };
+		A20047 /* AutomaticBackupRetentionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20047 /* AutomaticBackupRetentionPolicy.swift */; };
+		A20048 /* AutomaticBackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20048 /* AutomaticBackupService.swift */; };
+		A20049 /* AutomaticBackupSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20049 /* AutomaticBackupSection.swift */; };
 		A30001 /* PermissionPolicyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30001 /* PermissionPolicyService.swift */; };
 /* End PBXBuildFile section */
 
@@ -178,6 +200,28 @@
 		B20025 /* GameControllerInputService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControllerInputService.swift; sourceTree = "<group>"; };
 		B20026 /* GameStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStorageService.swift; sourceTree = "<group>"; };
 		B20027 /* GameStorageSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStorageSection.swift; sourceTree = "<group>"; };
+		B20028 /* GameStoragePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStoragePreferences.swift; sourceTree = "<group>"; };
+		B20029 /* CompatibilityAssessment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibilityAssessment.swift; sourceTree = "<group>"; };
+		B20030 /* InputProfileResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputProfileResolver.swift; sourceTree = "<group>"; };
+		B20031 /* InputProfileEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputProfileEditorViewModel.swift; sourceTree = "<group>"; };
+		B20032 /* InputMappingEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputMappingEditorView.swift; sourceTree = "<group>"; };
+		B20033 /* TouchControlLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchControlLayout.swift; sourceTree = "<group>"; };
+		B20034 /* InputPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputPreset.swift; sourceTree = "<group>"; };
+		B20035 /* TouchLayoutEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchLayoutEditorViewModel.swift; sourceTree = "<group>"; };
+		B20036 /* TouchLayoutEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchLayoutEditorView.swift; sourceTree = "<group>"; };
+		B20037 /* TouchLayoutEditorCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchLayoutEditorCanvas.swift; sourceTree = "<group>"; };
+		B20038 /* TouchControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchControlView.swift; sourceTree = "<group>"; };
+		B20039 /* TouchDirectionalPadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchDirectionalPadView.swift; sourceTree = "<group>"; };
+		B20040 /* PlatformKeyCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformKeyCaptureView.swift; sourceTree = "<group>"; };
+		B20041 /* SharedObjectSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedObjectSnapshot.swift; sourceTree = "<group>"; };
+		B20042 /* SharedObjectSnapshotService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedObjectSnapshotService.swift; sourceTree = "<group>"; };
+		B20043 /* RuntimeRecommendation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeRecommendation.swift; sourceTree = "<group>"; };
+		B20044 /* CompatibilityRuleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibilityRuleEngine.swift; sourceTree = "<group>"; };
+		B20045 /* CompatibilityActionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibilityActionService.swift; sourceTree = "<group>"; };
+		B20046 /* CompatibilityDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibilityDetailsView.swift; sourceTree = "<group>"; };
+		B20047 /* AutomaticBackupRetentionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomaticBackupRetentionPolicy.swift; sourceTree = "<group>"; };
+		B20048 /* AutomaticBackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomaticBackupService.swift; sourceTree = "<group>"; };
+		B20049 /* AutomaticBackupSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomaticBackupSection.swift; sourceTree = "<group>"; };
 		B30001 /* PermissionPolicyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionPolicyService.swift; sourceTree = "<group>"; };
 		C10099 /* Ruffnova.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ruffnova.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -354,7 +398,14 @@
 				B10019 /* SWFInfoPanel.swift */,
 				B10020 /* TraceConsoleView.swift */,
 				B20023 /* GameControlsView.swift */,
+				B20032 /* InputMappingEditorView.swift */,
 				B20027 /* GameStorageSection.swift */,
+				B20049 /* AutomaticBackupSection.swift */,
+				B20036 /* TouchLayoutEditorView.swift */,
+				B20037 /* TouchLayoutEditorCanvas.swift */,
+				B20038 /* TouchControlView.swift */,
+				B20039 /* TouchDirectionalPadView.swift */,
+				B20040 /* PlatformKeyCaptureView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -620,6 +671,8 @@
 			isa = PBXGroup;
 			children = (
 				B20013 /* CompatibilityReport.swift */,
+				B20029 /* CompatibilityAssessment.swift */,
+				B20043 /* RuntimeRecommendation.swift */,
 				B20005 /* PlayerIssue.swift */,
 			);
 			path = Models;
@@ -629,6 +682,8 @@
 			isa = PBXGroup;
 			children = (
 				B20014 /* DiagnosticsService.swift */,
+				B20044 /* CompatibilityRuleEngine.swift */,
+				B20045 /* CompatibilityActionService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -637,6 +692,7 @@
 			isa = PBXGroup;
 			children = (
 				B20015 /* DiagnosticsView.swift */,
+				B20046 /* CompatibilityDetailsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -645,6 +701,8 @@
 			isa = PBXGroup;
 			children = (
 				B20004 /* PlayerViewModel.swift */,
+				B20031 /* InputProfileEditorViewModel.swift */,
+				B20035 /* TouchLayoutEditorViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -680,6 +738,10 @@
 				B20020 /* PlayerLoadState.swift */,
 				B20010 /* PlayerMode.swift */,
 				B20021 /* InputProfile.swift */,
+				B20033 /* TouchControlLayout.swift */,
+				B20034 /* InputPreset.swift */,
+				B20041 /* SharedObjectSnapshot.swift */,
+				B20028 /* GameStoragePreferences.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -689,6 +751,10 @@
 			children = (
 				B20011 /* PlayerInputCoordinator.swift */,
 				B20022 /* InputRouter.swift */,
+				B20030 /* InputProfileResolver.swift */,
+				B20042 /* SharedObjectSnapshotService.swift */,
+				B20047 /* AutomaticBackupRetentionPolicy.swift */,
+				B20048 /* AutomaticBackupService.swift */,
 				B20025 /* GameControllerInputService.swift */,
 				B20026 /* GameStorageService.swift */,
 			);
@@ -841,6 +907,28 @@
 				A20025 /* GameControllerInputService.swift in Sources */,
 				A20026 /* GameStorageService.swift in Sources */,
 				A20027 /* GameStorageSection.swift in Sources */,
+				A20028 /* GameStoragePreferences.swift in Sources */,
+				A20029 /* CompatibilityAssessment.swift in Sources */,
+				A20030 /* InputProfileResolver.swift in Sources */,
+				A20031 /* InputProfileEditorViewModel.swift in Sources */,
+				A20032 /* InputMappingEditorView.swift in Sources */,
+				A20033 /* TouchControlLayout.swift in Sources */,
+				A20034 /* InputPreset.swift in Sources */,
+				A20035 /* TouchLayoutEditorViewModel.swift in Sources */,
+				A20036 /* TouchLayoutEditorView.swift in Sources */,
+				A20037 /* TouchLayoutEditorCanvas.swift in Sources */,
+				A20038 /* TouchControlView.swift in Sources */,
+				A20039 /* TouchDirectionalPadView.swift in Sources */,
+				A20040 /* PlatformKeyCaptureView.swift in Sources */,
+				A20041 /* SharedObjectSnapshot.swift in Sources */,
+				A20042 /* SharedObjectSnapshotService.swift in Sources */,
+				A20043 /* RuntimeRecommendation.swift in Sources */,
+				A20044 /* CompatibilityRuleEngine.swift in Sources */,
+				A20045 /* CompatibilityActionService.swift in Sources */,
+				A20046 /* CompatibilityDetailsView.swift in Sources */,
+				A20047 /* AutomaticBackupRetentionPolicy.swift in Sources */,
+				A20048 /* AutomaticBackupService.swift in Sources */,
+				A20049 /* AutomaticBackupSection.swift in Sources */,
 				A30001 /* PermissionPolicyService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -915,7 +1003,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = b3;
+				CURRENT_PROJECT_VERSION = b4;
 				DEVELOPMENT_TEAM = B8NH9LK6K6;
 				ENABLE_DEBUG_DYLIB = NO;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
@@ -984,7 +1072,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = b3;
+				CURRENT_PROJECT_VERSION = b4;
 				DEVELOPMENT_TEAM = B8NH9LK6K6;
 				"EXCLUDED_ARCHS[sdk=*]" = x86_64;
 				INFOPLIST_FILE = Info.plist;

@@ -33,4 +33,7 @@ extension Notification.Name {
 
     /// Posted after the app language changes.
     static let localizationChanged = Notification.Name("localizationChanged")
+
+    /// Posted when the active file should receive a best-effort automatic backup.
+    static let automaticBackupRequested = Notification.Name("automaticBackupRequested")
 }

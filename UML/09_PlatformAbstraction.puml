@@ -1,0 +1,102 @@
+@startuml 09_PlatformAbstraction
+!theme plain
+title Ruffnova - 平台抽象层时序图
+
+participant "AppState" as State
+participant "RuffleBridge" as Bridge
+
+box "macOS Platform" #LightYellow
+    participant "MacInputProvider" as MacInput
+    participant "MacFilePickerService" as MacPicker
+    participant "MacMenuLocalization\nService" as MacMenu
+    participant "RuffleMetalView\nMacOS" as MacView
+    participant "NSOpenPanel" as NSPanel
+    participant "NSWindow" as NSWin
+end box
+
+box "iOS Platform" #LightBlue
+    participant "IOSInputProvider" as IOSInput
+    participant "IOSFilePickerService" as IOSPicker
+    participant "RuffleMetalView\nIOS" as IOSView
+    participant "UIDocumentPicker\nViewController" as UIDoc
+    participant "IOSOrientation\nController" as IOSOrient
+end box
+
+== macOS 输入事件 ==
+
+MacView -> MacView : NSEvent mouseDown/moved/up
+MacView -> MacInput : sendMouseDown(x, y, button)
+MacInput -> Bridge : sendMouseEvent(x, y, type=1, delta=0)
+Bridge -> Bridge : ruffle_player_mouse_event FFI
+
+MacView -> MacView : NSEvent keyDown
+MacView -> MacInput : sendKeyDown(keyCode, charCode, modifiers)
+MacInput -> Bridge : sendKeyEvent(keyCode, charCode, true, mods)
+Bridge -> Bridge : ruffle_player_key_event FFI
+
+== iOS 输入事件 ==
+
+IOSView -> IOSView : UITapGestureRecognizer
+IOSView -> IOSInput : sendTap(x, y)
+IOSInput -> IOSInput : sendMouseDown + sendMouseUp
+IOSInput -> Bridge : sendMouseEvent FFI
+
+IOSView -> IOSView : UILongPressGestureRecognizer
+IOSView -> IOSInput : sendLongPress(x, y)
+IOSInput -> Bridge : sendMouseEvent(x, y, type=3)\n映射为右键
+
+== macOS 文件选择 ==
+
+State -> MacPicker : pickSWFFile(completion:)
+MacPicker -> NSPanel : NSOpenPanel()\n.allowedContentTypes = [.swf]
+NSPanel -> NSPanel : runModal()
+NSPanel --> MacPicker : selected URL
+MacPicker --> State : completion(url)
+
+== iOS 文件选择 ==
+
+State -> IOSPicker : pickSWFFile(completion:)
+IOSPicker -> UIDoc : UIDocumentPickerViewController\n(for: [.swf])
+IOSPicker -> IOSPicker : 找到 topViewController
+IOSPicker -> UIDoc : present(animated)
+UIDoc --> IOSPicker : documentPicker(didPickDocumentsAt:)
+IOSPicker --> State : completion(url)
+
+== macOS 菜单本地化 ==
+
+State -> MacMenu : apply() [on .localizationChanged]
+MacMenu -> MacMenu : NSApp.mainMenu\n遍历所有菜单项
+MacMenu -> MacMenu : canonicalTopLevelKey / canonicalItemKey\n映射到 localization key
+MacMenu -> MacMenu : locManager.localized(key)\n替换菜单标题
+
+== iOS 屏幕方向控制 ==
+
+State -> IOSOrient : update(orientation)
+IOSOrient -> IOSOrient : supportedOrientations = orientation
+IOSOrient -> IOSOrient : windowScene\n.requestGeometryUpdate()
+
+note over State
+  AppState 根据 SWF 舞台尺寸决定方向:
+  - 宽 > 高 → .landscape
+  - 高 > 宽 → .portrait
+end note
+
+== 协议抽象 ==
+
+note over MacInput, IOSInput
+  **InputProvider Protocol**
+  ├── sendMouseMove(x, y)
+  ├── sendMouseDown/Up(x, y, button)
+  ├── sendScroll(x, y, deltaX, deltaY)
+  ├── sendKeyDown/Up(keyCode, charCode, modifiers)
+  ├── sendTap(x, y)
+  ├── sendDoubleTap(x, y)
+  └── sendLongPress(x, y)
+
+  **FilePickerService Protocol**
+  ├── pickSWFFile(completion:)
+  ├── pickFolder(completion:)
+  └── saveScreenshot(data, name, completion:)
+end note
+
+@enduml

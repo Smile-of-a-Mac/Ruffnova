@@ -1,0 +1,125 @@
+@startuml 07_PersistenceFlow
+!theme plain
+title Ruffnova - 数据持久化时序图
+
+participant "AppState" as State
+participant "SettingsPersistence\n(UserDefaults)" as Settings
+participant "LibraryService" as LibSvc
+participant "LibraryPersistence" as LibPersist
+participant "CollectionService" as CollSvc
+participant "BookmarkManager" as BookMgr
+participant "ThumbnailService" as ThumbSvc
+participant "GameStorageService" as GameStorage
+participant "PermissionPolicyService" as PermSvc
+participant "Disk\n(~/Library/Application Support/RuffleFlashPlayer/)" as Disk
+
+== 设置持久化 (Combine 自动保存) ==
+
+State -> State : setupPersistence()
+note over State
+  Combine $property.sink 订阅:
+  - quality → settings.quality
+  - volume → settings.volume
+  - isMuted → settings.isMuted
+  - playbackSpeed → settings.speed
+  - isLooping → settings.isLooping
+  - showDebugUI → settings.showDebugUI
+  - maxExecutionDuration → settings.maxExecution
+  - quality → bridge.setQuality()
+  - volume → bridge.setVolume()
+  ...
+end note
+
+State -> Settings : save via @Published sink
+Settings -> Disk : UserDefaults\n(standard plist)
+
+== 库数据持久化 ==
+
+State -> LibSvc : add(item)
+activate LibSvc
+LibSvc -> LibSvc : dedup by resolved URL
+LibSvc -> LibSvc : create bookmark data\nURL.bookmarkData()
+LibSvc -> Disk : library.json\n{version: 3, items: [...]}
+deactivate LibSvc
+
+State -> LibSvc : update(item) { changes }
+LibSvc -> LibSvc : mutate item fields
+LibSvc -> Disk : library.json (overwrite)
+
+== 每文件播放偏好 ==
+
+note over State
+  每次用户更改播放设置时:
+  volume/mute/quality/speed/loop/mode
+  → LibraryService.update(item) {
+      playbackPreferences = PlaybackPreferences(...)
+    }
+end note
+
+State -> LibSvc : update preferences
+LibSvc -> Disk : library.json\n(per-item PlaybackPreferences)
+
+== 缩略图存储 ==
+
+State -> ThumbSvc : captureThumbnail()
+State -> State : grab Metal drawable\nCGImage crop/scale
+State -> ThumbSvc : store(image, for: identifier)
+activate ThumbSvc
+ThumbSvc -> ThumbSvc : CGImageSource validate
+ThumbSvc -> Disk : Thumbnails/{uuid}.png
+ThumbSvc --> State : identifier string
+deactivate ThumbSvc
+
+State -> LibSvc : update(item) { thumbnailIdentifier }
+
+== 收藏夹持久化 ==
+
+State -> BookMgr : toggleFavorite(for: url)
+activate BookMgr
+BookMgr -> BookMgr : add/remove Bookmark
+BookMgr -> Disk : bookmarks.json
+deactivate BookMgr
+
+== 集合持久化 ==
+
+State -> CollSvc : create/rename/delete/add/remove
+activate CollSvc
+CollSvc -> Disk : collections.json\n{collections: [{id, name, itemIDs, ...}]}
+deactivate CollSvc
+
+== Flash SharedObject 存储 ==
+
+State -> GameStorage : read/replace/delete
+activate GameStorage
+GameStorage -> GameStorage : ruffle_storage_* FFI calls
+GameStorage -> Disk : SharedObjects/{library-uuid}/{name}.sol
+deactivate GameStorage
+
+== 权限策略持久化 ==
+
+State -> PermSvc : apply(.allowForFile, ...)
+activate PermSvc
+PermSvc -> PermSvc : save override to store
+PermSvc -> Disk : permissionPolicies.json\n{version, overrides: [...]}
+deactivate PermSvc
+
+== 文件路径汇总 ==
+
+note over Disk
+  **~/Library/Application Support/RuffleFlashPlayer/**
+
+  library.json          - 库条目 (含元数据、偏好、书签)
+  collections.json      - 用户集合
+  bookmarks.json        - 收藏夹
+  recentFiles.json      - 最近文件 (遗留, 迁移后保留)
+  permissionPolicies.json - 权限覆盖
+  Thumbnails/{uuid}.png - 缩略图
+  SharedObjects/{uuid}/{name}.sol - Flash LSO 存储
+
+  **UserDefaults (系统 plist):**
+  quality, volume, isMuted, isLooping, speed,
+  showDebugUI, showToolbar, maxExecutionDuration,
+  letterbox, autoplay, defaultPlayerMode, appLanguage
+end note
+
+@enduml

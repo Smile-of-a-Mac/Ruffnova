@@ -1,0 +1,71 @@
+@startuml 03_RenderLoop
+!theme plain
+title Ruffnova - 渲染循环时序图
+
+participant "DisplayTimer\n(60 FPS)" as Timer
+participant "RuffleBridge" as Bridge
+participant "RuffleFFI\n(Rust C API)" as FFI
+participant "RufflePlayer\n(Rust)" as Player
+participant "wgpu/Metal\nRenderer" as Renderer
+participant "CAMetalLayer" as Metal
+participant "AppState" as State
+participant "ContentView" as Content
+participant "DebugOverlay" as Debug
+
+== 初始化渲染循环 ==
+
+State -> Bridge : setRenderLoopActive(true)
+activate Bridge
+Bridge -> Timer : setupDisplayTimer()\nmacOS: Timer 60fps\niOS: CADisplayLink
+
+== 每帧渲染 (60fps) ==
+
+loop 每帧 (~16.67ms)
+    Timer -> Bridge : renderFrame()
+    activate Bridge
+
+    Bridge -> Bridge : deltaTime =\nmach_absolute_time() - lastFrameTime
+
+    Bridge -> FFI : ruffle_player_tick(playerPtr, dt)
+    activate FFI
+    FFI -> Player : lock player
+    FFI -> Player : executor.run()
+    FFI -> Player : guard.tick(dt)\n执行 AVM 字节码\n处理事件队列
+    FFI -> Player : executor.run()
+    deactivate FFI
+
+    Bridge -> FFI : ruffle_player_render(playerPtr)
+    activate FFI
+    FFI -> Player : guard.render()
+    Player -> Renderer : render display list
+    Renderer -> Metal : present drawable
+    deactivate FFI
+
+    Bridge -> Bridge : renderedFrames++\nupdate FPS counter
+
+    Bridge -> State : onFrameUpdate(fps, frame)
+    activate State
+    State -> State : debugFrameRate = fps\nDebugOverlay 自动更新
+    deactivate State
+
+    deactivate Bridge
+end
+
+== 时间线轮询 (4Hz) ==
+
+loop 每 250ms
+    State -> Bridge : getPlaybackInfo()
+    Bridge -> FFI : ruffle_player_get_playback_info(playerPtr)
+    FFI --> Bridge : RufflePlaybackInfo{currentFrame, totalFrames, ...}
+    Bridge --> State : PlaybackInfo
+    State -> State : 更新 currentFrame, totalFrames,\nframeRate, seekPosition
+
+    alt 循环播放 && 到达末尾
+        State -> Bridge : rewind()
+        Bridge -> FFI : ruffle_player_rewind(playerPtr)
+    end
+end
+
+deactivate Bridge
+
+@enduml

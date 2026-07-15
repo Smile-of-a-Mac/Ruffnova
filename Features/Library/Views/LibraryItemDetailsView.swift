@@ -23,6 +23,15 @@ struct LibraryItemDetailsView: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        macOSBody
+        #else
+        iOSBody
+        #endif
+    }
+
+    @ViewBuilder
+    private var macOSBody: some View {
         NavigationSplitView {
             List {
                 ForEach(LibraryItemDetailsSection.allCases) { section in
@@ -56,11 +65,55 @@ struct LibraryItemDetailsView: View {
             }
             .navigationTitle(locManager.localized((selectedSection ?? initialSection).localizedKey))
         }
-        #if os(macOS)
         .frame(width: 640, height: 480)
-        #else
+        .onAppear(perform: loadDraft)
+        .sheet(isPresented: $showInputMappingEditor) {
+            InputMappingEditorView(itemID: itemID, profile: libraryService.item(with: itemID)?.inputProfile ?? InputProfile())
+                .environmentObject(appState)
+                .environmentObject(locManager)
+        }
+        .sheet(isPresented: $showTouchLayoutEditor) {
+            TouchLayoutEditorView(itemID: itemID, layoutSet: libraryService.item(with: itemID)?.inputProfile?.touchLayouts ?? TouchLayoutSet())
+                .environmentObject(appState)
+                .environmentObject(locManager)
+        }
+    }
+
+    private var iOSBody: some View {
+        NavigationStack {
+            detailContent
+            .navigationTitle(locManager.localized((selectedSection ?? initialSection).localizedKey))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        saveDraft()
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .accessibilityLabel(locManager.localized("menu.close"))
+                }
+
+                ToolbarItem(placement: .automatic) {
+                    Menu {
+                        ForEach(LibraryItemDetailsSection.allCases) { section in
+                            Button {
+                                selectedSection = section
+                            } label: {
+                                Label(
+                                    locManager.localized(section.localizedKey),
+                                    systemImage: section.systemImage
+                                )
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "list.bullet")
+                    }
+                    .accessibilityLabel(locManager.localized("library.details.title"))
+                }
+            }
+        }
         .frame(minHeight: 500)
-        #endif
         .onAppear(perform: loadDraft)
         .sheet(isPresented: $showInputMappingEditor) {
             InputMappingEditorView(itemID: itemID, profile: libraryService.item(with: itemID)?.inputProfile ?? InputProfile())

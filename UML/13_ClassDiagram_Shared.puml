@@ -1,0 +1,290 @@
+@startuml 13_ClassDiagram_Shared
+!theme plain
+title Ruffnova - Shared 与 Platform 模块类图
+
+skinparam classAttributeIconSize 0
+
+' ===== 本地化 =====
+class LocalizationManager <<@MainActor ObservableObject>> {
+    {static} + shared: LocalizationManager
+    + selectedLanguage: Language
+    + translations: [String: String]
+    + fallbackTranslations: [String: String]
+    --
+    + localized(_ key: String) -> String
+    + setLanguage(_ language: Language)
+    --
+    - reload()
+    - load(language:into:)
+}
+
+enum Language <<String CaseIterable>> {
+    + english("en")
+    + simplifiedChinese("zh-Hans")
+    + traditionalChinese("zh-Hant")
+    + japanese("ja")
+    + korean("ko")
+    --
+    + displayName: String
+    + locale: Locale
+    + static detectDeviceLanguage() -> Language
+}
+
+LocalizationManager *-- Language
+
+' ===== 权限 =====
+class PermissionPolicyService <<@MainActor ObservableObject>> {
+    {static} + shared: PermissionPolicyService
+    + overrides: [PermissionOverride]
+    --
+    + globalDefault(for: PermissionScope) -> PermissionGlobalDefault
+    + setGlobalDefault(_: PermissionGlobalDefault, for: PermissionScope)
+    + override(for: String, scope: PermissionScope) -> PermissionOverride?
+    + evaluation(for: String, scope: PermissionScope) -> PermissionPolicyEvaluation
+    + apply(_: PermissionDecision, for: String, scope: PermissionScope) -> PermissionPolicyEvaluation
+    + clearOverride(for: String, scope: PermissionScope)
+    + clearOverride(_ id: UUID)
+    + clearAllOverrides()
+    + clearSessionAllowances(for: String)
+    + policySummary(for: String) -> [String]
+    --
+    - load()
+    - save()
+    - sessionAllowances: Set<PermissionSessionAllowance>
+}
+
+enum PermissionScope <<String Codable CaseIterable>> {
+    + network
+    + filesystem
+}
+
+enum PermissionGlobalDefault <<String Codable CaseIterable>> {
+    + alwaysAsk
+    + allow
+    + deny
+}
+
+enum PermissionDecision <<String Codable CaseIterable>> {
+    + alwaysAsk
+    + allowOnce
+    + allowForFile
+    + denyForFile
+    + useGlobalDefault
+}
+
+enum PermissionPolicyEvaluation <<Equatable>> {
+    + allowed
+    + denied
+    + requiresPrompt
+}
+
+struct PermissionOverride <<Identifiable Codable Equatable>> {
+    + id: UUID
+    + fileIdentifier: String
+    + fileName: String
+    + scope: PermissionScope
+    + decision: PermissionDecision
+    + updatedAt: Date
+}
+
+struct PermissionRequestContext <<Identifiable Equatable>> {
+    + id: UUID
+    + fileURL: URL
+    + scope: PermissionScope
+    + requestedResource: String
+}
+
+PermissionPolicyService *-- PermissionOverride
+PermissionPolicyService ..> PermissionScope
+PermissionPolicyService ..> PermissionGlobalDefault
+PermissionPolicyService ..> PermissionDecision
+PermissionPolicyService ..> PermissionPolicyEvaluation
+PermissionPolicyService ..> PermissionRequestContext
+
+' ===== 持久化 =====
+class LibraryPersistence {
+    {static} + shared: LibraryPersistence
+    --
+    + loadRecentFiles() -> [RecentFile]
+    + saveRecentFiles(_ files: [RecentFile])
+    + removeFromRecent(_ id: UUID)
+    + persist(_ url: URL) -> PersistedRecentFile?
+    + resolve(_ persisted: PersistedRecentFile) -> RecentFile?
+}
+
+struct PersistedRecentFile <<Codable Identifiable>> {
+    + id: UUID
+    + name: String
+    + lastOpened: Date
+    + fileSize: UInt64
+    + bookmarkData: Data
+    + thumbnailData: Data?
+}
+
+struct SharedObjectStoragePaths {
+    + rootURL: URL
+    --
+    + init(rootURL: URL)
+    + namespace(for libraryID: UUID) -> URL
+}
+
+class SettingsPersistence {
+    {static} + shared: SettingsPersistence
+    + quality: Int32
+    + volume: Float
+    + isMuted: Bool
+    + isLooping: Bool
+    + speed: Float
+    + showDebugUI: Bool
+    + showToolbar: Bool
+    + maxExecutionDuration: Double
+    + letterbox: String
+    + autoplay: Bool
+    + defaultPlayerMode: PlayerMode
+    --
+    + resetAll()
+}
+
+' ===== 设计系统 =====
+enum NativeSpacing {
+    + xs(4)
+    + sm(8)
+    + md(12/16)
+    + lg(16/20)
+    + xl(20)
+    + xxl(24)
+    + xxxl(32)
+    + section(40)
+}
+
+enum NativeRadius {
+    + sm(8)
+    + md(12)
+    + lg(16)
+    + xl(20)
+    + xxl(24)
+    + circle(999)
+}
+
+enum GlassMaterial {
+    + ultraLight
+    + light
+    + regular
+    + thick
+    + heavy
+}
+
+' ===== 协议 =====
+interface InputProvider <<@MainActor protocol>> {
+    + sendMouseMove(x: Float, y: Float)
+    + sendMouseDown(x: Float, y: Float, button: MouseButton)
+    + sendMouseUp(x: Float, y: Float, button: MouseButton)
+    + sendScroll(x: Float, y: Float, deltaX: Float, deltaY: Float)
+    + sendKeyDown(keyCode: UInt32, charCode: UInt32, modifiers: UInt32)
+    + sendKeyUp(keyCode: UInt32, charCode: UInt32, modifiers: UInt32)
+    + sendTap(x: Float, y: Float)
+    + sendDoubleTap(x: Float, y: Float)
+    + sendLongPress(x: Float, y: Float)
+}
+
+enum MouseButton {
+    + left
+    + right
+    + middle
+}
+
+interface FilePickerService <<@MainActor protocol>> {
+    + pickSWFFile(completion: (URL?) -> Void)
+    + pickFolder(completion: (URL?) -> Void)
+    + saveScreenshot(data: Data, suggestedName: String, completion: (Bool) -> Void)
+}
+
+' ===== macOS 实现 =====
+class MacInputProvider <<@MainActor #if os(macOS)>> {
+    - bridge: RuffleBridge
+    --
+    + init(bridge: RuffleBridge)
+    + sendMouseMove(x:y:)
+    + sendMouseDown(x:y:button:)
+    + sendMouseUp(x:y:button:)
+    + sendScroll(x:y:deltaX:deltaY:)
+    + sendKeyDown(keyCode:charCode:modifiers:)
+    + sendKeyUp(keyCode:charCode:modifiers:)
+    + sendTap(x:y:)
+    + sendDoubleTap(x:y:)
+    + sendLongPress(x:y:)
+}
+
+class MacFilePickerService <<@MainActor #if os(macOS)>> {
+    + pickSWFFile(completion:)
+    + pickFolder(completion:)
+    + saveScreenshot(data:suggestedName:completion:)
+}
+
+enum MacMenuLocalizationService <<@MainActor #if os(macOS)>> {
+    + {static} apply()
+    --
+    - localizeTopLevelMenus(_:loc:)
+    - localizeItems(in:loc:)
+    - canonicalTopLevelKey(for:) -> String?
+    - canonicalItemKey(for:) -> String?
+}
+
+' ===== iOS 实现 =====
+class IOSInputProvider <<@MainActor #if os(iOS)>> {
+    - bridge: RuffleBridge
+    --
+    + init(bridge: RuffleBridge)
+    + sendMouseMove(x:y:)
+    + sendMouseDown(x:y:button:)
+    + sendMouseUp(x:y:button:)
+    + sendScroll(x:y:deltaX:deltaY:)
+    + sendKeyDown(keyCode:charCode:modifiers:)
+    + sendKeyUp(keyCode:charCode:modifiers:)
+    + sendTap(x:y:)
+    + sendDoubleTap(x:y:)
+    + sendLongPress(x:y:)
+}
+
+class IOSFilePickerService <<NSObject @MainActor #if os(iOS)>> {
+    - pickCompletion: ((URL?) -> Void)?
+    - presentedController: UIViewController?
+    --
+    + pickSWFFile(completion:)
+    + pickFolder(completion:)
+    + saveScreenshot(data:suggestedName:completion:)
+    --
+    - presentPicker(_: UIViewController)
+    + documentPicker(_:didPickDocumentsAt:)
+    + documentPickerWasCancelled(_:)
+}
+
+enum IOSOrientationController <<#if os(iOS)>> {
+    + {static} supportedOrientations: UIInterfaceOrientationMask
+    + {static} update(to: UIInterfaceOrientationMask)
+}
+
+' ===== 通知常量 =====
+enum Notification.Name.Extensions <<extension>> {
+    + {static} .openSWFFile
+    + {static} .viewportChanged
+    + {static} .keyEvent
+    + {static} .swfLoaded
+    + {static} .toggleSWFInfo
+    + {static} .toggleTraceConsole
+    + {static} .importFolder
+    + {static} .focusSearch
+    + {static} .focusPlayerStage
+    + {static} .localizationChanged
+}
+
+' ===== 关系 =====
+MacInputProvider ..|> InputProvider
+IOSInputProvider ..|> InputProvider
+MacFilePickerService ..|> FilePickerService
+IOSFilePickerService ..|> FilePickerService
+
+MacMenuLocalizationService --> LocalizationManager
+LocalizationManager ..> Notification.Name.Extensions
+
+@enduml

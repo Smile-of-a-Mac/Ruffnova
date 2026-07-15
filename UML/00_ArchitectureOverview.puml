@@ -1,0 +1,171 @@
+@startuml 00_ArchitectureOverview
+!theme plain
+title Ruffnova - 整体架构概览
+
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+
+package "SwiftUI 层" #LightCoral {
+    [RuffleApp\n(@main)] as App
+    [ContentView\n(macOS)] as ContentView
+    [IOSContentView\n(iOS)] as IOSContent
+    [AppSidebar] as Sidebar
+    [PlayerControlBar] as ControlBar
+    [SettingsView] as Settings
+    [LibraryContentView] as LibContent
+    [DiagnosticsView] as DiagView
+}
+
+package "Commands & Toolbar" #LightYellow {
+    [RuffleCommands] as Commands
+    [AppCommandRouter] as Router
+    [AppToolbar] as Toolbar
+}
+
+package "核心状态" #LightGreen {
+    [AppState\n(ObservableObject)] as State
+    [PlayerViewModel] as PlayerVM
+    [PlayerInputCoordinator] as InputCoord
+    [InputRouter] as InRouter
+}
+
+package "Features" #LightBlue {
+    package "Player" {
+        [RufflePlayerView\n(Metal/MTKView)] as PlayerView
+        [GameControlsView] as GamePad
+        [DebugOverlayView] as Debug
+        [SWFInfoPanel] as InfoPanel
+        [TraceConsoleView] as TraceView
+        [GameStorageSection] as GameStorage
+    }
+    package "Library" {
+        [LibraryService] as LibSvc
+        [CollectionService] as CollSvc
+        [ThumbnailService] as ThumbSvc
+        [LibraryItem\nLibraryCollection\nSWFMetadata] as Models
+    }
+    package "Search" {
+        [SearchService] as SearchSvc
+        [SearchViewModel] as SearchVM
+    }
+    package "Import" {
+        [ImportService] as ImportSvc
+    }
+    package "Diagnostics" {
+        [DiagnosticsService] as DiagSvc
+        [PlayerIssue\nCompatibilityReport] as DiagModels
+    }
+    package "Settings" {
+        [SettingsPersistence] as SettingsPersist
+    }
+}
+
+package "安全" #Pink {
+    [PermissionPolicyService] as PermSvc
+}
+
+package "Shared" #Wheat {
+    [LocalizationManager] as LocMgr
+    [BookmarkManager] as BookMgr
+    [DesignTokens] as Tokens
+    [Notification.Name\nExtensions] as Notifs
+
+    package "Persistence" {
+        [LibraryPersistence] as LibPersist
+        [SharedObjectStoragePaths] as StoragePaths
+    }
+
+    package "Protocols" {
+        [InputProvider] as InputProto
+        [FilePickerService] as FileProto
+    }
+}
+
+package "Platform (macOS)" #LightYellow {
+    [MacInputProvider] as MacInput
+    [MacFilePickerService] as MacPicker
+    [MacMenuLocalizationService] as MacMenu
+}
+
+package "Platform (iOS)" #LightBlue {
+    [IOSInputProvider] as IOSInput
+    [IOSFilePickerService] as IOSPicker
+    [IOSOrientationController] as IOSOrient
+}
+
+package "FFI 桥接" #Plum {
+    [RuffleBridge\n(Swift @MainActor)] as Bridge
+    [ruffle_ffi.h\n(C Header)] as FFIHeader
+    [RuffleBridgingHeader.h] as BridgingHdr
+}
+
+package "Rust 引擎" #Thistle {
+    [ruffle_ffi\n(Rust crate)] as RustFFI
+    [ruffle_core\nPlayer] as RustCore
+    [WgpuRenderBackend\n(Metal)] as Wgpu
+    [DiskStorageBackend] as DiskStorage
+    [FfiNavigatorBackend] as NavBackend
+    [FfiUiBackend] as UiBackend
+}
+
+' ===== 连接关系 =====
+
+App --> State
+App --> ContentView
+App --> IOSContent
+App --> Commands
+App --> LocMgr
+
+ContentView --> Sidebar
+ContentView --> PlayerView
+ContentView --> LibContent
+ContentView --> ControlBar
+ContentView --> DiagView
+ContentView --> State
+
+Commands --> Router
+Router --> State
+
+State --> Bridge
+State --> LibSvc
+State --> CollSvc
+State --> ThumbSvc
+State --> SearchSvc
+State --> PermSvc
+State --> ImportSvc
+State --> DiagSvc
+State --> SettingsPersist
+State --> BookMgr
+State --> InRouter
+State --> InputCoord
+State --> PlayerVM
+
+PlayerView --> State
+PlayerView --> Notifs
+
+LibSvc --> LibPersist
+LibSvc --> ThumbSvc
+LibSvc --> CollSvc
+CollSvc --> Models
+
+Bridge --> FFIHeader
+
+BridgingHdr --> FFIHeader
+
+FFIHeader <.. RustFFI : cbindgen\nauto-generate
+
+RustFFI --> RustCore
+RustFFI --> Wgpu
+RustFFI --> DiskStorage
+RustFFI --> NavBackend
+RustFFI --> UiBackend
+
+InputProto <|.. MacInput
+InputProto <|.. IOSInput
+FileProto <|.. MacPicker
+FileProto <|.. IOSPicker
+
+MacInput --> Bridge
+IOSInput --> Bridge
+
+@enduml

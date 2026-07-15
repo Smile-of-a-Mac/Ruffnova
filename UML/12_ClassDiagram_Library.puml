@@ -1,0 +1,337 @@
+@startuml 12_ClassDiagram_Library
+!theme plain
+title Ruffnova - Library 模块类图
+
+skinparam classAttributeIconSize 0
+
+' ===== 核心模型 =====
+class LibraryItem <<Identifiable Codable Equatable>> {
+    + id: UUID
+    + url: URL
+    + name: String
+    + fileSize: UInt64
+    + lastOpened: Date?
+    + dateAdded: Date
+    + thumbnailIdentifier: String?
+    + thumbnailData: Data?
+    + metadata: SWFMetadata?
+    + bookmarkData: Data?
+    + tags: [String]
+    + notes: String
+    + isFavorite: Bool
+    + lastPlaybackFrame: UInt32?
+    + playbackPreferences: PlaybackPreferences?
+    + runtimeProfile: FileRuntimeProfile?
+    + inputProfile: InputProfile?
+    + contentType: LibraryContentType?
+    + compatibilityStatus: CompatibilityStatus
+    + availabilityStatus: AvailabilityStatus
+    --
+    + matchesSearchText(_: String) -> Bool
+}
+
+class SWFMetadata <<Codable Equatable>> {
+    + stageWidth: UInt32
+    + stageHeight: UInt32
+    + frameRate: Float
+    + totalFrames: UInt32
+    + swfVersion: UInt8
+    + playerVersion: UInt8
+    + isActionScript3: Bool
+    + updatedAt: Date
+    --
+    + hasStageSize: Bool
+    + hasFrameRate: Bool
+    + hasTotalFrames: Bool
+}
+
+class LibraryCollection <<Identifiable Codable Equatable>> {
+    + id: UUID
+    + name: String
+    + itemIDs: [UUID]
+    + createdAt: Date
+    + updatedAt: Date
+    + sortSettings: LibraryCollectionSortSettings
+}
+
+struct LibraryCollectionSortSettings <<Codable Equatable>> {
+    + order: LibrarySortOrder
+    + ascending: Bool
+}
+
+struct FileRuntimeProfile <<Codable Equatable>> {
+    + quality: Int32?
+    + letterbox: String?
+    + speed: Float?
+    + looping: Bool?
+    + autoplay: Bool?
+    + maxExecutionDuration: Double?
+    --
+    + resolved(using defaults: RuntimeDefaults) -> RuntimeDefaults
+    + isEmpty: Bool
+}
+
+struct RuntimeDefaults {
+    + quality: Int32
+    + letterbox: String
+    + speed: Float
+    + looping: Bool
+    + autoplay: Bool
+    + maxExecutionDuration: Double
+}
+
+enum LibraryContentType <<String Codable>> {
+    + animation
+    + interactive
+}
+
+enum CompatibilityStatus <<String Codable>> {
+    + compatible
+    + unknown
+    + unsupported
+}
+
+enum AvailabilityStatus <<String Codable>> {
+    + available
+    + missing
+}
+
+enum LibrarySortOrder <<String Codable CaseIterable>> {
+    + name
+    + lastOpened
+    + dateAdded
+    + fileSize
+}
+
+enum LibraryFilter <<String Codable CaseIterable>> {
+    + all
+    + favorites
+    + recent
+    + missing
+    + compatibilityIssues
+    + animation
+    + interactive
+    + continuePlaying
+    + recentlyAdded
+    + untagged
+}
+
+LibraryItem *-- SWFMetadata
+LibraryItem *-- PlaybackPreferences
+LibraryItem *-- FileRuntimeProfile
+LibraryItem *-- InputProfile
+LibraryItem ..> LibraryContentType
+LibraryItem ..> CompatibilityStatus
+LibraryItem ..> AvailabilityStatus
+FileRuntimeProfile ..> RuntimeDefaults
+LibraryCollection *-- LibraryCollectionSortSettings
+LibraryCollectionSortSettings ..> LibrarySortOrder
+
+' ===== 服务 =====
+class LibraryService <<@MainActor ObservableObject>> {
+    {static} + shared: LibraryService
+    + items: [LibraryItem]
+    --
+    + add(_: LibraryItem)
+    + add(_: [LibraryItem])
+    + importFiles(_: [URL]) -> ImportResult
+    + update(_: UUID, changes: (inout LibraryItem) -> Void)
+    + remove(_: UUID)
+    + remove(_: [UUID])
+    + removeAll()
+    + item(for url: URL) -> LibraryItem?
+    + item(for id: UUID) -> LibraryItem?
+    + sorted(by: LibrarySortOrder) -> [LibraryItem]
+    + items(matching: LibraryFilter, sortedBy: LibrarySortOrder) -> [LibraryItem]
+    + filtered(by: LibraryFilter) -> [LibraryItem]
+    + resolveBookmarks()
+    + locateFile(for: UUID, newURL: URL)
+    + migrateIfNeeded()
+    + effectiveRuntimeProfile(for: LibraryItem, defaults: RuntimeDefaults) -> RuntimeDefaults
+    --
+    - save()
+    - load()
+    - deduplicate()
+}
+
+class CollectionService <<@MainActor ObservableObject>> {
+    {static} + shared: CollectionService
+    + collections: [LibraryCollection]
+    --
+    + create(name: String) -> LibraryCollection
+    + rename(_: UUID, to: String)
+    + delete(_: UUID)
+    + add(_: UUID, to: UUID)
+    + remove(_: UUID, from: UUID)
+    + toggle(_: UUID, in: UUID)
+    + removeItemFromAllCollections(_: UUID)
+    + items(in: UUID, from: [LibraryItem]) -> [LibraryItem]
+    + collections(containing: UUID) -> [LibraryCollection]
+    --
+    - save()
+    - load()
+}
+
+class ThumbnailService <<@MainActor>> {
+    {static} + shared: ThumbnailService
+    --
+    + store(_: CGImage, for identifier: String) -> String?
+    + data(for identifier: String) -> Data?
+    + remove(_ identifier: String)
+}
+
+class BookmarkManager <<@MainActor ObservableObject>> {
+    {static} + shared: BookmarkManager
+    + bookmarks: [Bookmark]
+    --
+    + add(url: URL, name: String, frame: UInt32?)
+    + remove(_ bookmark: Bookmark)
+    + remove(url: URL)
+    + contains(_ url: URL) -> Bool
+    + removeAll()
+    --
+    - load()
+    - save()
+    - urlsMatch(_:_:) -> Bool
+}
+
+struct Bookmark <<Identifiable Codable Equatable>> {
+    + id: UUID
+    + url: URL
+    + name: String
+    + addedDate: Date
+    + frame: UInt32?
+}
+
+class ImportService {
+    {static} + shared: ImportService
+    --
+    + classify(_ url: URL) -> ImportedContent?
+    + resolveImport(for url: URL) -> ImportedContent
+    + scanForSWFFiles(in url: URL, recursively: Bool) -> [URL]
+    --
+    - extractZip(_ url: URL) -> URL
+}
+
+enum ImportedContent {
+    + swf(URL)
+    + directory(URL)
+    + zip(URL)
+}
+
+struct ImportPreview <<Equatable>> {
+    + candidates: [URL]
+    + existingURLs: Set<String>
+    --
+    + init(candidates:existingItems:)
+}
+
+struct ImportResult <<Equatable>> {
+    + addedURLs: [URL]
+    + duplicateURLs: [URL]
+}
+
+class SearchService <<@MainActor>> {
+    {static} + shared: SearchService
+    --
+    + search(query: String) -> [LibraryItem]
+}
+
+class SearchViewModel <<@MainActor ObservableObject>> {
+    + searchText: String
+    + searchResults: [LibraryItem]
+    + isSearching: Bool
+    --
+    + performSearch()
+    + updateSearchText(_: String)
+    + clearSearch()
+    + openResult(_: LibraryItem)
+    + deleteResult(_: LibraryItem)
+    + toggleFavorite(_: LibraryItem)
+}
+
+' ===== 视图 =====
+class AppSidebar <<SwiftUI View>> {
+    + body: some View
+}
+
+class LibraryContentView <<SwiftUI View>> {
+    + body: some View
+}
+
+class LibraryGridView <<SwiftUI View>> {
+    + filter: LibraryFilter
+    + body: some View
+    --
+    - selectableLibraryCell(_: LibraryItem)
+    - toggleSelection(for: UUID)
+    - setSelectedFavorites(_: Bool)
+    - removeSelectedItems()
+}
+
+class FavoritesGridView <<SwiftUI View>> {
+    + body: some View
+}
+
+class RecentListView <<SwiftUI View>> {
+    + body: some View
+}
+
+class RecentFileRow <<SwiftUI View>> {
+    + file: LibraryItem
+    + body: some View
+}
+
+class LibraryFileCell <<SwiftUI View>> {
+    + file: LibraryItem
+    + body: some View
+}
+
+class LibraryItemDetailsView <<SwiftUI View>> {
+    + item: LibraryItem
+    + body: some View
+    --
+    - runtimeSettingsSection(_: LibraryItem)
+    - permissionSettingsSection(_: LibraryItem)
+    - saveTags()
+    - saveNotes()
+}
+
+class EmptyStateView <<SwiftUI View>> {
+    + body: some View
+    --
+    - showOpenPanel()
+    - showImportFolderPanel()
+}
+
+class SidebarCollectionsView <<SwiftUI View>> {
+    + body: some View
+    --
+    - createCollection()
+    - renameCollection()
+    - deleteCollection(_: UUID)
+}
+
+' ===== 关系 =====
+LibraryService *-- "0..*" LibraryItem
+LibraryService --> ThumbnailService
+LibraryService --> BookmarkManager
+LibraryService --> CollectionService
+
+CollectionService *-- "0..*" LibraryCollection
+SearchViewModel --> SearchService
+SearchService --> LibraryService
+SearchService --> CollectionService
+
+LibraryContentView --> LibraryGridView
+LibraryContentView --> FavoritesGridView
+LibraryContentView --> RecentListView
+LibraryContentView --> EmptyStateView
+
+LibraryGridView --> LibraryFileCell
+RecentListView --> RecentFileRow
+FavoritesGridView --> LibraryFileCell
+LibraryFileCell --> LibraryItemDetailsView
+SidebarCollectionsView --> CollectionService
+
+@enduml

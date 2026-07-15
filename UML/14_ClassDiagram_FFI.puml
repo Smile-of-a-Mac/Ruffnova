@@ -1,0 +1,266 @@
+@startuml 14_ClassDiagram_FFI
+!theme plain
+title Ruffnova - Swift ↔ Rust FFI 桥接类图
+
+skinparam classAttributeIconSize 0
+
+' ===== Swift 侧 =====
+package "Swift (Xcode Project)" #LightCoral {
+    class RuffleBridge <<@MainActor>> {
+        - playerPointer: OpaquePointer?
+        - rendererPointer: OpaquePointer?
+        - metalLayer: CAMetalLayer
+        --
+        + loadURL(_: String) -> Bool
+        + loadState() -> RuffleMovieLoadState?
+        + renderFrame()
+        + tick(_: Double)
+        + setPlaying(_: Bool)
+        + setVolume(_: Float)
+        + sendKeyEvent(...)
+        + sendMouseEvent(...)
+        + getPlaybackInfo() -> RufflePlaybackInfo?
+        + getMetadata() -> RuffleMetadata?
+        + seekFrame(_: UInt32)
+        + rewind()
+        + drainPolicyDiagnostics()
+        + setQuality(_: RuffleQuality)
+        + setSpeed(_: Float)
+        + setLooping(_: Bool)
+        + configureSharedObjectStorage(root:libraryID:)
+    }
+
+    note top of RuffleBridge
+      所有方法通过 OpaquePointer
+      调用 C FFI 函数
+    end note
+}
+
+' ===== C 头文件 =====
+package "CRuffleFFI (C ABI)" #LightYellow {
+    note as CHeader
+      **ruffle_ffi.h** (自动生成 by cbindgen)
+      ─────────────────────────────
+      所有类型均为 repr(C)
+      函数均为 extern "C" + no_mangle
+    end note
+
+    class "OpaquePointer" as OpaquePlayer {
+      RufflePlayer (不透明)
+    }
+
+    class "OpaquePointer" as OpaqueRenderer {
+      RuffleRenderer (不透明)
+    }
+
+    struct RuffleConfig <<repr(C)>> {
+        + width: UInt32
+        + height: UInt32
+        + scale_factor: Float
+        + quality: Int32
+        + autoplay: Bool
+        + max_execution_secs: Double
+        + network_access: Int32
+        + filesystem_access: Int32
+    }
+
+    struct RuffleKeyEvent <<repr(C)>> {
+        + key_code: UInt32
+        + char_code: UInt32
+        + is_down: Bool
+        + modifiers: UInt32
+    }
+
+    struct RuffleMouseEvent <<repr(C)>> {
+        + x: Float
+        + y: Float
+        + event_type: Int32
+        + scroll_delta: Float
+    }
+
+    struct RuffleMetadata <<repr(C)>> {
+        + swf_version: UInt8
+        + player_version: UInt8
+        + is_action_script_3: Bool
+        + frame_rate: Float
+        + stage_width: UInt32
+        + stage_height: UInt32
+        + total_frames: UInt32
+        + uses_avm2: Bool
+        + background_color: UInt32
+    }
+
+    struct RufflePlaybackInfo <<repr(C)>> {
+        + current_frame: UInt32
+        + total_frames: UInt32
+        + frame_rate: Float
+        + elapsed_time_secs: Double
+        + is_playing: Bool
+        + is_looping: Bool
+        + speed_multiplier: Float
+    }
+
+    struct RuffleLoadInfo <<repr(C)>> {
+        + state: Int32
+    }
+
+    struct RuffleString <<repr(C)>> {
+        + pointer: UnsafePointer<UInt8>?
+        + length: UInt
+    }
+
+    struct RuffleBytes <<repr(C)>> {
+        + pointer: UnsafePointer<UInt8>?
+        + length: UInt
+    }
+
+    struct RuffleStringList <<repr(C)>> {
+        + strings: UnsafePointer<RuffleString>?
+        + count: UInt
+    }
+
+    struct RuffleDiagnostic <<repr(C)>> {
+        + kind: Int32
+        + target: RuffleString
+    }
+
+    enum RuffleResult <<Int32>> {
+        + OK(0)
+        + ERROR_NULL_POINTER(-1)
+        + ERROR_LOCK_POISONED(-2)
+        + ERROR_INVALID_ARGUMENT(-3)
+        + ERROR_RENDERER_INIT(-4)
+        + ERROR_LOAD_FAILED(-5)
+    }
+
+    enum RuffleAccessPolicy <<Int32>> {
+        + Deny(0)
+        + Allow(1)
+    }
+
+    enum RuffleDiagnosticKind <<Int32>> {
+        + FilesystemDenied(0)
+        + NetworkDenied(1)
+        + NetworkUnsupported(2)
+        + UnsupportedScheme(3)
+        + NavigationDenied(4)
+        + SocketDenied(5)
+    }
+}
+
+' ===== Rust 侧 =====
+package "ruffle_ffi (Rust crate)" #Thistle {
+    class RufflePlayer_Rust {
+        + inner: Arc<Mutex<Player>>
+        + executor: NullExecutor
+        + base_path: Option<PathBuf>
+        + root_movie_url: Option<String>
+        + load_status: LoadStatus
+        + diagnostics: VecDeque<PolicyDiagnostic>
+    }
+
+    class RuffleRenderer_Rust {
+        + backend: Option<Box<dyn RenderBackend>>
+    }
+
+    class LoadStatus {
+        + begin()
+        + mark_ready()
+        + mark_failed()
+        + info() -> RuffleLoadInfo
+    }
+
+    class FfiNavigatorBackend {
+        - network_access: RuffleAccessPolicy
+        - filesystem_access: RuffleAccessPolicy
+        + root_movie_access(url) -> AccessOutcome
+        + resource_access(url) -> AccessOutcome
+        + fetch(url) -> Box<dyn Future>
+        + connect_socket() -> Error
+    }
+
+    class FfiUiBackend {
+        + load_font(...)
+        + display_unsupported_message(...)
+    }
+
+    class DiskStorageBackend {
+        - shared_objects_path: PathBuf
+        + get(name) -> Option<Vec<u8>>
+        + put(name, value)
+        + remove_key(name)
+        + list_keys() -> Vec<String>
+        + total_size() -> usize
+    }
+}
+
+package "ruffle_core (Rust)" #Plum {
+    class Player {
+        + tick(dt: FloatDuration)
+        + render()
+        + handle_event(event: PlayerEvent)
+    }
+
+    class PlayerBuilder {
+        + with_navigator(backend) -> Self
+        + with_ui(backend) -> Self
+        + with_renderer(backend) -> Self
+        + with_video(backend) -> Self
+        + with_audio(backend) -> Self
+        + with_storage(backend) -> Self
+        + with_viewport(w, h, scale) -> Self
+        + with_quality(quality) -> Self
+        + with_autoplay(autoplay) -> Self
+        + build() -> Player
+    }
+
+    interface StorageBackend {
+        + get(name: &str) -> Option<Vec<u8>>
+        + put(name: &str, value: &[u8])
+        + remove_key(name: &str)
+        + list_keys() -> Vec<String>
+        + total_size() -> usize
+    }
+
+    interface NavigatorBackend {
+        + fetch(url: &str) -> BoxFuture
+        + resource_access(url: &str) -> AccessOutcome
+    }
+}
+
+package "wgpu (Rust)" #LightBlue {
+    class WgpuRenderBackend {
+        + set_viewport_dimensions(w, h, scale)
+        + render()
+        + recreate_surface_unsafe(layer)
+    }
+}
+
+' ===== 关系 =====
+RuffleBridge --> OpaquePlayer : playerPointer
+RuffleBridge --> OpaqueRenderer : rendererPointer
+RuffleBridge ..> RuffleConfig
+RuffleBridge ..> RuffleKeyEvent
+RuffleBridge ..> RuffleMouseEvent
+RuffleBridge ..> RuffleMetadata
+RuffleBridge ..> RufflePlaybackInfo
+RuffleBridge ..> RuffleLoadInfo
+RuffleBridge ..> RuffleString
+RuffleBridge ..> RuffleDiagnostic
+
+OpaquePlayer --> RufflePlayer_Rust : Box::into_raw / Box::from_raw
+OpaqueRenderer --> RuffleRenderer_Rust : Box::into_raw / Box::from_raw
+
+RufflePlayer_Rust --> Player : Arc<Mutex<>>
+RufflePlayer_Rust --> LoadStatus
+RufflePlayer_Rust --> FfiNavigatorBackend
+RufflePlayer_Rust --> FfiUiBackend
+RufflePlayer_Rust --> DiskStorageBackend
+
+PlayerBuilder --> Player
+FfiNavigatorBackend ..|> NavigatorBackend
+FfiUiBackend ..|> "UiBackend"
+DiskStorageBackend ..|> StorageBackend
+RuffleRenderer_Rust --> WgpuRenderBackend
+
+@enduml

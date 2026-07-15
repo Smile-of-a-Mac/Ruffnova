@@ -1,0 +1,258 @@
+@startuml 10_ClassDiagram_Core
+!theme plain
+title Ruffnova - 核心状态与桥接类图
+
+skinparam classAttributeIconSize 0
+
+' ===== AppState =====
+class AppState <<@MainActor ObservableObject>> {
+    - bridge: RuffleBridge?
+    - loadCoordinator: PlayerLoadCoordinator
+    - playerViewModel: PlayerViewModel
+    - playerInputCoordinator: PlayerInputCoordinator
+    - inputRouter: InputRouter
+    - gameControllerService: GameControllerInputService
+    - traceConsole: TraceConsole
+    --
+    {field} + isPlaying: Bool
+    + volume: Float
+    + isMuted: Bool
+    + isLooping: Bool
+    + playbackSpeed: Float
+    + currentFrame: UInt32
+    + totalFrames: UInt32
+    + frameRate: Double
+    + seekPosition: Double
+    + isFullscreen: Bool
+    + isStageMaximized: Bool
+    + showControlBar: Bool
+    + playerMode: PlayerMode
+    + selectedSection: Section
+    + currentFileURL: URL?
+    + recentFiles: [RecentFile]
+    + searchText: String
+    + isLoading: Bool
+    + playerLoadState: PlayerLoadState
+    + pendingPermissionRequest: PermissionRequestContext?
+    + playerIssues: [PlayerIssue]
+    + policyDiagnostics: [RufflePolicyDiagnostic]
+    + quality: RuffleQuality
+    + maxExecutionDuration: Double
+    --
+    + initializeBridge(metalLayer:width:height:scaleFactor:) -> Bool
+    + openFile(_: URL)
+    + closeFile()
+    + togglePlayPause()
+    + pausePlayback()
+    + setVolume(_: Float)
+    + toggleMute()
+    + setSpeed(_: Float)
+    + toggleLoop()
+    + seekToFrame(_: UInt32)
+    + stepForward()
+    + stepBackward()
+    + rewind()
+    + toggleFullscreen()
+    + toggleStageMaximized()
+    + setPlayerMode(_: PlayerMode)
+    + requestPermission(scope:)
+    + resolvePendingPermission(with:)
+    + captureThumbnail()
+    + routePlayerKeyEvent(...)
+    + sendVirtualGameAction(...)
+    + sendControllerGameAction(...)
+    + browseDirectory(_: URL)
+    + openImportedContent(_: ImportedContent)
+    + toggleFavorite(for: URL)
+    + selectSection(_: Section)
+    + removeLibraryItem(_: LibraryItem)
+    + applyRuntimeProfile(for: LibraryItem)
+    + handleSceneActiveStateChanged(_: Bool)
+    --
+    - setupPersistence()
+    - startLoadStatePolling()
+    - afterMovieLoaded(for: URL)
+    - pollPlaybackInfo()
+    - restorePlaybackPreferences(for: URL)
+    - recordEnginePolicyDiagnostic(_: RufflePolicyDiagnostic)
+    - handleEnginePermissionDenial()
+    - startTimelinePolling()
+    - captureAndStoreThumbnail(for: URL)
+}
+
+enum Section {
+    + player
+    + library
+    + recent
+    + favorites
+    + settings
+}
+
+AppState --> Section
+
+' ===== RuffleBridge =====
+class RuffleBridge <<@MainActor>> {
+    - playerPointer: OpaquePointer?
+    - rendererPointer: OpaquePointer?
+    - metalLayer: CAMetalLayer
+    - viewportWidth: Int
+    - viewportHeight: Int
+    - viewportScaleFactor: CGFloat
+    - configuredQuality: RuffleQuality
+    - playbackSpeed: Float
+    - currentVolume: Float
+    - loopFlag: Bool
+    - hasLoadedMovie: Bool
+    - renderLoopActive: Bool
+    - displayTimer: Timer? / displayLink: CADisplayLink?
+    - sharedObjectStorage: (root: URL, libraryID: UUID)?
+    --
+    + onFrameUpdate: ((Double, UInt64) -> Void)?
+    + onPolicyDiagnostic: ((RufflePolicyDiagnostic) -> Void)?
+    --
+    + init?(metalLayer:width:height:scaleFactor:quality:...)
+    + loadURL(_: String) -> Bool
+    + loadData(_: UnsafePointer<UInt8>, url: String)
+    + loadState() -> RuffleMovieLoadState?
+    + renderFrame()
+    + tick(_: Double)
+    + setPlaying(_: Bool)
+    + isPlaying() -> Bool
+    + setVolume(_: Float)
+    + getVolume() -> Float
+    + getPlaybackInfo() -> RufflePlaybackInfo?
+    + getMetadata() -> RuffleMetadata?
+    + seekFrame(_: UInt32)
+    + seekTime(_: Double)
+    + stepBack(_: UInt32)
+    + rewind()
+    + sendKeyEvent(...)
+    + sendMouseEvent(...)
+    + setViewport(width:height:scaleFactor:)
+    + setQuality(_: RuffleQuality)
+    + setSpeed(_: Float)
+    + setLooping(_: Bool)
+    + setFullscreen(_: Bool)
+    + setScaleMode(_: Int32)
+    + setLetterboxMode(_: Int32)
+    + setBackgroundColor(_: UInt32)
+    + stageSize() -> (width: UInt32, height: UInt32)?
+    + drainPolicyDiagnostics()
+    + setRenderLoopActive(_: Bool)
+    + configureSharedObjectStorage(root: URL, libraryID: UUID)
+    + getMetalLayer() -> CAMetalLayer
+    --
+    - recreatePlayer()
+    - setupDisplayTimer()
+}
+
+AppState *-- RuffleBridge : bridge
+
+' ===== RuffleBridge 内部类型 =====
+enum RuffleMovieLoadState {
+    + idle
+    + loading
+    + ready
+    + failed
+}
+
+enum RuffleQuality {
+    + low
+    + medium
+    + high
+    + high8x8Linear
+    + high8x8
+    + high16x16Linear
+    + high16x16
+    + high16x16Bitmap
+}
+
+struct RufflePolicyDiagnostic {
+    + kind: Kind
+    + target: String
+}
+enum RufflePolicyDiagnostic.Kind {
+    + filesystemDenied
+    + networkDenied
+    + networkUnsupported
+    + unsupportedScheme
+    + navigationDenied
+    + socketDenied
+}
+
+RuffleBridge ..> RuffleMovieLoadState
+RuffleBridge ..> RuffleQuality
+RuffleBridge ..> RufflePolicyDiagnostic
+
+' ===== PlayerLoadState =====
+enum PlayerLoadState {
+    + idle
+    + loading(UUID)
+    + ready
+    + failed(PlayerLoadFailure)
+}
+enum PlayerLoadFailure {
+    + engineLoadFailed
+    + timedOut
+}
+struct PlayerLoadCoordinator {
+    + loadState: PlayerLoadState
+    --
+    + begin() -> UUID
+    + complete(UUID, with: Bool) -> Bool
+    + cancel(UUID) -> Bool
+}
+
+AppState *-- PlayerLoadCoordinator : loadCoordinator
+
+' ===== PlayerViewModel =====
+class PlayerViewModel <<@MainActor>> {
+    + showControlBar: Bool
+    + isStageMaximized: Bool
+    + isFullscreen: Bool
+    + onControlBarVisibilityChanged: (() -> Void)?
+    --
+    + showControlBarTemporarily(isPlaying: Bool)
+    + keepControlBarVisible()
+    + controlBarOnPause()
+    + toggleStageMaximized()
+    + exitStageMaximized()
+    + toggleFullscreen()
+    --
+    - controlBarHideGeneration: Int
+    - controlBarHideWork: DispatchWorkItem?
+}
+
+AppState *-- PlayerViewModel : playerViewModel
+
+' ===== PlayerInputCoordinator =====
+class PlayerInputCoordinator <<@MainActor>> {
+    + pointerMoved(isPlaying:mode:setOverlayVisible:)
+    + cancelOverlayHide()
+    + playbackPaused(setOverlayVisible:)
+    + handleEscape(...)
+    + handleStageDoubleClick(...)
+    --
+    - overlayHideGeneration: Int
+    - overlayHideWork: DispatchWorkItem?
+}
+
+AppState *-- PlayerInputCoordinator : playerInputCoordinator
+
+' ===== InputRouter =====
+class InputRouter <<@MainActor>> {
+    - activeSources: [UInt32 : Set<InputSource>]
+    --
+    + route(keyCode:charCode:isDown:modifiers:source:isInteractive:isStageFocused:send:)
+    + releaseAll(send:)
+}
+enum InputSource {
+    + keyboard
+    + virtual(GameAction)
+    + controller(UUID, GameAction)
+}
+
+AppState *-- InputRouter : inputRouter
+InputRouter ..> InputSource
+
+@enduml

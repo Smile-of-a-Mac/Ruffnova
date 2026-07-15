@@ -1,0 +1,92 @@
+@startuml 02_FileOpening
+!theme plain
+title Ruffnova - 文件打开时序图
+
+actor User
+participant "AppCommandRouter" as Router
+participant "ContentView" as Content
+participant "AppState" as State
+participant "RuffleBridge" as Bridge
+participant "RuffleFFI\n(Rust C API)" as FFI
+participant "RufflePlayer\n(Rust)" as RustPlayer
+participant "FfiNavigatorBackend" as Nav
+participant "PermissionPolicyService" as PermSvc
+participant "LibraryService" as LibSvc
+participant "LibraryPersistence" as LibPersist
+
+== 用户通过菜单打开文件 ==
+
+User -> Router : Cmd+O (Open)
+activate Router
+Router -> Router : NSOpenPanel.show()\n过滤 .swf
+Router -> State : openFile(url)
+deactivate Router
+
+activate State
+State -> State : clearPermissions()
+State -> LibSvc : add(LibraryItem)\n创建/更新条目
+LibSvc -> LibPersist : saveRecentFiles()
+State -> State : restorePlaybackPreferences(for: url)
+State -> State : loadCoordinator.begin() → requestId
+
+alt Bridge 已就绪
+    State -> Bridge : loadURL(url)
+    activate Bridge
+    Bridge -> Bridge : RufflePlayerLifecycle\n.shouldRecreateBeforeLoad()
+    Bridge -> FFI : ruffle_player_load_url(playerPtr, url)
+    activate FFI
+    FFI -> RustPlayer : fetch_root_movie(url)
+    activate RustPlayer
+    RustPlayer -> Nav : evaluate URL access policy
+    Nav -> Nav : check networkAccess/\nfilesystemAccess policy
+
+    alt 策略允许
+        RustPlayer -> RustPlayer : load SWF data
+        RustPlayer -> FFI : mark Ready
+    else 策略拒绝
+        RustPlayer -> FFI : record diagnostic\n(FilesystemDenied/NetworkDenied)
+        RustPlayer -> FFI : mark Failed
+    end
+    deactivate RustPlayer
+    deactivate FFI
+    deactivate Bridge
+
+else Bridge 未就绪
+    State -> State : pendingFileURL = url\n等待 Metal 视图初始化
+end
+
+== 轮询加载状态 (100ms) ==
+
+State -> Bridge : loadState()
+Bridge -> FFI : ruffle_player_get_load_info(playerPtr)
+FFI --> Bridge : RuffleLoadInfo{state=Ready}
+Bridge --> State : .ready
+
+State -> State : afterMovieLoaded()
+State -> State : loadCoordinator.complete(requestId)
+State -> State : restore lastPlaybackFrame
+State -> State : autoPlay if configured
+State -> State : detect content type\n(animation vs interactive)
+State -> State : adopt stage size
+State -> LibSvc : update metadata/thumbnail
+State -> State : post .swfLoaded notification
+State -> State : startTimelinePolling()
+
+== 权限诊断 ==
+
+Bridge -> FFI : drainPolicyDiagnostics()
+FFI --> Bridge : [RufflePolicyDiagnostic]
+Bridge -> State : onPolicyDiagnostic callback
+
+alt 需要提示用户
+    State -> State : pendingPermissionRequest = context
+    Content -> Content : alert("Allow network access?")
+    User -> Content : Allow Once / Allow for File / Deny
+    Content -> State : resolvePendingPermission(decision)
+    State -> PermSvc : apply(decision, for: url, scope:)
+    State -> State : retry load if allowed
+end
+
+deactivate State
+
+@enduml

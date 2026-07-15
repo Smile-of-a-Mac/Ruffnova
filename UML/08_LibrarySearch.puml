@@ -1,0 +1,80 @@
+@startuml 08_LibrarySearch
+!theme plain
+title Ruffnova - 库搜索与过滤时序图
+
+actor User
+participant "AppSidebar" as Sidebar
+participant "AppState" as State
+participant "SearchService" as SearchSvc
+participant "LibraryService" as LibSvc
+participant "CollectionService" as CollSvc
+participant "LibraryContentView" as Content
+participant "LibraryFileCell" as Cell
+
+== 搜索流程 ==
+
+User -> Sidebar : 输入搜索文本
+Sidebar -> State : updateSearchText(text)
+activate State
+State -> State : searchText = text\nisSearching = !text.isEmpty
+
+alt 搜索文本非空
+    State -> SearchSvc : search(query: text)
+    activate SearchSvc
+    SearchSvc -> LibSvc : LibraryService.shared.items
+    SearchSvc -> CollSvc : CollectionService.shared
+
+    SearchSvc -> SearchSvc : 过滤匹配:\n1. name (不区分大小写)\n2. url path\n3. tags\n4. notes\n5. collection names\n6. "favorite" → isFavorite\n7. availability status\n8. compatibility status\n9. content type
+
+    SearchSvc --> State : [LibraryItem] results
+    deactivate SearchSvc
+
+    State -> Content : 显示搜索结果视图
+    Content -> Cell : 渲染匹配的条目
+else 搜索文本为空
+    State -> Content : 显示正常库视图
+end
+deactivate State
+
+== 排序与过滤 ==
+
+User -> Content : 选择排序/过滤器
+Content -> LibSvc : items(matching: filter, sortedBy: order)
+activate LibSvc
+
+LibSvc -> LibSvc : filtered(by: filter)
+note right of LibSvc
+  过滤器:
+  .all, .favorites, .recent,
+  .missing, .compatibilityIssues,
+  .animation, .interactive,
+  .continuePlaying, .recentlyAdded,
+  .untagged
+end note
+
+LibSvc -> LibSvc : sorted(by: order)
+note right of LibSvc
+  排序:
+  .name (字母序)
+  .lastOpened (最近打开)
+  .dateAdded (添加时间)
+  .fileSize (文件大小)
+end note
+
+LibSvc --> Content : [LibraryItem]
+deactivate LibSvc
+
+== 多选批量操作 ==
+
+User -> Content : 进入多选模式
+Content -> Content : selectedItems: Set<UUID>
+
+User -> Content : 选择多个条目
+Content -> Content : toggleSelection(for: id)
+
+User -> Content : 批量操作 (收藏/删除)
+Content -> LibSvc : setSelectedFavorites(true/false)
+Content -> LibSvc : removeSelectedItems()
+LibSvc -> LibSvc : remove items\n清理 thumbnails, bookmarks, collections
+
+@enduml

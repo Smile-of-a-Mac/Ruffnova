@@ -1,0 +1,104 @@
+@startuml 05_PermissionFlow
+!theme plain
+title Ruffnova - 权限管理时序图
+
+participant "RufflePlayer\n(Rust)" as RustPlayer
+participant "FfiNavigatorBackend" as Nav
+participant "RuffleFFI" as FFI
+participant "RuffleBridge" as Bridge
+participant "AppState" as State
+participant "PermissionPolicy\nService" as PermSvc
+participant "ContentView" as Content
+actor User
+
+== SWF 请求受保护资源 ==
+
+RustPlayer -> Nav : fetch(url)\n请求网络/文件资源
+activate Nav
+Nav -> Nav : resource_access(url)\n检查 scheme + policy
+
+alt 网络资源 (http/https) && networkAccess == Deny
+    Nav -> Nav : redacted_target(url)\n脱敏 URL
+    Nav -> FFI : push diagnostic\n{NetworkDenied, target}
+    Nav --> RustPlayer : 返回 error future
+
+else 文件资源 (file://) && filesystemAccess == Deny
+    Nav -> Nav : redacted_target(url)
+    Nav -> FFI : push diagnostic\n{FilesystemDenied, target}
+    Nav --> RustPlayer : 返回 error future
+
+else Socket 请求
+    Nav -> FFI : push diagnostic\n{SocketDenied}
+    Nav --> RustPlayer : 返回 error
+
+else 允许访问
+    Nav -> Nav : fetch_path(url)
+    Nav --> RustPlayer : 返回 data future
+end
+deactivate Nav
+
+== Swift 侧轮询诊断队列 ==
+
+loop 定期调用
+    Bridge -> FFI : ruffle_player_next_diagnostic(playerPtr)
+    FFI --> Bridge : RuffleDiagnostic{kind, target}
+
+    Bridge -> State : onPolicyDiagnostic(diagnostic)
+    activate State
+
+    State -> State : policyDiagnostics.append(diagnostic)
+    State -> State : handleEnginePermissionDenial()
+
+    State -> PermSvc : evaluation(for: fileURL, scope:)
+    activate PermSvc
+    PermSvc -> PermSvc : 三层评估:\n1. sessionAllowance\n2. per-file override\n3. global default
+    PermSvc --> State : .requiresPrompt / .allowed / .denied
+    deactivate PermSvc
+
+    alt evaluation == .requiresPrompt
+        State -> State : pendingPermissionRequest =\nPermissionRequestContext{url, scope, resource}
+    end
+    deactivate State
+end
+
+== 用户交互确认权限 ==
+
+Content -> Content : .alert(bound to pendingPermissionRequest)
+Content -> User : 显示权限提示\n"Allow network access to example.com?"
+
+User -> Content : 选择决策
+
+alt Allow Once
+    Content -> State : resolvePendingPermission(.allowOnce)
+    State -> PermSvc : apply(.allowOnce, for: url, scope: .network)
+    PermSvc -> PermSvc : sessionAllowances.insert({url, scope})
+    State -> State : 重试文件加载
+
+else Allow for File
+    Content -> State : resolvePendingPermission(.allowForFile)
+    State -> PermSvc : apply(.allowForFile, for: url, scope: .network)
+    PermSvc -> PermSvc : save override to disk\npermissionPolicies.json
+    State -> State : 重试文件加载
+
+else Deny for File
+    Content -> State : resolvePendingPermission(.denyForFile)
+    State -> PermSvc : apply(.denyForFile, for: url, scope: .network)
+    PermSvc -> PermSvc : save override to disk
+
+end
+
+== 三层权限评估模型 ==
+
+note over PermSvc
+  **Priority (high → low):**
+  1. Session Allowance (内存, 仅本次运行)
+  2. Per-File Override (持久化到 JSON)
+  3. Global Default (UserDefaults)
+
+  **Decision 流转:**
+  - allowOnce → 加入 session set
+  - allowForFile / denyForFile → 写入 per-file override
+  - useGlobalDefault → 清除 override, 回退到全局
+end note
+
+@enduml

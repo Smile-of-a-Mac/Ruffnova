@@ -1,0 +1,280 @@
+@startuml 11_ClassDiagram_Player
+!theme plain
+title Ruffnova - Player 模块类图
+
+skinparam classAttributeIconSize 0
+
+' ===== 渲染视图 =====
+abstract class RufflePlayerView <<SwiftUI View>> {
+    + body: some View
+}
+note right of RufflePlayerView
+  平台适配器:
+  #if os(macOS) → RufflePlayerViewMacOS
+  #if os(iOS)  → RufflePlayerViewIOS
+end note
+
+class RufflePlayerViewMacOS <<NSViewRepresentable>> {
+    + makeNSView(context:) -> RuffleMetalViewMacOS
+    + updateNSView(_:context:)
+    + makeCoordinator() -> Coordinator
+    + dismantleNSView(_:coordinator:)
+}
+class RuffleMetalViewMacOS <<MTKView>> {
+    - appState: AppState?
+    - trackingArea: NSTrackingArea?
+    - isBridgeInitialized: Bool
+    --
+    + tryInitializeBridge()
+    + updateViewport()
+    - handleMouseEvent(_: RuffleMetalMouseEvent)
+    - postKeyEvent(keyCode:charCode:isDown:modifiers:)
+}
+
+class RufflePlayerViewIOS <<UIViewRepresentable>> {
+    + makeUIView(context:) -> RuffleMetalViewIOS
+    + updateUIView(_:context:)
+    + makeCoordinator() -> Coordinator
+    + dismantleUIView(_:coordinator:)
+}
+class RuffleMetalViewIOS <<MTKView>> {
+    - appState: AppState?
+    - isBridgeInitialized: Bool
+    --
+    + tryInitializeBridge()
+    + updateViewport()
+    - handleTap(_: UITapGestureRecognizer)
+    - handleDoubleTap(_: UITapGestureRecognizer)
+    - handleLongPress(_: UILongPressGestureRecognizer)
+    - handlePan(_: UIPanGestureRecognizer)
+    - handlePinch(_: UIPinchGestureRecognizer)
+}
+
+RufflePlayerView --> RufflePlayerViewMacOS : macOS
+RufflePlayerView --> RufflePlayerViewIOS : iOS
+RufflePlayerViewMacOS *-- RuffleMetalViewMacOS
+RufflePlayerViewIOS *-- RuffleMetalViewIOS
+
+struct RuffleMetalMouseEvent {
+    + x: Float
+    + y: Float
+    + eventType: Int32
+    + scrollDeltaX: Float
+    + scrollDeltaY: Float
+}
+enum RuffleMetalConfig {
+    + configure(_ view: MTKView)
+}
+enum RuffleSurfaceInitialization {
+    + isReady(width:height:layer:) -> Bool
+}
+
+RuffleMetalViewMacOS ..> RuffleMetalMouseEvent
+RuffleMetalViewIOS ..> RuffleMetalMouseEvent
+RuffleMetalViewMacOS ..> RuffleMetalConfig
+RuffleMetalViewIOS ..> RuffleMetalConfig
+
+' ===== 控制栏 =====
+class PlayerControlBar <<SwiftUI View>> {
+    + body: some View
+    --
+    - modernSeekBar: some View
+    - modernSkipButtons: some View
+    - modernTimeDisplay: some View
+    - modernLoopButton: some View
+    - modernSpeedButton: some View
+    - modernVolumeControl: some View
+    - iosInteractiveControlBar: some View
+    - iosAnimationControlBar: some View
+    - interactiveGlassPills: some View
+    - animationBar: some View
+}
+
+class PlayerModeMenu <<SwiftUI View>> {
+    + body: some View
+}
+
+class GameControlsView <<SwiftUI View>> {
+    + send: (GameAction, Bool) -> Void
+    + body: some View
+    --
+    - dPad: some View
+    - actionButtons: some View
+}
+
+class DebugOverlayView <<SwiftUI View>> {
+    + body: some View
+}
+
+class SWFInfoPanel <<SwiftUI View>> {
+    + url: URL
+    + body: some View
+    --
+    - refresh()
+}
+
+class TraceConsoleView <<SwiftUI View>> {
+    + body: some View
+}
+
+class GameStorageSection <<SwiftUI View>> {
+    + libraryID: UUID
+    + body: some View
+    --
+    - reload()
+    - export(_: GameStorageEntry)
+    - delete(_: GameStorageEntry)
+}
+
+' ===== 模型 =====
+enum PlayerMode {
+    + normal
+    + cinema
+    + game
+    --
+    + localizedKey: String
+}
+
+struct PlaybackPreferences <<Codable Equatable>> {
+    + volume: Float?
+    + isMuted: Bool?
+    + quality: Int32?
+    + letterbox: String?
+    + isLooping: Bool?
+    + speed: Float?
+    + lastFrame: UInt32?
+    + preferredMode: PlayerMode?
+}
+
+enum GameAction <<String Codable CaseIterable Identifiable>> {
+    + up
+    + down
+    + left
+    + right
+    + confirm
+    + cancel
+    + primary
+    + secondary
+    --
+    + id: String
+    + localizedKey: String
+}
+
+struct InputProfile <<Codable Equatable>> {
+    + mapping: [GameAction : UInt32]
+    --
+    + static defaultMapping: [GameAction : UInt32]
+    + keyCode(for action: GameAction) -> UInt32?
+}
+
+enum HIDKeyMapper {
+    + macVirtualKeyToHID(_: UInt16) -> UInt32
+    + hidUsage(_: UInt32) -> UInt32
+}
+
+' ===== 服务 =====
+class GameControllerInputService <<@MainActor>> {
+    - connectedControllers: [UUID : GCController]
+    - send: (UUID, GameAction, Bool) -> Void
+    --
+    + start()
+    + stop()
+    --
+    - observeNotifications()
+    - bindController(_: UUID)
+    - releaseController(_: UUID)
+}
+
+class GameStorageService {
+    {static} + shared: GameStorageService
+    --
+    + entries(for libraryID: UUID) -> [GameStorageEntry]
+    + usage(for libraryID: UUID) -> GameStorageUsage
+    + read(_ name: String, for libraryID: UUID) -> Data?
+    + replace(_ data: Data, named: String, for libraryID: UUID) -> Bool
+    + importData(_ data: Data, named: String, for libraryID: UUID) -> Bool
+    + delete(_ name: String, for libraryID: UUID) -> Bool
+}
+
+struct GameStorageEntry <<Identifiable Equatable>> {
+    + id: String
+    + name: String
+    + size: UInt64
+}
+
+struct GameStorageUsage {
+    + usedBytes: UInt64
+    + quotaBytes: UInt64
+}
+
+class TraceConsole <<@MainActor ObservableObject>> {
+    {static} + shared: TraceConsole
+    + entries: [TraceEntry]
+    + maxEntries: Int = 1000
+    --
+    + append(_ message: String)
+    + clear()
+}
+
+struct TraceEntry <<Identifiable>> {
+    + id: UUID
+    + message: String
+    + timestamp: Date
+}
+
+' ===== 诊断 =====
+enum PlayerIssue <<Error Equatable Identifiable>> {
+    + fileInaccessible
+    + fileMissing
+    + fileDamaged
+    + ruffleLoadFailure
+    + unsupportedAPI
+    + networkBlocked
+    + filesystemBlocked
+    + libraryMigrationFailed
+    + renderInitFailure
+    + scriptTimeout
+    + unknown(String)
+    --
+    + id: String
+    + displayMessage(localize:) -> String
+    + recoverySuggestion(localize:) -> String?
+}
+
+struct CompatibilityReport <<Equatable>> {
+    + generatedAt: Date
+    + fileName: String
+    + filePath: String
+    + fileSize: UInt64
+    + appVersion: String
+    + engineVersion: String
+    + metadata: SWFMetadata?
+    + currentFrame: UInt32
+    + issues: [PlayerIssue]
+    + permissionPolicy: [String]
+    + traceSummary: [String]
+    --
+    + plainText(localize:) -> String
+}
+
+class DiagnosticsService {
+    {static} + shared: DiagnosticsService
+    --
+    + makeReport(...) -> CompatibilityReport
+    + traceSummary(from:maxEntries:) -> [String]
+    + copyReport(_: CompatibilityReport)
+    --
+    - redactedTraceMessage(_: String) -> String
+}
+
+' ===== 关系 =====
+GameControlsView ..> GameAction
+GameControlsView ..> InputProfile
+GameControllerInputService ..> GameAction
+GameStorageSection --> GameStorageService
+SWFInfoPanel ..> TraceConsole
+DiagnosticsView ..> DiagnosticsService
+DiagnosticsService ..> CompatibilityReport
+CompatibilityReport ..> PlayerIssue
+
+@enduml

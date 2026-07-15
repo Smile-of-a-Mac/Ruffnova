@@ -1,0 +1,85 @@
+@startuml 01_AppStartup
+!theme plain
+title Ruffnova - 应用启动时序图
+
+actor User
+participant "RuffleApp\n(@main)" as App
+participant "AppDelegate\n(macOS)" as Delegate
+participant "AppState\n(ObservableObject)" as State
+participant "LocalizationManager" as LocMgr
+participant "SettingsPersistence" as Settings
+participant "LibraryService" as LibSvc
+participant "BookmarkManager" as BookMgr
+participant "ContentView" as Content
+participant "RufflePlayerView" as PlayerView
+
+== 应用启动 ==
+
+User -> App : 启动应用
+activate App
+
+App -> State : 创建 @StateObject
+activate State
+State -> Settings : restore settings
+State -> LibSvc : loadRecentFiles()
+State -> BookMgr : load()
+State -> LocMgr : detectDeviceLanguage()
+State -> State : setupPersistence()\n(Combine sinks)
+State -> State : migrateIfNeeded()
+deactivate State
+
+App -> LocMgr : 创建 @StateObject
+activate LocMgr
+LocMgr -> LocMgr : load translations\nfrom JSON bundle
+deactivate LocMgr
+
+App -> Delegate : applicationDidFinishLaunching
+activate Delegate
+Delegate -> Delegate : setActivationPolicy(.regular)
+Delegate -> Delegate : configure windows\n(transparent titlebar, glass)
+Delegate -> Delegate : applyMenuLocalization()
+Delegate -> Delegate : register notifications\n(didBecomeMain, localizationChanged)
+deactivate Delegate
+
+App -> Content : 注入 @EnvironmentObject\n(appState, locManager)
+activate Content
+
+== 用户打开文件（拖拽或菜单） ==
+
+Delegate -> Delegate : application(_:open:)\n接收 SWF URL
+Delegate -> State : post .openSWFFile notification
+
+Content -> State : onReceive(.openSWFFile)\n→ appState.openFile(url)
+activate State
+State -> LibSvc : add/update LibraryItem
+State -> State : restorePlaybackPreferences()
+State -> State : startLoadStatePolling()
+State -> State : pendingFileURL = url\n(bridge 未就绪时暂存)
+deactivate State
+
+== Metal 视图就绪，初始化 Bridge ==
+
+Content -> PlayerView : SwiftUI 渲染
+activate PlayerView
+PlayerView -> PlayerView : tryInitializeBridge()\n创建 CAMetalLayer
+PlayerView -> State : initializeBridge(metalLayer:...)
+activate State
+State -> State : 创建 RuffleBridge\n(metalLayer, config)
+State -> State : 配置 quality/volume/speed/loop
+State -> State : bridge.loadURL(pendingFileURL)
+deactivate State
+deactivate PlayerView
+
+== 加载完成 ==
+
+State -> State : pollLoadState() [100ms timer]
+State -> State : loadState == .ready
+State -> State : afterMovieLoaded()
+State -> LibSvc : update metadata
+State -> State : post .swfLoaded
+State -> State : startTimelinePolling()
+
+deactivate Content
+deactivate App
+
+@enduml

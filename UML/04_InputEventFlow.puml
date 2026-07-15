@@ -1,0 +1,84 @@
+@startuml 04_InputEventFlow
+!theme plain
+title Ruffnova - 输入事件流时序图
+
+participant "NSEvent /\nUIGestureRecognizer" as NativeInput
+participant "RuffleMetalView\n(MTKView)" as MetalView
+participant "NotificationCenter" as NC
+participant "ContentView" as Content
+participant "AppState" as State
+participant "InputRouter" as Router
+participant "RuffleBridge" as Bridge
+participant "RuffleFFI\n(Rust)" as FFI
+participant "GameControllerInput\nService" as GCInput
+participant "GameControlsView" as VGamePad
+
+== 键盘输入 ==
+
+NativeInput -> MetalView : keyDown(with: event)
+activate MetalView
+MetalView -> MetalView : HIDKeyMapper\n.macVirtualKeyToHID()
+MetalView -> NC : post .keyEvent\n(keyCode, charCode, isDown, modifiers)
+deactivate MetalView
+
+NC -> Content : onReceive(.keyEvent)
+Content -> State : routePlayerKeyEvent(...)
+activate State
+State -> Router : route(keyCode, charCode,\nisDown, source: .keyboard,\nisInteractive, isStageFocused, send)
+activate Router
+Router -> Router : deduplicate\n(只转发首次按下/最后释放)
+Router -> Bridge : sendKeyEvent(keyCode, charCode,\nisDown, modifiers)
+activate Bridge
+Bridge -> FFI : ruffle_player_key_event(playerPtr, event)
+FFI -> FFI : map HID → PhysicalKey\ndispatch PlayerEvent
+deactivate Bridge
+deactivate Router
+deactivate State
+
+== 鼠标/触摸输入 ==
+
+NativeInput -> MetalView : mouseMoved / touchesBegan
+activate MetalView
+MetalView -> MetalView : 计算坐标 (归一化)
+MetalView -> Bridge : sendMouseEvent(x, y, type, delta)
+activate Bridge
+Bridge -> FFI : ruffle_player_mouse_event(playerPtr, event)
+FFI -> FFI : dispatch PlayerEvent\n(MouseMove/Down/Up/Wheel)
+deactivate Bridge
+deactivate MetalView
+
+== 游戏控制器输入 ==
+
+GCInput -> GCInput : GCController\n.buttonValueChangedHandler
+activate GCInput
+GCInput -> Router : route(keyCode from InputProfile,\nsource: .controller(uuid, action))
+activate Router
+Router -> Bridge : sendKeyEvent(...)
+Bridge -> FFI : ruffle_player_key_event(...)
+deactivate Router
+deactivate GCInput
+
+== 虚拟游戏手柄输入 ==
+
+User -> VGamePad : 触摸 D-pad / Action 按钮
+activate VGamePad
+VGamePad -> VGamePad : DragGesture(0)\npress/release 语义
+VGamePad -> State : sendVirtualGameAction(action, isDown)
+State -> Router : route(keyCode from InputProfile,\nsource: .virtual(action))
+activate Router
+Router -> Bridge : sendKeyEvent(...)
+Bridge -> FFI : ruffle_player_key_event(...)
+deactivate Router
+deactivate VGamePad
+
+== 输入去重逻辑 ==
+
+note over Router
+  InputRouter 维护 activeSources: [keyCode: Set<InputSource>]
+  - 首次按下 (set 为空 → 非空): 转发 keyDown
+  - 重复按下 (set 已含此 source): 忽略
+  - 最后释放 (set 变空): 转发 keyUp
+  - releaseAll(): 焦点丢失时释放所有按键
+end note
+
+@enduml

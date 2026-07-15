@@ -1,0 +1,311 @@
+@startuml 15_ClassDiagram_Views
+!theme plain
+title Ruffnova - 视图层类图
+
+skinparam classAttributeIconSize 0
+
+' ===== App 入口 =====
+class RuffleApp <<@main SwiftUI App>> {
+    + body: some Scene
+}
+note right of RuffleApp
+  macOS: WindowGroup + Settings + About
+  iOS:   WindowGroup + .onOpenURL
+end note
+
+class AppDelegate <<NSApplicationDelegate>> {
+    + applicationDidFinishLaunching(_:)
+    + application(_:open:)
+    + applicationShouldTerminateAfterLastWindowClosed -> Bool
+    + applicationShouldHandleReopen(_:flag:) -> Bool
+    + windowDidBecomeMain(_:)
+    --
+    - configure(_ window: NSWindow)
+}
+
+class IOSAppDelegate <<UIApplicationDelegate>> {
+    + didFinishLaunchingWithOptions -> Bool
+    + supportedInterfaceOrientationsFor -> UIInterfaceOrientationMask
+}
+
+' ===== 主窗口 =====
+class ContentView <<SwiftUI View macOS>> {
+    + body: some View
+    --
+    - playerArea: some View
+    - permissionAlert: some View
+    - presentedSheet: PresentedSheet?
+}
+enum PresentedSheet {
+    + swfInfo
+    + traceConsole
+    + diagnostics
+}
+
+class IOSContentView <<SwiftUI View iOS>> {
+    + body: some View
+    --
+    - iPadLayout: some View
+    - iPhoneLayout: some View
+    - playerView: some View
+    - sidebarContent: some View
+}
+
+' ===== 侧边栏 =====
+class AppSidebar <<SwiftUI View>> {
+    + body: some View
+}
+
+class SidebarCollectionsView <<SwiftUI View>> {
+    + body: some View
+}
+
+' ===== 库视图 =====
+class LibraryContentView <<SwiftUI View>> {
+    + body: some View
+}
+
+class LibraryGridView <<SwiftUI View>> {
+    + filter: LibraryFilter
+    + body: some View
+}
+
+class LibraryFileCell <<SwiftUI View>> {
+    + file: LibraryItem
+    + body: some View
+}
+
+class FavoritesGridView <<SwiftUI View>> {
+    + body: some View
+}
+
+class RecentListView <<SwiftUI View>> {
+    + body: some View
+}
+
+class RecentFileRow <<SwiftUI View>> {
+    + file: LibraryItem
+    + body: some View
+}
+
+class LibraryItemDetailsView <<SwiftUI View>> {
+    + item: LibraryItem
+    + body: some View
+}
+
+class EmptyStateView <<SwiftUI View>> {
+    + body: some View
+}
+
+' ===== 播放器视图 =====
+class RufflePlayerView <<SwiftUI View>> {
+    + body: some View
+}
+
+class RufflePlayerViewMacOS <<NSViewRepresentable>> {
+    + makeNSView(context:)
+    + updateNSView(_:context:)
+}
+
+class RufflePlayerViewIOS <<UIViewRepresentable>> {
+    + makeUIView(context:)
+    + updateUIView(_:context:)
+}
+
+class PlayerControlBar <<SwiftUI View>> {
+    + body: some View
+}
+
+class PlayerModeMenu <<SwiftUI View>> {
+    + body: some View
+}
+
+class GameControlsView <<SwiftUI View>> {
+    + send: (GameAction, Bool) -> Void
+    + body: some View
+}
+
+class DebugOverlayView <<SwiftUI View>> {
+    + body: some View
+}
+
+class SWFInfoPanel <<SwiftUI View>> {
+    + url: URL
+    + body: some View
+}
+
+class TraceConsoleView <<SwiftUI View>> {
+    + body: some View
+}
+
+class GameStorageSection <<SwiftUI View>> {
+    + libraryID: UUID
+    + body: some View
+}
+
+class DiagnosticsView <<SwiftUI View>> {
+    + body: some View
+}
+
+' ===== 工具栏 & 状态栏 =====
+class AppToolbar <<ToolbarContent>> {
+    + refreshToken: Int
+    + body: some ToolbarContent
+}
+
+class StatusBarView <<SwiftUI View>> {
+    + body: some View
+}
+
+class AppBrandHeader <<SwiftUI View>> {
+    + size: Size
+    + alignment: VerticalAlignment
+    + body: some View
+}
+enum AppBrandHeader.Size {
+    + sidebar
+    + about
+}
+
+' ===== 设置 =====
+class SettingsView <<SwiftUI View>> {
+    + body: some View
+}
+note right of SettingsView
+  macOS → MacSettingsView (TabView)
+  iOS   → IOSSettingsRootView
+end note
+
+class MacSettingsView <<SwiftUI View macOS>> {
+    + body: some View
+}
+class InlineSettingsView <<SwiftUI View>> {
+    + body: some View
+}
+class GeneralSettingsView <<SwiftUI View>> {
+    + body: some View
+}
+class AdvancedSettingsView <<SwiftUI View>> {
+    + body: some View
+}
+class PrivacySettingsView <<SwiftUI View>> {
+    + body: some View
+}
+class AboutSettingsView <<SwiftUI View>> {
+    + body: some View
+}
+
+struct SettingsActions {
+    + setQuality: (Int32) -> Void
+    + setVolume: (Float) -> Void
+    + setMuted: (Bool) -> Void
+    + setLooping: (Bool) -> Void
+    + setSpeed: (Float) -> Void
+    + setAutoplay: (Bool) -> Void
+    + setLetterbox: (String) -> Void
+    + setMaxExecutionDuration: (Double) -> Void
+    + setShowDebugUI: (Bool) -> Void
+    + setDefaultPlayerMode: (PlayerMode) -> Void
+    + setLanguage: (Language) -> Void
+    + resetAll: () -> Void
+}
+
+' ===== About =====
+class AboutView <<SwiftUI View>> {
+    + body: some View
+}
+
+' ===== 搜索 =====
+class SearchView <<SwiftUI View>> {
+    + body: some View
+}
+
+' ===== Commands =====
+class RuffleCommands <<Commands>> {
+    + body: some Commands
+}
+
+enum AppCommandRouter <<@MainActor>> {
+    + {static} openFile(appState:loc:)
+    + {static} importFolder(appState:loc:)
+    + {static} reloadCurrentFile(appState:)
+    + {static} closeCurrentFile(appState:)
+    + {static} toggleFavorite(appState:)
+    + {static} showCurrentFileInFinder(appState:)
+    + {static} focusSearch(appState:)
+    + {static} showSWFInfo(appState:)
+    + {static} showDiagnostics(appState:)
+    + {static} toggleTraceConsole(appState:)
+    + {static} saveScreenshot(appState:)
+    + {static} copyScreenshot(appState:)
+    + {static} enterGameMode(appState:)
+    + {static} exitGameMode(appState:)
+    + {static} openHelp()
+    + {static} reportIssue()
+}
+
+class WindowAppearancePolicy <<enum>> {
+    + {static} shouldConfigure(_ window: NSWindow) -> Bool
+}
+
+' ===== 视图关系 =====
+RuffleApp --> ContentView : macOS
+RuffleApp --> IOSContentView : iOS
+RuffleApp --> AppDelegate : @NSApplicationDelegateAdaptor
+RuffleApp --> IOSAppDelegate : @UIApplicationDelegateAdaptor
+RuffleApp --> RuffleCommands
+RuffleApp --> SettingsView
+RuffleApp --> AboutView
+
+ContentView --> AppSidebar
+ContentView --> LibraryContentView
+ContentView --> RufflePlayerView
+ContentView --> PlayerControlBar
+ContentView --> PlayerModeMenu
+ContentView --> DebugOverlayView
+ContentView --> SWFInfoPanel
+ContentView --> TraceConsoleView
+ContentView --> DiagnosticsView
+ContentView --> StatusBarView
+ContentView --> AppToolbar
+ContentView --> GameControlsView
+
+IOSContentView --> AppSidebar
+IOSContentView --> LibraryContentView
+IOSContentView --> RufflePlayerView
+IOSContentView --> PlayerControlBar
+IOSContentView --> GameControlsView
+IOSContentView --> SidebarCollectionsView
+IOSContentView --> SettingsView
+IOSContentView --> DiagnosticsView
+IOSContentView --> EmptyStateView
+
+AppSidebar --> SidebarCollectionsView
+AppSidebar --> AppBrandHeader
+
+LibraryContentView --> LibraryGridView
+LibraryContentView --> FavoritesGridView
+LibraryContentView --> RecentListView
+LibraryContentView --> EmptyStateView
+LibraryContentView --> SettingsView
+
+LibraryGridView --> LibraryFileCell
+RecentListView --> RecentFileRow
+
+RufflePlayerView --> RufflePlayerViewMacOS : #if macOS
+RufflePlayerView --> RufflePlayerViewIOS : #if iOS
+
+SettingsView --> MacSettingsView : macOS
+SettingsView --> InlineSettingsView : iOS inline
+MacSettingsView --> GeneralSettingsView
+MacSettingsView --> PrivacySettingsView
+MacSettingsView --> AdvancedSettingsView
+MacSettingsView --> AboutSettingsView
+SettingsView --> SettingsActions
+
+RuffleCommands --> AppCommandRouter
+AppToolbar --> AppCommandRouter
+
+AppDelegate --> WindowAppearancePolicy
+
+@enduml

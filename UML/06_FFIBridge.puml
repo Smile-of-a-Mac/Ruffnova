@@ -1,0 +1,110 @@
+@startuml 06_FFIBridge
+!theme plain
+title Ruffnova - Swift ↔ Rust FFI 桥接时序图
+
+participant "AppState\n(Swift)" as State
+participant "RuffleBridge\n(Swift @MainActor)" as Bridge
+participant "CRuffleFFI\n(C Header)" as FFI
+participant "ruffle_ffi\n(Rust crate)" as Rust
+participant "ruffle_core\n(Rust Player)" as Core
+participant "WgpuRenderBackend\n(wgpu + Metal)" as GPU
+participant "DiskStorageBackend\n(Rust)" as Storage
+participant "Disk\n(.sol files)" as Disk
+
+== 创建渲染器 ==
+
+State -> Bridge : init(metalLayer, config...)
+activate Bridge
+Bridge -> FFI : ruffle_renderer_create(metalLayer, w, h, scale)
+activate FFI
+FFI -> Rust : WgpuRenderBackend::new(\n  CoreAnimationLayer from CAMetalLayer,\n  Metal backend, HighPerformance)
+Rust -> GPU : initialize wgpu surface
+FFI --> Bridge : *mut RuffleRenderer (opaque)
+deactivate FFI
+
+== 创建播放器 ==
+
+Bridge -> FFI : ruffle_player_create_with_renderer_and_storage(\n  config, renderer, storageRoot, libraryID)
+activate FFI
+FFI -> Rust : ruffle_player_create_internal(...)
+Rust -> Rust : PlayerBuilder\n  .with_navigator(FfiNavigatorBackend)\n  .with_ui(FfiUiBackend)\n  .with_renderer(renderer.backend.take())\n  .with_video(SoftwareVideoBackend)\n  .with_audio(CpalAudioBackend)\n  .with_storage(DiskStorageBackend)\n  .with_viewport(w, h, scale)\n  .with_quality(quality)\n  .with_autoplay(autoplay)
+Rust -> Core : PlayerBuilder.build()
+Core --> Rust : Player
+Rust --> FFI : Box::into_raw(RufflePlayer{inner: Arc<Mutex<Player>>})
+FFI --> Bridge : *mut RufflePlayer (opaque)
+deactivate FFI
+
+== 加载 SWF 文件 ==
+
+Bridge -> FFI : ruffle_player_load_url(playerPtr, "file:///path/to/game.swf")
+activate FFI
+FFI -> Rust : parse URL, set root_movie_url
+FFI -> Rust : load_status.begin()
+FFI -> Core : guard.fetch_root_movie(url, callback)
+Core -> Core : parse SWF header\ninitialize AVM\nbuild display list
+Core --> Rust : callback → load_status.mark_ready()
+deactivate FFI
+
+== 渲染帧 (每帧) ==
+
+Bridge -> FFI : ruffle_player_tick(playerPtr, deltaTime)
+activate FFI
+FFI -> Rust : lock Arc<Mutex<Player>>
+Rust -> Core : guard.tick(dt)\n  - run AVM bytecode\n  - process event queue\n  - update display objects\n  - advance timeline
+FFI -> Rust : executor.run()
+deactivate FFI
+
+Bridge -> FFI : ruffle_player_render(playerPtr)
+activate FFI
+FFI -> Rust : lock player
+Rust -> Core : guard.render()
+Core -> GPU : render display list → wgpu commands
+GPU -> GPU : submit to Metal command queue
+deactivate FFI
+
+== 存储操作 (Flash SharedObject) ==
+
+State -> Bridge : configureSharedObjectStorage(root, libraryID)
+Bridge -> Bridge : storageRoot + libraryID\n→ namespace path
+
+note over Storage
+  每次 FFI 存储调用都验证:
+  - 路径安全 (无 ".." 组件)
+  - 命名空间有效 (绝对路径 + UUID)
+  - 10MB 配额限制
+end note
+
+Bridge -> FFI : ruffle_storage_list(playerPtr, storageRoot, libraryID)
+activate FFI
+FFI -> Storage : DiskStorageBackend::new(path)
+Storage -> Disk : read_dir(path)\nfilter *.sol
+Disk --> Storage : [name1.sol, name2.sol, ...]
+Storage --> FFI : RuffleStringList
+FFI --> Bridge : [GameStorageEntry]
+deactivate FFI
+
+Bridge -> FFI : ruffle_storage_replace(playerPtr, root, id, name, data, len)
+activate FFI
+FFI -> Storage : put(name, data)
+Storage -> Storage : check quota (10MB)
+Storage -> Disk : write to temp file\n→ sync_all()\n→ atomic rename
+Storage --> FFI : success
+deactivate FFI
+
+== 内存管理 ==
+
+note over Bridge, FFI
+  **所有权规则:**
+  - Rust 通过 Box::into_raw 分配 → Swift 持有 OpaquePointer
+  - Swift 必须调用对应的 _free 函数释放:
+    ruffle_player_free(playerPtr)
+    ruffle_renderer_free(rendererPtr)
+    ruffle_string_free(str)
+    ruffle_bytes_free(bytes)
+    ruffle_string_list_free(list)
+  - RuffleString/RuffleBytes: Rust 泄露 Box, Swift 负责释放
+end note
+
+deactivate Bridge
+
+@enduml

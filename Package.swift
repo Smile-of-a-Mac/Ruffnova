@@ -6,7 +6,7 @@ let package = Package(
     name: "Ruffnova",
     defaultLocalization: "en",
     platforms: [
-        .macOS(.v13),
+        .macOS(.v14),
         .iOS(.v17),
     ],
     targets: [

@@ -3,10 +3,20 @@ import SwiftUI
 struct RuffleCommands: Commands {
     @ObservedObject var appState: AppState
     @ObservedObject private var locManager = LocalizationManager.shared
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
 
     private var loc: LocalizationManager { locManager }
 
     var body: some Commands {
+        #if os(macOS)
+        CommandGroup(replacing: .appInfo) {
+            Button(loc.localized("menu.about")) {
+                openWindow(id: "ruffnova-about")
+            }
+        }
+        #endif
 
         // MARK: - File Menu
         CommandGroup(replacing: .newItem) {
@@ -69,6 +79,14 @@ struct RuffleCommands: Commands {
         }
 
         // MARK: - Edit Menu
+        CommandGroup(replacing: .appSettings) {
+            #if os(macOS)
+            Button(loc.localized("menu.preferences")) {
+                openWindow(id: "ruffnova-settings")
+            }
+            .keyboardShortcut(",", modifiers: .command)
+            #endif
+        }
 
         // MARK: - Control Menu
         CommandMenu(loc.localized("menu.control")) {

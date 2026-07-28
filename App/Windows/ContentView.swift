@@ -52,6 +52,9 @@ struct ContentView: View {
         .toolbar {
             AppToolbar(refreshToken: appState.toolbarRefreshToken)
         }
+        #if os(macOS)
+        .toolbar(appState.isStageMaximized ? .hidden : .visible, for: .windowToolbar)
+        #endif
         .onDrop(of: [.fileURL, .folder].compactMap { $0 }, isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }

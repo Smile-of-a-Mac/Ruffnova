@@ -15,7 +15,7 @@ struct TouchLayoutEditorView: View {
     }
 
     var body: some View {
-        CompatibleNavigationContainer {
+        NavigationStack {
             VStack(spacing: NativeSpacing.md) {
                 orientationPicker
                 TouchLayoutEditorCanvas(editor: editor)

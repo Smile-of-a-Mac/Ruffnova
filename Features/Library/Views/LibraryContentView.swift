@@ -11,21 +11,16 @@ struct LibraryContentView: View {
     @State private var sortOrder = LibrarySortOrder.lastOpened
     @State private var filter = LibraryFilter.all
 
-    @ViewBuilder
     var body: some View {
-        #if os(iOS)
-        if appState.selectedSection == .library {
-            content
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        libraryActionsMenu
-                    }
-                }
-        } else {
-            content
-        }
-        #else
         content
+        #if os(iOS)
+        .toolbar {
+            if appState.selectedSection == .library {
+                ToolbarItem(placement: .primaryAction) {
+                    libraryActionsMenu
+                }
+            }
+        }
         #endif
     }
 
@@ -141,6 +136,13 @@ struct LibrarySectionEmptyState: View {
     let subtitleKey: String
 
     var body: some View {
+        #if os(iOS)
+        ContentUnavailableView(
+            locManager.localized(titleKey),
+            systemImage: icon,
+            description: Text(locManager.localized(subtitleKey))
+        )
+        #else
         VStack(spacing: NativeSpacing.xxl) {
             Spacer()
             Image(systemName: icon)
@@ -157,6 +159,7 @@ struct LibrarySectionEmptyState: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #endif
     }
 }
 

@@ -217,14 +217,14 @@ struct CompatibilityDetailsView: View {
     private func environment(_ assessment: PersistedCompatibilityAssessment, item: LibraryItem) -> some View {
         detailGroup(locManager.localized("compatibility.environment")) {
             if let metadata = item.metadata {
-                CompatibleLabeledContent(locManager.localized("compatibility.environment.swfVersion"), value: String(metadata.swfVersion))
-                CompatibleLabeledContent(locManager.localized("compatibility.environment.actionScript"), value: metadata.isActionScript3 ? "AVM2" : "AVM1")
-                CompatibleLabeledContent(locManager.localized("diagnostics.report.stageDimensions"), value: "\(metadata.stageWidth) x \(metadata.stageHeight)")
-                CompatibleLabeledContent(locManager.localized("diagnostics.report.frameRate"), value: String(format: "%.1f", metadata.frameRate))
+                LabeledContent(locManager.localized("compatibility.environment.swfVersion"), value: String(metadata.swfVersion))
+                LabeledContent(locManager.localized("compatibility.environment.actionScript"), value: metadata.isActionScript3 ? "AVM2" : "AVM1")
+                LabeledContent(locManager.localized("diagnostics.report.stageDimensions"), value: "\(metadata.stageWidth) x \(metadata.stageHeight)")
+                LabeledContent(locManager.localized("diagnostics.report.frameRate"), value: String(format: "%.1f", metadata.frameRate))
             }
-            CompatibleLabeledContent(locManager.localized("diagnostics.report.appVersion"), value: assessment.appBuildIdentifier.isEmpty ? locManager.localized("diagnostics.unavailable") : assessment.appBuildIdentifier)
-            CompatibleLabeledContent(locManager.localized("diagnostics.report.engineVersion"), value: assessment.engineBuildIdentifier.isEmpty ? locManager.localized("diagnostics.unavailable") : assessment.engineBuildIdentifier)
-            CompatibleLabeledContent(
+            LabeledContent(locManager.localized("diagnostics.report.appVersion"), value: assessment.appBuildIdentifier.isEmpty ? locManager.localized("diagnostics.unavailable") : assessment.appBuildIdentifier)
+            LabeledContent(locManager.localized("diagnostics.report.engineVersion"), value: assessment.engineBuildIdentifier.isEmpty ? locManager.localized("diagnostics.unavailable") : assessment.engineBuildIdentifier)
+            LabeledContent(
                 locManager.localized("storage.automatic.title"),
                 value: locManager.localized(
                     appState.isAutomaticBackupEnabled(for: itemID)
@@ -232,7 +232,7 @@ struct CompatibilityDetailsView: View {
                         : "storage.automatic.status.disabled"
                 )
             )
-            CompatibleLabeledContent(
+            LabeledContent(
                 locManager.localized("storage.automatic.latest"),
                 value: latestAutomaticBackup?.createdAt.formatted(date: .abbreviated, time: .shortened)
                     ?? locManager.localized("storage.automatic.none")

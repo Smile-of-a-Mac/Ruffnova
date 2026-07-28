@@ -385,9 +385,6 @@ final class AppState: ObservableObject {
             updateIOSRenderLoopAvailability()
             return true
         }
-        #if os(iOS)
-        configureAudioSession()
-        #endif
         let runtimeProfile = resolvedRuntimeProfile(for: currentFileURL)
         let accessPolicies = resolvedEngineAccessPolicies(for: currentFileURL)
         bridge = RuffleBridge(
@@ -1309,16 +1306,6 @@ final class AppState: ObservableObject {
     }
 
     #if os(iOS)
-    private func configureAudioSession() {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try session.setActive(true)
-        } catch {
-            Logger.appState.error("Failed to configure AVAudioSession: \(error.localizedDescription)")
-        }
-    }
-
     private func setupSystemVolumeObservation() {
         let audioSession = AVAudioSession.sharedInstance()
         systemVolumeObservation = audioSession.observe(\AVAudioSession.outputVolume, options: [.initial, .new]) { [weak self] session, _ in

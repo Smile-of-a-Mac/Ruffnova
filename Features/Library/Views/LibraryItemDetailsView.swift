@@ -30,22 +30,40 @@ struct LibraryItemDetailsView: View {
         #endif
     }
 
-    #if os(macOS)
     @ViewBuilder
     private var macOSBody: some View {
-        Group {
-            if #available(macOS 13.0, *) {
-                NavigationSplitView {
-                    macOSSidebar
-                } detail: {
-                    macOSDetail
-                }
-            } else {
-                NavigationView {
-                    macOSSidebar
-                    macOSDetail
+        NavigationSplitView {
+            List {
+                ForEach(LibraryItemDetailsSection.allCases) { section in
+                    Button {
+                        selectedSection = section
+                    } label: {
+                        Label(
+                            locManager.localized(section.localizedKey),
+                            systemImage: section.systemImage
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                    .listRowBackground(
+                        (selectedSection ?? initialSection) == section
+                            ? Color.accentColor.opacity(0.18)
+                            : Color.clear
+                    )
+                    .accessibilityAddTraits(
+                        (selectedSection ?? initialSection) == section ? .isSelected : []
+                    )
                 }
             }
+            .listStyle(.sidebar)
+            .navigationTitle(locManager.localized("library.details.title"))
+        } detail: {
+            VStack(spacing: 0) {
+                detailContent
+                detailActionBar
+            }
+            .navigationTitle(locManager.localized((selectedSection ?? initialSection).localizedKey))
         }
         .frame(width: 640, height: 480)
         .onAppear(perform: loadDraft)
@@ -61,47 +79,8 @@ struct LibraryItemDetailsView: View {
         }
     }
 
-    private var macOSSidebar: some View {
-        List {
-            ForEach(LibraryItemDetailsSection.allCases) { section in
-                Button {
-                    selectedSection = section
-                } label: {
-                    Label(
-                        locManager.localized(section.localizedKey),
-                        systemImage: section.systemImage
-                    )
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                .listRowBackground(
-                    (selectedSection ?? initialSection) == section
-                        ? Color.accentColor.opacity(0.18)
-                        : Color.clear
-                )
-                .accessibilityAddTraits(
-                    (selectedSection ?? initialSection) == section ? .isSelected : []
-                )
-            }
-        }
-        .listStyle(.sidebar)
-        .navigationTitle(locManager.localized("library.details.title"))
-    }
-
-    private var macOSDetail: some View {
-        VStack(spacing: 0) {
-            detailContent
-            detailActionBar
-        }
-        .navigationTitle(locManager.localized((selectedSection ?? initialSection).localizedKey))
-    }
-
-    #endif
-
-    #if os(iOS)
     private var iOSBody: some View {
-        CompatibleNavigationContainer {
+        NavigationStack {
             detailContent
             .navigationTitle(locManager.localized((selectedSection ?? initialSection).localizedKey))
             .toolbar {
@@ -148,8 +127,6 @@ struct LibraryItemDetailsView: View {
         }
     }
 
-    #endif
-
     @ViewBuilder
     private var detailContent: some View {
         if let item = libraryService.item(with: itemID) {
@@ -174,7 +151,7 @@ struct LibraryItemDetailsView: View {
                 .padding(.vertical, NativeSpacing.xl)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .visibleScrollIndicators()
+            .scrollIndicators(.visible)
         } else {
             VStack(spacing: NativeSpacing.md) {
                 Image(systemName: "questionmark.folder")
@@ -208,8 +185,8 @@ struct LibraryItemDetailsView: View {
 
     private func fileSection(_ item: LibraryItem) -> some View {
         Section(locManager.localized("library.details.file")) {
-            CompatibleLabeledContent(locManager.localized("diagnostics.report.fileName"), value: item.name)
-            CompatibleLabeledContent(locManager.localized("diagnostics.report.path"), value: item.url.path)
+            LabeledContent(locManager.localized("diagnostics.report.fileName"), value: item.name)
+            LabeledContent(locManager.localized("diagnostics.report.path"), value: item.url.path)
         }
     }
 
@@ -249,7 +226,7 @@ struct LibraryItemDetailsView: View {
                 )
             )
 
-            CompatibleLabeledContent(
+            LabeledContent(
                 locManager.localized("library.details.controls.profile"),
                 value: String(format: locManager.localized("library.details.controls.actionCount"), item.inputProfile?.mapping.count ?? GameAction.allCases.count)
             )

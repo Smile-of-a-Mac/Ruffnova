@@ -42,7 +42,7 @@ struct AppSidebar: View {
         #else
         .background(Color(.systemBackground))
         #endif
-        .compatibleSidebarWidth()
+        .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
         .onAppear {
             handlePendingSearchFocusRequest()
         }

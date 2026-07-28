@@ -4,6 +4,9 @@ struct AppToolbar: ToolbarContent {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
     let refreshToken: Int
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
@@ -50,7 +53,11 @@ struct AppToolbar: ToolbarContent {
 
     private var settingsButton: some View {
         Button {
+            #if os(macOS)
+            openWindow(id: "ruffnova-settings")
+            #else
             appState.selectedSection = .settings
+            #endif
         } label: {
             Label(locManager.localized("toolbar.settings"), systemImage: "gearshape")
         }

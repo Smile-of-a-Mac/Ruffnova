@@ -38,7 +38,7 @@ struct GameStorageSection: View {
     var body: some View {
         Section(locManager.localized("storage.title")) {
             if let usage {
-                CompatibleLabeledContent(locManager.localized("storage.usage")) {
+                LabeledContent(locManager.localized("storage.usage")) {
                     Text("\(ByteCountFormatter.string(fromByteCount: usage.usedBytes, countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: usage.quotaBytes, countStyle: .file))")
                         .monospacedDigit()
                 }

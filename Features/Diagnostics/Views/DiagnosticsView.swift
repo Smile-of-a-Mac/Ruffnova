@@ -14,7 +14,13 @@ struct DiagnosticsView: View {
             Divider()
 
             if let report {
-                diagnosticsForm(report)
+                Form {
+                    issuesSection(report)
+                    fileSection(report)
+                    playbackSection(report)
+                    traceSection(report)
+                }
+                .formStyle(.grouped)
 
                 Divider()
                 footer(report)
@@ -26,29 +32,6 @@ struct DiagnosticsView: View {
         .frame(minWidth: 520, minHeight: 520)
         .onAppear(perform: refresh)
         .onReceive(appState.$playerIssues.dropFirst()) { _ in refresh() }
-    }
-
-    @ViewBuilder
-    private func diagnosticsForm(_ report: CompatibilityReport) -> some View {
-        #if os(macOS)
-        if #available(macOS 13.0, *) {
-            formContent(report)
-                .formStyle(.grouped)
-        } else {
-            formContent(report)
-        }
-        #else
-        formContent(report)
-        #endif
-    }
-
-    private func formContent(_ report: CompatibilityReport) -> some View {
-        Form {
-            issuesSection(report)
-            fileSection(report)
-            playbackSection(report)
-            traceSection(report)
-        }
     }
 
     private var header: some View {
@@ -197,13 +180,7 @@ private struct ReportRow: View {
     let value: String
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: NativeSpacing.md) {
-            Text(label)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .multilineTextAlignment(.trailing)
-                .textSelection(.enabled)
-        }
+        LabeledContent(label, value: value)
+            .textSelection(.enabled)
     }
 }

@@ -605,6 +605,31 @@ private struct SettingsForm: View {
     let category: SettingsCategory
 
     var body: some View {
+        compatibleForm
+            .background(settingsPageBackground)
+    }
+
+    @ViewBuilder
+    private var compatibleForm: some View {
+        #if os(macOS)
+        if #available(macOS 13.0, *) {
+            formContent
+                .scrollContentBackground(.hidden)
+                .formStyle(.grouped)
+        } else {
+            formContent
+        }
+        #else
+        if #available(iOS 16.0, *) {
+            formContent
+                .scrollContentBackground(.hidden)
+        } else {
+            formContent
+        }
+        #endif
+    }
+
+    private var formContent: some View {
         Form {
             switch category {
             case .general:
@@ -617,11 +642,6 @@ private struct SettingsForm: View {
                 AboutSettingsView()
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(settingsPageBackground)
-        #if os(macOS)
-        .formStyle(.grouped)
-        #endif
     }
 }
 
@@ -655,7 +675,7 @@ struct GeneralSettingsView: View {
                 Text(locManager.localized("settings.rendering.quality.high")).tag(RuffleQuality.high)
                 Text(locManager.localized("settings.rendering.quality.best")).tag(RuffleQuality.best)
             }
-            LabeledContent(locManager.localized("settings.general.playback.speed")) {
+            CompatibleLabeledContent(locManager.localized("settings.general.playback.speed")) {
                 HStack(spacing: NativeSpacing.md) {
                     Slider(value: speedBinding, in: 0.25...4.0, step: 0.25)
                         .settingsSliderWidth()
@@ -748,7 +768,7 @@ struct AdvancedSettingsView: View {
 
     var body: some View {
         Section {
-            LabeledContent(locManager.localized("settings.advanced.actionscript.maxDuration")) {
+            CompatibleLabeledContent(locManager.localized("settings.advanced.actionscript.maxDuration")) {
                 HStack(spacing: NativeSpacing.md) {
                     Slider(value: maxExecutionDurationBinding, in: 5...60, step: 1)
                         .settingsSliderWidth()
@@ -898,18 +918,33 @@ struct AboutSettingsView: View {
 
     var body: some View {
         #if os(iOS)
-        Form {
-            aboutSections
-        }
-        .scrollContentBackground(.hidden)
-        .background(settingsPageBackground)
-        .navigationTitle(locManager.localized("settings.about"))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
+        aboutForm
         #else
         aboutSections
         #endif
     }
+
+    #if os(iOS)
+    @ViewBuilder
+    private var aboutForm: some View {
+        if #available(iOS 16.0, *) {
+            Form {
+                aboutSections
+            }
+            .scrollContentBackground(.hidden)
+            .background(settingsPageBackground)
+            .navigationTitle(locManager.localized("settings.about"))
+            .navigationBarTitleDisplayMode(.inline)
+        } else {
+            Form {
+                aboutSections
+            }
+            .background(settingsPageBackground)
+            .navigationTitle(locManager.localized("settings.about"))
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+    #endif
 
     @ViewBuilder
     private var aboutSections: some View {
@@ -936,9 +971,9 @@ struct AboutSettingsView: View {
         }
 
         Section {
-            LabeledContent(locManager.localized("about.version"), value: appVersion)
-            LabeledContent(locManager.localized("about.build"), value: buildNumber)
-            LabeledContent(locManager.localized("about.ruffleVersion"), value: "0.3.0")
+            CompatibleLabeledContent(locManager.localized("about.version"), value: appVersion)
+            CompatibleLabeledContent(locManager.localized("about.build"), value: buildNumber)
+            CompatibleLabeledContent(locManager.localized("about.ruffleVersion"), value: "0.3.0")
         }
 
         if let ruffleSourceURL {
@@ -1103,6 +1138,23 @@ struct IOSSettingsRootView: View {
     @EnvironmentObject private var locManager: LocalizationManager
 
     var body: some View {
+        settingsForm
+            .background(settingsPageBackground)
+            .navigationTitle(locManager.localized("sidebar.settings"))
+            .navigationBarTitleDisplayMode(.large)
+    }
+
+    @ViewBuilder
+    private var settingsForm: some View {
+        if #available(iOS 16.0, *) {
+            formContent
+                .scrollContentBackground(.hidden)
+        } else {
+            formContent
+        }
+    }
+
+    private var formContent: some View {
         Form {
             GeneralSettingsView()
             PrivacySettingsView(showsOverrides: false)
@@ -1116,11 +1168,6 @@ struct IOSSettingsRootView: View {
                 }
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(settingsPageBackground)
-        .navigationTitle(locManager.localized("sidebar.settings"))
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar(.visible, for: .navigationBar)
     }
 }
 #endif

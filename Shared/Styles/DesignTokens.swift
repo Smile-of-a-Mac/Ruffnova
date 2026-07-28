@@ -99,6 +99,55 @@ struct LiquidGlassModifier<S: InsettableShape>: ViewModifier {
     }
 }
 
+struct CompatibleNavigationContainer<Content: View>: View {
+    private let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    @ViewBuilder
+    var body: some View {
+        #if os(macOS)
+        if #available(macOS 13.0, *) {
+            NavigationStack { content }
+        } else {
+            NavigationView { content }
+        }
+        #else
+        if #available(iOS 16.0, *) {
+            NavigationStack { content }
+        } else {
+            NavigationView { content }
+        }
+        #endif
+    }
+}
+
+struct CompatibleLabeledContent<Content: View>: View {
+    private let label: String
+    private let content: Content
+
+    init(_ label: String, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.content = content()
+    }
+
+    init(_ label: String, value: String) where Content == Text {
+        self.init(label) { Text(value) }
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: NativeSpacing.md) {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: NativeSpacing.md)
+            content
+                .multilineTextAlignment(.trailing)
+        }
+    }
+}
+
 extension View {
     /// Uses the system Liquid Glass API when available, with the native material fallback.
     @ViewBuilder
@@ -130,15 +179,54 @@ extension View {
     }
 
     /// Content should inherit the window material instead of painting an opaque surface.
+    @ViewBuilder
     func glassWindowBase() -> some View {
         #if os(macOS)
-        return self
-            .background(Color(nsColor: .windowBackgroundColor))
-            .scrollContentBackground(.hidden)
+        if #available(macOS 13.0, *) {
+            self
+                .background(Color(nsColor: .windowBackgroundColor))
+                .scrollContentBackground(.hidden)
+        } else {
+            self.background(Color(nsColor: .windowBackgroundColor))
+        }
         #else
-        return self
-            .background(Color(.systemBackground))
-            .scrollContentBackground(.hidden)
+        if #available(iOS 16.0, *) {
+            self
+                .background(Color(.systemBackground))
+                .scrollContentBackground(.hidden)
+        } else {
+            self.background(Color(.systemBackground))
+        }
+        #endif
+    }
+
+    @ViewBuilder
+    func compatibleSidebarWidth() -> some View {
+        #if os(macOS)
+        if #available(macOS 13.0, *) {
+            self.navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func visibleScrollIndicators() -> some View {
+        #if os(macOS)
+        if #available(macOS 13.0, *) {
+            self.scrollIndicators(.visible)
+        } else {
+            self
+        }
+        #else
+        if #available(iOS 16.0, *) {
+            self.scrollIndicators(.visible)
+        } else {
+            self
+        }
         #endif
     }
 
@@ -151,7 +239,7 @@ extension View {
             .background(material, in: Capsule())
             .overlay {
                 Capsule()
-                    .strokeBorder(.separator.opacity(0.45), lineWidth: 0.7)
+                    .strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.7)
             }
             .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
     }

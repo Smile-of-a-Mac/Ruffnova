@@ -15,7 +15,7 @@ struct InputMappingEditorView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatibleNavigationContainer {
             List {
                 Section {
                     Text(locManager.localized("input.editor.explanation"))

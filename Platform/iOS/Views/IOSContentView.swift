@@ -14,7 +14,6 @@ struct IOSContentView: View {
     @ObservedObject private var libraryService = LibraryService.shared
     @Namespace private var playerNamespace
     @State private var selectedIPadSection: AppState.Section? = .library
-    @State private var iPadColumnVisibility: NavigationSplitViewVisibility = .all
     @State private var hidesStageSystemChrome = false
     @State private var showingCollectionsSheet = false
 
@@ -35,7 +34,7 @@ struct IOSContentView: View {
     var body: some View {
         Group {
             if horizontalSizeClass == .regular {
-                iPadLayout
+                compatibleIPadLayout
             } else {
                 iPhoneLayout
             }
@@ -45,10 +44,10 @@ struct IOSContentView: View {
             appState.setPlayerSurfaceVisible(appState.isPlayerVisible)
             hidesStageSystemChrome = appState.isStageMaximized
         }
-        .onChange(of: scenePhase) { _, phase in
+        .onChange(of: scenePhase) { phase in
             appState.handleScenePhaseChanged(phase)
         }
-        .onChange(of: appState.isStageMaximized) { _, maximized in
+        .onChange(of: appState.isStageMaximized) { maximized in
             syncStageSystemChrome(for: maximized)
         }
         .sheet(isPresented: $showingCollectionsSheet) {
@@ -87,8 +86,18 @@ struct IOSContentView: View {
 
     // MARK: - iPad Layout (NavigationSplitView)
 
+    @ViewBuilder
+    private var compatibleIPadLayout: some View {
+        if #available(iOS 16.0, *) {
+            iPadLayout
+        } else {
+            iPhoneLayout
+        }
+    }
+
+    @available(iOS 16.0, *)
     private var iPadLayout: some View {
-        NavigationSplitView(columnVisibility: $iPadColumnVisibility) {
+        NavigationSplitView {
             iPadSidebar
         } detail: {
             iPadDetailContent(for: appState.selectedSection)
@@ -96,13 +105,12 @@ struct IOSContentView: View {
         }
         .onAppear {
             selectedIPadSection = appState.selectedCollectionID == nil ? appState.selectedSection : nil
-            iPadColumnVisibility = appState.isStageMaximized ? .detailOnly : .all
         }
-        .onChange(of: selectedIPadSection) { _, section in
+        .onChange(of: selectedIPadSection) { section in
             guard let section else { return }
             appState.selectSection(section)
         }
-        .onChange(of: appState.selectedSection) { _, newSection in
+        .onChange(of: appState.selectedSection) { newSection in
             if appState.selectedCollectionID == nil, selectedIPadSection != newSection {
                 selectedIPadSection = newSection
             }
@@ -112,13 +120,8 @@ struct IOSContentView: View {
                 appState.setPlayerSurfaceVisible(false)
             }
         }
-        .onChange(of: appState.selectedCollectionID) { _, collectionID in
+        .onChange(of: appState.selectedCollectionID) { collectionID in
             selectedIPadSection = collectionID == nil ? appState.selectedSection : nil
-        }
-        .onChange(of: appState.isStageMaximized) { _, maximized in
-            withAnimation(.stageFullscreen) {
-                iPadColumnVisibility = maximized ? .detailOnly : .all
-            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSWFFile)) { n in
             if let url = n.userInfo?["url"] as? URL { appState.openFile(url) }
@@ -145,6 +148,7 @@ struct IOSContentView: View {
         )
     }
 
+    @available(iOS 16.0, *)
     private var iPadSidebar: some View {
         VStack(alignment: .leading, spacing: NativeSpacing.md) {
             List(iPadSections, id: \.self, selection: $selectedIPadSection) { section in
@@ -176,7 +180,7 @@ struct IOSContentView: View {
 
     private var iPhoneLayout: some View {
         TabView(selection: $appState.selectedSection) {
-            NavigationStack {
+            CompatibleNavigationContainer {
                 libraryTab
             }
             .tabItem {
@@ -184,7 +188,7 @@ struct IOSContentView: View {
             }
             .tag(AppState.Section.library)
 
-            NavigationStack {
+            CompatibleNavigationContainer {
                 recentTab
             }
             .tabItem {
@@ -192,7 +196,7 @@ struct IOSContentView: View {
             }
             .tag(AppState.Section.recent)
 
-            NavigationStack {
+            CompatibleNavigationContainer {
                 playerTab
             }
             .tabItem {
@@ -200,7 +204,7 @@ struct IOSContentView: View {
             }
             .tag(AppState.Section.player)
 
-            NavigationStack {
+            CompatibleNavigationContainer {
                 favoritesTab
             }
             .tabItem {
@@ -208,7 +212,7 @@ struct IOSContentView: View {
             }
             .tag(AppState.Section.favorites)
 
-            NavigationStack {
+            CompatibleNavigationContainer {
                 settingsTab
             }
             .tabItem {
@@ -216,7 +220,7 @@ struct IOSContentView: View {
             }
             .tag(AppState.Section.settings)
         }
-        .onChange(of: appState.selectedSection) { _, newSection in
+        .onChange(of: appState.selectedSection) { newSection in
             if newSection == .player {
                 appState.setPlayerSurfaceVisible(appState.isPlayerVisible)
             } else if appState.currentFileURL != nil {
@@ -243,10 +247,9 @@ struct IOSContentView: View {
                 text: searchBinding,
                 prompt: locManager.localized("search.placeholder")
             )
-            .onChange(of: hasLibrarySearchContent) { _, hasContent in
+            .onChange(of: hasLibrarySearchContent) { hasContent in
                 clearSearchIfNeeded(hasContent: hasContent)
             }
-            .toolbar(.visible, for: .navigationBar)
     }
 
     private var addContentMenu: some View {
@@ -270,7 +273,21 @@ struct IOSContentView: View {
     }
 
     private var collectionsSheet: some View {
-        NavigationStack {
+        collectionsSheetContent
+    }
+
+    @ViewBuilder
+    private var collectionsSheetContent: some View {
+        if #available(iOS 16.0, *) {
+            collectionsNavigation
+                .presentationDetents([.medium, .large])
+        } else {
+            collectionsNavigation
+        }
+    }
+
+    private var collectionsNavigation: some View {
+        CompatibleNavigationContainer {
             ScrollView {
                 SidebarCollectionsView { _ in
                     showingCollectionsSheet = false
@@ -289,7 +306,6 @@ struct IOSContentView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
     }
 
     private var playerTab: some View {
@@ -303,7 +319,6 @@ struct IOSContentView: View {
         }
         .navigationTitle(locManager.localized("sidebar.player"))
         .navigationBarTitleDisplayMode(.large)
-        .toolbar(appState.isStageMaximized ? .hidden : .visible, for: .navigationBar)
     }
 
     private var recentTab: some View {
@@ -317,10 +332,9 @@ struct IOSContentView: View {
                 text: searchBinding,
                 prompt: locManager.localized("search.placeholder")
             )
-            .onChange(of: hasRecentSearchContent) { _, hasContent in
+            .onChange(of: hasRecentSearchContent) { hasContent in
                 clearSearchIfNeeded(hasContent: hasContent)
             }
-            .toolbar(.visible, for: .navigationBar)
     }
 
     private var favoritesTab: some View {
@@ -334,10 +348,9 @@ struct IOSContentView: View {
                 text: searchBinding,
                 prompt: locManager.localized("search.placeholder")
             )
-            .onChange(of: hasFavoriteSearchContent) { _, hasContent in
+            .onChange(of: hasFavoriteSearchContent) { hasContent in
                 clearSearchIfNeeded(hasContent: hasContent)
             }
-            .toolbar(.visible, for: .navigationBar)
     }
 
     private var settingsTab: some View {
@@ -370,7 +383,7 @@ struct IOSContentView: View {
     private func iPadDetailContent(for section: AppState.Section) -> some View {
         switch section {
         case .settings:
-            NavigationStack {
+            CompatibleNavigationContainer {
                 SettingsView(settingsActions: SettingsActions(appState: appState))
                     .environmentObject(appState)
                     .environmentObject(locManager)
@@ -393,11 +406,15 @@ struct IOSContentView: View {
     // MARK: - Player View
 
     private var playerEmptyState: some View {
-        ContentUnavailableView {
-            Label(locManager.localized("player.noMedia.title"), systemImage: "play.circle")
-        } description: {
+        VStack(spacing: NativeSpacing.lg) {
+            Image(systemName: "play.circle")
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(.secondary)
+            Text(locManager.localized("player.noMedia.title"))
+                .font(.title2)
             Text(locManager.localized("player.noMedia.subtitle"))
-        } actions: {
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
             Button {
                 AppCommandRouter.openFile(appState: appState, loc: locManager)
             } label: {
@@ -405,6 +422,8 @@ struct IOSContentView: View {
             }
             .buttonStyle(.borderedProminent)
         }
+        .padding(NativeSpacing.xxl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
     }
 
@@ -425,7 +444,7 @@ struct IOSContentView: View {
             .onDisappear {
                 appState.setPlayerSurfaceVisible(false)
             }
-            .onChange(of: colorScheme) { _, _ in syncStageBackground() }
+            .onChange(of: colorScheme) { _ in syncStageBackground() }
             .onReceive(NotificationCenter.default.publisher(for: .viewportChanged)) { n in
                 guard let i = n.userInfo,
                       let w = i["width"] as? UInt32, let h = i["height"] as? UInt32,
@@ -521,7 +540,7 @@ struct IOSContentView: View {
                     ) { instanceID, action, isDown in
                         appState.sendVirtualGameAction(action, instanceID: instanceID, isDown: isDown)
                     }
-                    .onChange(of: orientation) { _, _ in
+                    .onChange(of: orientation) { _ in
                         appState.releasePlayerInput()
                     }
                 }
@@ -541,8 +560,6 @@ struct IOSContentView: View {
         }
         .ignoresSafeArea(.container, edges: hidesStageSystemChrome ? .all : [])
         .statusBarHidden(hidesStageSystemChrome)
-        .toolbar(hidesStageSystemChrome ? .hidden : .visible, for: .navigationBar)
-        .toolbar(hidesStageSystemChrome ? .hidden : .visible, for: .tabBar)
         .animation(.stageFullscreen, value: appState.isStageMaximized)
         .animation(.easeInOut(duration: 0.2), value: hidesStageSystemChrome)
     }

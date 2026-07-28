@@ -32,29 +32,10 @@ struct RuffleApp: App {
         }
         #if os(macOS)
         .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentMinSize)
-        .defaultSize(width: 1080, height: 720)
         .commands {
             RuffleCommands(appState: appState)
         }
         #endif
 
-        #if os(macOS)
-        WindowGroup("Settings", id: "ruffnova-settings") {
-            SettingsView(settingsActions: SettingsActions(appState: appState))
-                .environmentObject(appState)
-                .environmentObject(locManager)
-        }
-        .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
-        .defaultSize(width: 700, height: 560)
-
-        Window("About Ruffnova", id: "ruffnova-about") {
-            AboutView()
-                .environmentObject(locManager)
-        }
-        .windowResizability(.contentSize)
-        .defaultSize(width: 520, height: 300)
-        #endif
     }
 }

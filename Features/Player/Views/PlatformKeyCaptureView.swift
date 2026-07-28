@@ -17,7 +17,7 @@ struct PlatformKeyCaptureView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatibleNavigationContainer {
             List(matchingKeys) { key in
                 Button(key.name) {
                     capture(key.hidUsage, 0)

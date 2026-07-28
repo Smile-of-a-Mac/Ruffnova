@@ -100,7 +100,7 @@ struct StatusBarView: View {
 
     private var statusDivider: some View {
         Circle()
-            .fill(.separator.opacity(0.3))
+            .fill(Color.primary.opacity(0.2))
             .frame(width: 2, height: 2)
     }
 

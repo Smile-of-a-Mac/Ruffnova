@@ -17,7 +17,7 @@ struct TouchLayoutEditorCanvas: View {
                     .fill(.black.opacity(0.9))
                     .overlay {
                         RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
-                            .strokeBorder(.separator.opacity(0.5), lineWidth: 1)
+                            .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
                     }
 
                 ForEach(editor.controls.sorted { $0.zIndex < $1.zIndex }) { control in

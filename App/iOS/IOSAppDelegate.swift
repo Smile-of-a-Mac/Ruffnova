@@ -9,7 +9,9 @@ enum IOSOrientationController {
     @MainActor
     static func update(to orientations: UIInterfaceOrientationMask) {
         supportedOrientations = orientations
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+        guard #available(iOS 16.0, *),
+              let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+        else { return }
         windowScene.windows.first?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
         windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations))
     }

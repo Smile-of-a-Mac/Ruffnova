@@ -1,15 +1,20 @@
 import SwiftUI
 
 struct TouchLayoutEditorCanvas: View {
-    static let defaultCanvasSize = CGSize(width: 320, height: 520)
+    private static let coordinateSpaceName = "touch-layout-editor-canvas"
 
     @ObservedObject var editor: TouchLayoutEditorViewModel
     @EnvironmentObject private var locManager: LocalizationManager
     @State private var testedControlID: UUID?
 
+    private var referenceCanvasSize: CGSize {
+        TouchLayoutMetrics.referenceCanvas(for: editor.orientation)
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let size = constrainedCanvasSize(in: geometry.size)
+            let layoutCanvasSize = referenceCanvasSize
             let overlapIDs = editor.overlappingControlIDs(canvasSize: size)
 
             ZStack {
@@ -21,7 +26,12 @@ struct TouchLayoutEditorCanvas: View {
                     }
 
                 ForEach(editor.controls.sorted { $0.zIndex < $1.zIndex }) { control in
-                    editorControl(control, canvasSize: size, isOverlapping: overlapIDs.contains(control.id))
+                    editorControl(
+                        control,
+                        displayCanvasSize: size,
+                        layoutCanvasSize: layoutCanvasSize,
+                        isOverlapping: overlapIDs.contains(control.id)
+                    )
                 }
 
                 if !overlapIDs.isEmpty {
@@ -35,18 +45,20 @@ struct TouchLayoutEditorCanvas: View {
                 }
             }
             .frame(width: size.width, height: size.height)
+            .coordinateSpace(name: Self.coordinateSpaceName)
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
         }
-        .aspectRatio(editor.orientation == .portrait ? 320 / 520 : 520 / 320, contentMode: .fit)
+        .aspectRatio(referenceCanvasSize.width / referenceCanvasSize.height, contentMode: .fit)
     }
 
     private func editorControl(
         _ control: TouchControlInstance,
-        canvasSize: CGSize,
+        displayCanvasSize: CGSize,
+        layoutCanvasSize: CGSize,
         isOverlapping: Bool
     ) -> some View {
-        let displayControl = TouchLayoutMetrics.clamped(control, in: canvasSize)
-        let frame = TouchLayoutMetrics.frame(for: displayControl, in: canvasSize)
+        let displayControl = TouchLayoutMetrics.clamped(control, in: displayCanvasSize)
+        let frame = TouchLayoutMetrics.frame(for: displayControl, in: displayCanvasSize)
         let isSelected = editor.selectedControlID == control.id
 
         return TouchLayoutEditorControl(
@@ -61,28 +73,35 @@ struct TouchLayoutEditorCanvas: View {
         }
         .frame(width: frame.width, height: frame.height)
         .position(x: frame.midX, y: frame.midY)
-        .gesture(editGesture(for: control, canvasSize: canvasSize))
+        .gesture(
+            editGesture(
+                for: control,
+                displayCanvasSize: displayCanvasSize,
+                layoutCanvasSize: layoutCanvasSize
+            )
+        )
         .accessibilityLabel(accessibilityLabel(for: control))
     }
 
-    private func editGesture(for control: TouchControlInstance, canvasSize: CGSize) -> some Gesture {
-        DragGesture(minimumDistance: 0)
+    private func editGesture(
+        for control: TouchControlInstance,
+        displayCanvasSize: CGSize,
+        layoutCanvasSize: CGSize
+    ) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.coordinateSpaceName))
             .onChanged { value in
                 guard !editor.isTesting else { return }
                 editor.selectedControlID = control.id
                 editor.move(
                     controlID: control.id,
-                    to: NormalizedPoint(
-                        x: Double(value.location.x / canvasSize.width),
-                        y: Double(value.location.y / canvasSize.height)
-                    ),
-                    canvasSize: canvasSize
+                    to: TouchLayoutMetrics.normalizedPoint(for: value.location, in: displayCanvasSize),
+                    canvasSize: layoutCanvasSize
                 )
             }
     }
 
     private func constrainedCanvasSize(in available: CGSize) -> CGSize {
-        let targetAspect: CGFloat = editor.orientation == .portrait ? 320 / 520 : 520 / 320
+        let targetAspect = referenceCanvasSize.width / referenceCanvasSize.height
         let width = min(available.width, available.height * targetAspect)
         return CGSize(width: max(width, 1), height: max(width / targetAspect, 1))
     }

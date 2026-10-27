@@ -47,6 +47,19 @@ final class FileRuntimeProfileTests: XCTestCase {
         XCTAssertEqual(profile.resolved(using: defaults).quality, .low)
     }
 
+    func testVirtualControlsUseDetectedSupportUntilTheUserSetsAPreference() {
+        var item = LibraryItem(
+            url: URL(fileURLWithPath: "/tmp/example.swf"),
+            supportsVirtualControls: true
+        )
+
+        XCTAssertTrue(item.resolvedVirtualControlsVisibility)
+
+        item.showsVirtualControls = false
+
+        XCTAssertFalse(item.resolvedVirtualControlsVisibility)
+    }
+
     func testFileAutoplayOverrideControlsMovieStart() {
         let runtimeProfile = FileRuntimeProfile(autoplay: false).resolved(using: RuntimeDefaults(autoplay: true))
 
@@ -73,6 +86,7 @@ final class FileRuntimeProfileTests: XCTestCase {
         )
         let item = LibraryItem(
             url: directory.appendingPathComponent("game.swf"),
+            supportsVirtualControls: true,
             showsVirtualControls: false
         )
         service.add(item)
@@ -83,6 +97,7 @@ final class FileRuntimeProfileTests: XCTestCase {
         )
 
         XCTAssertEqual(reloaded.item(with: item.id)?.showsVirtualControls, false)
+        XCTAssertEqual(reloaded.item(with: item.id)?.supportsVirtualControls, true)
     }
 
     @MainActor

@@ -84,6 +84,7 @@ struct LibraryItem: Identifiable, Codable, Equatable {
     var lastPlaybackFrame: UInt32?
     var playbackPreferences: PlaybackPreferences?
     var runtimeProfile: FileRuntimeProfile?
+    var supportsVirtualControls: Bool?
     var showsVirtualControls: Bool?
     var inputProfile: InputProfile?
     var gameStoragePreferences: GameStoragePreferences?
@@ -110,6 +111,7 @@ struct LibraryItem: Identifiable, Codable, Equatable {
         lastPlaybackFrame: UInt32? = nil,
         playbackPreferences: PlaybackPreferences? = nil,
         runtimeProfile: FileRuntimeProfile? = nil,
+        supportsVirtualControls: Bool? = nil,
         showsVirtualControls: Bool? = nil,
         inputProfile: InputProfile? = nil,
         gameStoragePreferences: GameStoragePreferences? = nil,
@@ -135,6 +137,7 @@ struct LibraryItem: Identifiable, Codable, Equatable {
         self.lastPlaybackFrame = lastPlaybackFrame
         self.playbackPreferences = playbackPreferences
         self.runtimeProfile = runtimeProfile
+        self.supportsVirtualControls = supportsVirtualControls
         self.showsVirtualControls = showsVirtualControls
         self.inputProfile = inputProfile
         self.gameStoragePreferences = gameStoragePreferences
@@ -146,6 +149,10 @@ struct LibraryItem: Identifiable, Codable, Equatable {
 
     static func == (lhs: LibraryItem, rhs: LibraryItem) -> Bool {
         lhs.id == rhs.id
+    }
+
+    var resolvedVirtualControlsVisibility: Bool {
+        showsVirtualControls ?? supportsVirtualControls ?? false
     }
 }
 

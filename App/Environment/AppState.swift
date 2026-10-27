@@ -103,7 +103,7 @@ final class AppState: ObservableObject {
     @Published var swfContentType: SwfContentType = .animation
 
     @Published var showControlBar: Bool = true
-    @Published var showVirtualControls: Bool = true
+    @Published var showVirtualControls: Bool = false
     @Published var playerMode: PlayerMode = .normal
     private let playerViewModel = PlayerViewModel()
     private enum StageMaximizedExitIntent {
@@ -177,6 +177,7 @@ final class AppState: ObservableObject {
         self?.sendControllerGameAction(element, controllerID: controllerID, isDown: isDown)
     }
     private var isRestoringPlaybackPreferences = false
+    private var virtualControlDetectionTask: Task<Void, Never>?
     private var pendingStageMaximizedExitIntent: StageMaximizedExitIntent?
 
     var formattedCurrentTime: String {
@@ -438,6 +439,7 @@ final class AppState: ObservableObject {
     }
 
     func openFile(_ url: URL) {
+        virtualControlDetectionTask?.cancel()
         if currentFileURL != url {
             requestAutomaticBackupForCurrentFile()
             stopAutomaticBackups()
@@ -504,6 +506,7 @@ final class AppState: ObservableObject {
         swfContentType = libraryItem.contentType == .interactive ? .interactive : .animation
 
         restorePlaybackPreferences(for: url)
+        detectVirtualControlSupport(for: url, itemID: libraryItem.id)
 
         loadTimeoutTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 15_000_000_000)
@@ -1096,6 +1099,30 @@ final class AppState: ObservableObject {
         }
     }
 
+    private func detectVirtualControlSupport(for url: URL, itemID: UUID) {
+        let detector = SWFInputSupportDetector()
+        virtualControlDetectionTask = Task { [weak self] in
+            let supportsVirtualControls = await Task.detached(priority: .userInitiated) {
+                detector.supportsVirtualControls(at: url)
+            }.value
+
+            guard !Task.isCancelled,
+                  let self,
+                  self.currentFileURL == url,
+                  let item = LibraryService.shared.item(with: itemID)
+            else { return }
+
+            let hasManualPreference = item.showsVirtualControls != nil
+            LibraryService.shared.update(itemID) {
+                $0.supportsVirtualControls = supportsVirtualControls
+            }
+
+            guard !hasManualPreference, self.showVirtualControls != supportsVirtualControls else { return }
+            self.releasePlayerInput()
+            self.showVirtualControls = supportsVirtualControls
+        }
+    }
+
     private func restorePlaybackPreferences(for url: URL) {
         guard let item = LibraryService.shared.item(for: url) else { return }
         let settings = SettingsPersistence.shared
@@ -1118,7 +1145,7 @@ final class AppState: ObservableObject {
         isLooping = runtimeProfile.isLooping
         playbackSpeed = runtimeProfile.playbackSpeed
         maxExecutionDuration = runtimeProfile.maxExecutionDuration
-        showVirtualControls = item.showsVirtualControls ?? true
+        showVirtualControls = item.resolvedVirtualControlsVisibility
         playerMode = preferences.preferredMode
         isRestoringPlaybackPreferences = false
 

@@ -39,6 +39,23 @@ extension TouchLayoutSet {
 enum TouchLayoutMetrics {
     static let minimumTouchTarget: CGFloat = 44
 
+    static func referenceCanvas(for orientation: TouchLayoutOrientation) -> CGSize {
+        switch orientation {
+        case .portrait:
+            CGSize(width: 320, height: 520)
+        case .landscape:
+            CGSize(width: 520, height: 320)
+        }
+    }
+
+    static func normalizedPoint(for location: CGPoint, in canvasSize: CGSize) -> NormalizedPoint {
+        guard canvasSize.width > 0, canvasSize.height > 0 else { return NormalizedPoint() }
+        return NormalizedPoint(
+            x: Double(location.x / canvasSize.width),
+            y: Double(location.y / canvasSize.height)
+        )
+    }
+
     static func frame(for control: TouchControlInstance, in canvasSize: CGSize) -> CGRect {
         let size = renderedSize(for: control, in: canvasSize)
         let center = CGPoint(
@@ -55,13 +72,14 @@ enum TouchLayoutMetrics {
 
     static func renderedSize(for control: TouchControlInstance, in canvasSize: CGSize) -> CGSize {
         let minimum = minimumRenderedSize(for: control.kind)
+        let maximum = min(canvasSize.width, canvasSize.height)
         let requested = CGSize(
             width: CGFloat(control.size.width) * canvasSize.width,
-            height: CGFloat(control.size.height) * canvasSize.height
+            height: CGFloat(control.size.height) * canvasSize.width
         )
         return CGSize(
-            width: min(max(minimum.width, requested.width), canvasSize.width),
-            height: min(max(minimum.height, requested.height), canvasSize.height)
+            width: min(max(minimum.width, requested.width), maximum),
+            height: min(max(minimum.height, requested.height), maximum)
         )
     }
 
@@ -76,7 +94,7 @@ enum TouchLayoutMetrics {
         )
         let normalizedSize = NormalizedSize(
             width: Double(size.width / canvasSize.width),
-            height: Double(size.height / canvasSize.height)
+            height: Double(size.height / canvasSize.width)
         )
         var clamped = control
         clamped.center = center

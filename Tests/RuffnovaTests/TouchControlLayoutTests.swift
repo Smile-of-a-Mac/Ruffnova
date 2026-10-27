@@ -43,6 +43,39 @@ final class TouchControlLayoutTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(frame.height, 88)
     }
 
+    func testSquareControlStaysSquareOnPortraitReferenceCanvas() {
+        let control = TouchControlInstance(
+            kind: .button,
+            actions: [.primary],
+            size: NormalizedSize(width: 0.14, height: 0.14)
+        )
+
+        let frame = TouchLayoutMetrics.frame(for: control, in: CGSize(width: 320, height: 520))
+
+        XCTAssertEqual(frame.width, frame.height, accuracy: 0.001)
+    }
+
+    func testCanvasLocationIsNormalizedAgainstTheWholeCanvas() {
+        let point = TouchLayoutMetrics.normalizedPoint(
+            for: CGPoint(x: 240, y: 390),
+            in: CGSize(width: 320, height: 520)
+        )
+
+        XCTAssertEqual(point.x, 0.75, accuracy: 0.001)
+        XCTAssertEqual(point.y, 0.75, accuracy: 0.001)
+    }
+
+    func testReferenceCanvasesMatchTheirLayoutOrientations() {
+        XCTAssertEqual(
+            TouchLayoutMetrics.referenceCanvas(for: .portrait),
+            CGSize(width: 320, height: 520)
+        )
+        XCTAssertEqual(
+            TouchLayoutMetrics.referenceCanvas(for: .landscape),
+            CGSize(width: 520, height: 320)
+        )
+    }
+
     func testOverlapDetectionOnlyIncludesVisibleControls() {
         let first = TouchControlInstance(kind: .button, actions: [.primary])
         let second = TouchControlInstance(kind: .button, actions: [.secondary])
@@ -54,6 +87,23 @@ final class TouchControlLayoutTests: XCTestCase {
         )
 
         XCTAssertEqual(overlaps, Set([first.id, second.id]))
+    }
+
+    func testDefaultPresetsDoNotOverlapTheirControls() {
+        for preset in InputPreset.allCases {
+            for orientation in TouchLayoutOrientation.allCases {
+                let controls = preset.controls(for: orientation)
+                let overlaps = TouchLayoutMetrics.overlappingControlIDs(
+                    in: controls,
+                    canvasSize: TouchLayoutMetrics.referenceCanvas(for: orientation)
+                )
+
+                XCTAssertTrue(
+                    overlaps.isEmpty,
+                    "\(preset.rawValue) \(orientation.rawValue) controls overlap: \(overlaps)"
+                )
+            }
+        }
     }
 
     func testEditorChangesOnlyTheSelectedOrientationUntilSaved() {

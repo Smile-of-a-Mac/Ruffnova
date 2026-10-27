@@ -221,7 +221,7 @@ struct LibraryItemDetailsView: View {
             Toggle(
                 locManager.localized("player.virtualControls.show"),
                 isOn: Binding(
-                    get: { libraryService.item(with: item.id)?.showsVirtualControls ?? true },
+                    get: { libraryService.item(with: item.id)?.resolvedVirtualControlsVisibility ?? false },
                     set: { appState.setVirtualControls($0, for: item.id) }
                 )
             )

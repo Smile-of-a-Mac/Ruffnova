@@ -110,6 +110,7 @@
 		A20047 /* AutomaticBackupRetentionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20047 /* AutomaticBackupRetentionPolicy.swift */; };
 		A20048 /* AutomaticBackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20048 /* AutomaticBackupService.swift */; };
 		A20049 /* AutomaticBackupSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20049 /* AutomaticBackupSection.swift */; };
+		A20050 /* SWFInputSupportDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20050 /* SWFInputSupportDetector.swift */; };
 		A30001 /* PermissionPolicyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30001 /* PermissionPolicyService.swift */; };
 /* End PBXBuildFile section */
 
@@ -222,6 +223,7 @@
 		B20047 /* AutomaticBackupRetentionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomaticBackupRetentionPolicy.swift; sourceTree = "<group>"; };
 		B20048 /* AutomaticBackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomaticBackupService.swift; sourceTree = "<group>"; };
 		B20049 /* AutomaticBackupSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomaticBackupSection.swift; sourceTree = "<group>"; };
+		B20050 /* SWFInputSupportDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SWFInputSupportDetector.swift; sourceTree = "<group>"; };
 		B30001 /* PermissionPolicyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionPolicyService.swift; sourceTree = "<group>"; };
 		C10099 /* Ruffnova.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ruffnova.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -755,6 +757,7 @@
 				B20042 /* SharedObjectSnapshotService.swift */,
 				B20047 /* AutomaticBackupRetentionPolicy.swift */,
 				B20048 /* AutomaticBackupService.swift */,
+				B20050 /* SWFInputSupportDetector.swift */,
 				B20025 /* GameControllerInputService.swift */,
 				B20026 /* GameStorageService.swift */,
 			);
@@ -788,7 +791,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastUpgradeCheck = 1540;
+				LastUpgradeCheck = 2700;
 			};
 			buildConfigurationList = L10000 /* Build configuration list for PBXProject "Ruffnova" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -929,6 +932,7 @@
 				A20047 /* AutomaticBackupRetentionPolicy.swift in Sources */,
 				A20048 /* AutomaticBackupService.swift in Sources */,
 				A20049 /* AutomaticBackupSection.swift in Sources */,
+				A20050 /* SWFInputSupportDetector.swift in Sources */,
 				A30001 /* PermissionPolicyService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -940,15 +944,38 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = B8NH9LK6K6;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
@@ -964,6 +991,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -973,14 +1001,37 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = B8NH9LK6K6;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
@@ -990,6 +1041,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 			};
@@ -1004,7 +1056,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 2026.07.15;
-				DEVELOPMENT_TEAM = B8NH9LK6K6;
+				DEAD_CODE_STRIPPING = YES;
 				ENABLE_DEBUG_DYLIB = NO;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				INFOPLIST_FILE = Info.plist;
@@ -1073,7 +1125,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 2026.07.15;
-				DEVELOPMENT_TEAM = B8NH9LK6K6;
+				DEAD_CODE_STRIPPING = YES;
 				"EXCLUDED_ARCHS[sdk=*]" = x86_64;
 				INFOPLIST_FILE = Info.plist;
 				"INFOPLIST_FILE[sdk=iphoneos*]" = "Info-iOS.plist";

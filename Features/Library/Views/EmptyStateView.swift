@@ -99,6 +99,7 @@ struct EmptyStateView: View {
                     .font(.callout)
             }
             .frame(width: 120, height: 96)
+            .contentShape(RoundedRectangle(cornerRadius: NativeRadius.xxl, style: .continuous))
         }
         .buttonStyle(.plain)
         .liquidGlassRounded(cornerRadius: NativeRadius.xxl, material: GlassMaterial.light)
@@ -117,6 +118,7 @@ struct EmptyStateView: View {
                     .font(.callout)
             }
             .frame(width: 120, height: 96)
+            .contentShape(RoundedRectangle(cornerRadius: NativeRadius.xxl, style: .continuous))
         }
         .buttonStyle(.plain)
         .liquidGlassRounded(cornerRadius: NativeRadius.xxl, material: GlassMaterial.light)

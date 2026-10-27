@@ -60,6 +60,10 @@ struct TouchLayoutEditorView: View {
         .accessibilityLabel(locManager.localized("touchLayout.editor.orientation"))
     }
 
+    private var layoutCanvasSize: CGSize {
+        TouchLayoutMetrics.referenceCanvas(for: editor.orientation)
+    }
+
     private var editorControls: some View {
         VStack(spacing: NativeSpacing.sm) {
             HStack(spacing: NativeSpacing.sm) {
@@ -77,11 +81,11 @@ struct TouchLayoutEditorView: View {
                 Menu {
                     ForEach(GameAction.allCases) { action in
                         Button(locManager.localized("input.action.\(action.rawValue)")) {
-                            editor.addButton(action: action, canvasSize: TouchLayoutEditorCanvas.defaultCanvasSize)
+                            editor.addButton(action: action, canvasSize: layoutCanvasSize)
                         }
                     }
                     Button(locManager.localized("touchLayout.editor.addDirectionalPad")) {
-                        editor.addDirectionalPad(canvasSize: TouchLayoutEditorCanvas.defaultCanvasSize)
+                        editor.addDirectionalPad(canvasSize: layoutCanvasSize)
                     }
                 } label: {
                     Label(locManager.localized("touchLayout.editor.add"), systemImage: "plus")
@@ -128,7 +132,7 @@ struct TouchLayoutEditorView: View {
                 Spacer()
 
                 Button {
-                    editor.duplicateSelected(canvasSize: TouchLayoutEditorCanvas.defaultCanvasSize)
+                    editor.duplicateSelected(canvasSize: layoutCanvasSize)
                 } label: {
                     Image(systemName: "plus.square.on.square")
                 }
@@ -166,7 +170,7 @@ struct TouchLayoutEditorView: View {
                             editor.resize(
                                 controlID: control.id,
                                 to: NormalizedSize(width: value, height: value),
-                                canvasSize: TouchLayoutEditorCanvas.defaultCanvasSize
+                                canvasSize: layoutCanvasSize
                             )
                         }
                     ),

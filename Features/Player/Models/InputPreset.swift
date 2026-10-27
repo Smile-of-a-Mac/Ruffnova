@@ -31,13 +31,12 @@ enum InputPreset: String, Codable, CaseIterable, Identifiable {
 
     private func classicControls(isLandscape: Bool) -> [TouchControlInstance] {
         let dpadCenter = isLandscape ? NormalizedPoint(x: 0.16, y: 0.78) : NormalizedPoint(x: 0.19, y: 0.78)
-        let actionCenter = isLandscape ? NormalizedPoint(x: 0.84, y: 0.77) : NormalizedPoint(x: 0.81, y: 0.74)
         return [
             directionalPad(id: "20000000-0000-0000-0000-000000000001", center: dpadCenter, size: isLandscape ? 0.22 : 0.28),
-            button(id: "20000000-0000-0000-0000-000000000002", action: .primary, center: actionCenter),
-            button(id: "20000000-0000-0000-0000-000000000003", action: .secondary, center: offset(actionCenter, x: -0.15, y: 0.10)),
-            button(id: "20000000-0000-0000-0000-000000000004", action: .confirm, center: offset(actionCenter, x: 0.02, y: -0.18)),
-            button(id: "20000000-0000-0000-0000-000000000005", action: .cancel, center: offset(actionCenter, x: -0.17, y: -0.08)),
+            button(id: "20000000-0000-0000-0000-000000000002", action: .primary, center: NormalizedPoint(x: 0.84, y: 0.76)),
+            button(id: "20000000-0000-0000-0000-000000000003", action: .secondary, center: NormalizedPoint(x: 0.68, y: 0.76)),
+            button(id: "20000000-0000-0000-0000-000000000004", action: .confirm, center: NormalizedPoint(x: 0.84, y: 0.50)),
+            button(id: "20000000-0000-0000-0000-000000000005", action: .cancel, center: NormalizedPoint(x: 0.68, y: 0.50)),
         ]
     }
 
@@ -47,19 +46,18 @@ enum InputPreset: String, Codable, CaseIterable, Identifiable {
         return [
             directionalPad(id: "20000000-0000-0000-0000-000000000011", center: dpadCenter, size: isLandscape ? 0.18 : 0.22),
             button(id: "20000000-0000-0000-0000-000000000012", action: .primary, center: primaryCenter, size: 0.11),
-            button(id: "20000000-0000-0000-0000-000000000013", action: .secondary, center: offset(primaryCenter, x: -0.13, y: 0), size: 0.11),
+            button(id: "20000000-0000-0000-0000-000000000013", action: .secondary, center: offset(primaryCenter, x: -0.16, y: 0), size: 0.11),
         ]
     }
 
     private func leftHandedControls(isLandscape: Bool) -> [TouchControlInstance] {
         let dpadCenter = isLandscape ? NormalizedPoint(x: 0.84, y: 0.78) : NormalizedPoint(x: 0.81, y: 0.78)
-        let actionCenter = isLandscape ? NormalizedPoint(x: 0.16, y: 0.77) : NormalizedPoint(x: 0.19, y: 0.74)
         return [
             directionalPad(id: "20000000-0000-0000-0000-000000000021", center: dpadCenter, size: isLandscape ? 0.22 : 0.28),
-            button(id: "20000000-0000-0000-0000-000000000022", action: .primary, center: actionCenter),
-            button(id: "20000000-0000-0000-0000-000000000023", action: .secondary, center: offset(actionCenter, x: 0.15, y: 0.10)),
-            button(id: "20000000-0000-0000-0000-000000000024", action: .confirm, center: offset(actionCenter, x: -0.02, y: -0.18)),
-            button(id: "20000000-0000-0000-0000-000000000025", action: .cancel, center: offset(actionCenter, x: 0.17, y: -0.08)),
+            button(id: "20000000-0000-0000-0000-000000000022", action: .primary, center: NormalizedPoint(x: 0.16, y: 0.76)),
+            button(id: "20000000-0000-0000-0000-000000000023", action: .secondary, center: NormalizedPoint(x: 0.32, y: 0.76)),
+            button(id: "20000000-0000-0000-0000-000000000024", action: .confirm, center: NormalizedPoint(x: 0.16, y: 0.50)),
+            button(id: "20000000-0000-0000-0000-000000000025", action: .cancel, center: NormalizedPoint(x: 0.32, y: 0.50)),
         ]
     }
 

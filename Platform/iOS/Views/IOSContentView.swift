@@ -513,10 +513,11 @@ struct IOSContentView: View {
 
             }
             .overlay(alignment: .bottomLeading) {
-                if appState.swfContentType == .interactive && appState.showVirtualControls {
+                if appState.showVirtualControls {
                     let orientation: TouchLayoutOrientation = geo.size.width >= geo.size.height ? .landscape : .portrait
                     GameControlsView(
                         controls: appState.currentTouchControls(for: orientation),
+                        orientation: orientation,
                         safeAreaInsets: geo.safeAreaInsets
                     ) { instanceID, action, isDown in
                         appState.sendVirtualGameAction(action, instanceID: instanceID, isDown: isDown)

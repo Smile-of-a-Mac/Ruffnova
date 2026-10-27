@@ -1,6 +1,6 @@
-// DesignTokens — Multi-platform design system.
+// DesignTokens — Shared spacing, radius, motion, and native material helpers.
 // Material hierarchy creates depth. Whitespace creates structure.
-// Never fake glass — always use native system materials.
+// Never fake glass — prefer the system Liquid Glass API and semantic materials.
 
 import SwiftUI
 
@@ -30,7 +30,6 @@ enum NativeRadius {
     static let lg: CGFloat = 16
     static let xl: CGFloat = 20
     static let xxl: CGFloat = 24
-    static let circle: CGFloat = 999
 }
 
 // MARK: - Glass Material Hierarchy
@@ -47,11 +46,6 @@ enum GlassMaterial {
     /// Informational overlays — rare use
     static var heavy: Material { .thickMaterial }
 }
-
-// MARK: - Compatibility Aliases
-
-typealias GlassSpacing = NativeSpacing
-typealias GlassRadius = NativeRadius
 
 // MARK: - Animation Tokens
 // Physical, subtle, purposeful — never exaggerated.
@@ -71,62 +65,49 @@ extension Animation {
     static let stageFullscreen = Animation.spring(response: 0.46, dampingFraction: 0.9, blendDuration: 0.08)
 }
 
-// MARK: - Glass Card Modifier
-// Lightweight floating card with ultra-thin material.
-// Used sparingly — only for truly independent floating content.
+// MARK: - Native Glass
 
-struct NativeCardModifier: ViewModifier {
-    var cornerRadius: CGFloat = NativeRadius.lg
-    var material: Material = GlassMaterial.ultraLight
+/// Applies the system Liquid Glass effect on macOS 26 / iOS 26 and falls back to a
+/// native material on earlier systems. Reduce Transparency swaps the material for an
+/// opaque background so content stays legible.
+private struct NativeGlassModifier<S: InsettableShape>: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
-    func body(content: Content) -> some View {
-        content
-    }
-}
-
-struct LiquidGlassModifier<S: InsettableShape>: ViewModifier {
     let shape: S
-    var material: Material = GlassMaterial.ultraLight
+    let material: Material
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
-            .background(material, in: shape)
-            .overlay {
-                shape
-                    .strokeBorder(.white.opacity(0.20), lineWidth: 0.7)
-            }
-            .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 8)
+        if #available(iOS 26.0, macOS 26.0, *) {
+            content.glassEffect(.regular, in: shape)
+        } else if reduceTransparency {
+            content.background(.background, in: shape)
+        } else {
+            content.background(material, in: shape)
+        }
     }
 }
 
 extension View {
-    /// Uses the system Liquid Glass API when available, with the native material fallback.
-    @ViewBuilder
-    func nativeLiquidGlass<S: Shape>(in shape: S) -> some View {
-        #if os(iOS)
-        if #available(iOS 26.0, *) {
-            self.glassEffect(.regular, in: shape)
-        } else {
-            self.background(.regularMaterial, in: shape)
-        }
-        #else
-        self.background(.regularMaterial, in: shape)
-        #endif
+    func nativeLiquidGlass<S: InsettableShape>(
+        in shape: S,
+        material: Material = GlassMaterial.ultraLight
+    ) -> some View {
+        modifier(NativeGlassModifier(shape: shape, material: material))
     }
 
-    func nativeCard(cornerRadius: CGFloat = NativeRadius.lg, material: Material = GlassMaterial.ultraLight) -> some View {
-        modifier(NativeCardModifier(cornerRadius: cornerRadius, material: material))
+    func liquidGlassCapsule(material: Material = GlassMaterial.ultraLight) -> some View {
+        nativeLiquidGlass(in: Capsule(), material: material)
     }
 
-    /// Compatibility wrapper for existing `.glassCard()` call sites.
-    func glassCard(cornerRadius: CGFloat = NativeRadius.lg, interactive: Bool = false) -> some View {
-        self.nativeCard(cornerRadius: cornerRadius)
-    }
-
-    /// Floating glass circle — for toolbar buttons
-    func glassCircle(size: CGFloat = 36, material: Material = GlassMaterial.ultraLight) -> some View {
-        self
-            .frame(width: size, height: size)
+    func liquidGlassRounded(
+        cornerRadius: CGFloat = NativeRadius.lg,
+        material: Material = GlassMaterial.ultraLight
+    ) -> some View {
+        nativeLiquidGlass(
+            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
+            material: material
+        )
     }
 
     /// Content should inherit the window material instead of painting an opaque surface.
@@ -140,31 +121,5 @@ extension View {
             .background(Color(.systemBackground))
             .scrollContentBackground(.hidden)
         #endif
-    }
-
-    func liquidGlassCapsule(material: Material = GlassMaterial.ultraLight) -> some View {
-        modifier(LiquidGlassModifier(shape: Capsule(), material: material))
-    }
-
-    func toolbarGlassCapsule(material: Material = GlassMaterial.ultraLight) -> some View {
-        self
-            .background(material, in: Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(.separator.opacity(0.45), lineWidth: 0.7)
-            }
-            .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
-    }
-
-    func toolbarGlassCircle(size: CGFloat = 36, material: Material = GlassMaterial.ultraLight) -> some View {
-        self
-            .frame(width: size, height: size)
-    }
-
-    func liquidGlassRounded(cornerRadius: CGFloat = NativeRadius.lg, material: Material = GlassMaterial.ultraLight) -> some View {
-        modifier(LiquidGlassModifier(
-            shape: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
-            material: material
-        ))
     }
 }

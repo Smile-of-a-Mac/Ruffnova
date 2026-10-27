@@ -56,7 +56,7 @@ struct TraceConsoleView: View {
                     LazyVStack(alignment: .leading, spacing: 2) {
                         ForEach(console.messages) { entry in
                             Text(entry.text)
-                                .font(.system(size: 11, design: .monospaced))
+                                .font(.caption.monospaced())
                                 .textSelection(.enabled)
                         }
                     }

@@ -1,20 +1,32 @@
 import SwiftUI
 
 struct DebugOverlayView: View {
-    @EnvironmentObject var appState: AppState
-    @EnvironmentObject var locManager: LocalizationManager
+    @EnvironmentObject private var playback: PlaybackMetrics
+    @EnvironmentObject private var locManager: LocalizationManager
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 2) {
+        VStack(alignment: .trailing, spacing: NativeSpacing.xs) {
             Text(String(format: locManager.localized("debug.fps"),
-                       appState.frameRate,
-                       appState.currentFrame))
+                       playback.frameRate,
+                       playback.currentFrame))
             Text(locManager.localized("debug.render.placeholder"))
         }
-        .font(.system(size: 10, design: .monospaced))
+        .font(.caption2.monospaced())
         .foregroundStyle(.green)
-        .padding(10)
-        .background(GlassMaterial.ultraLight, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(NativeSpacing.sm)
+        .background(
+            GlassMaterial.ultraLight,
+            in: RoundedRectangle(cornerRadius: NativeRadius.sm, style: .continuous)
+        )
+        .accessibilityElement(children: .combine)
         .accessibilityLabel(locManager.localized("debug.overlay.label"))
     }
+}
+
+#Preview("Debug Overlay") {
+    let appState = AppState()
+    DebugOverlayView()
+        .environmentObject(appState.playback)
+        .environmentObject(LocalizationManager.shared)
+        .padding()
 }

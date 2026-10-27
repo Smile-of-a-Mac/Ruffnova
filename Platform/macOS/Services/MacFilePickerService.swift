@@ -6,34 +6,31 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class MacFilePickerService: FilePickerService {
-    func pickSWFFile(completion: @escaping (URL?) -> Void) {
+    func pickSWFFile(message: String?, title: String?) async -> URL? {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "swf")].compactMap { $0 }
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.runModal()
-        completion(panel.url)
+        panel.canChooseFiles = true
+        if let title { panel.title = title }
+        if let message { panel.message = message }
+        return await present(panel)
     }
 
-    func pickFolder(completion: @escaping (URL?) -> Void) {
+    func pickFolder(message: String?, prompt: String?) async -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.runModal()
-        completion(panel.url)
+        if let prompt { panel.prompt = prompt }
+        if let message { panel.message = message }
+        return await present(panel)
     }
 
-    func saveScreenshot(data: Data, suggestedName: String, completion: @escaping (URL?) -> Void) {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = suggestedName
-        panel.begin { response in
-            if response == .OK, let url = panel.url {
-                try? data.write(to: url)
-                completion(url)
-            } else {
-                completion(nil)
+    private func present(_ panel: NSOpenPanel) async -> URL? {
+        await withCheckedContinuation { continuation in
+            panel.begin { response in
+                continuation.resume(returning: response == .OK ? panel.url : nil)
             }
         }
     }

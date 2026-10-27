@@ -13,7 +13,7 @@ struct PlayerModeMenu: View {
             }
         } label: {
             Image(systemName: iconName)
-                .font(.system(size: 10, weight: .medium))
+                .font(.caption2.weight(.medium))
                 .foregroundStyle(.secondary)
         }
         #if os(macOS)

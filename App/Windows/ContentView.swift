@@ -5,16 +5,30 @@
 import Combine
 import SwiftUI
 import UniformTypeIdentifiers
-#if os(macOS)
-import AppKit
-#elseif os(iOS)
+#if os(iOS)
 import UIKit
 #endif
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isDropTargeted = false
+
+    private var sidebarVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding(
+            get: {
+                appState.sidebarCollapsed || appState.isStageMaximized ? .detailOnly : .all
+            },
+            set: { visibility in
+                guard !appState.isStageMaximized else { return }
+                let isCollapsed = visibility == .detailOnly
+                if appState.sidebarCollapsed != isCollapsed {
+                    appState.sidebarCollapsed = isCollapsed
+                }
+            }
+        )
+    }
 
     private enum PresentedSheet: String, Identifiable {
         case swfInfo
@@ -25,24 +39,19 @@ struct ContentView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            if !appState.sidebarCollapsed && !appState.isStageMaximized {
-                AppSidebar()
-                    .environmentObject(appState)
-                    .environmentObject(locManager)
-                    .frame(width: 240)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-
-                Divider()
-                    .opacity(0.35)
-            }
-
+        NavigationSplitView(columnVisibility: sidebarVisibility) {
+            AppSidebar()
+                .environmentObject(appState)
+                .environmentObject(locManager)
+        } detail: {
             contentArea
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 720, minHeight: 480)
         .glassWindowBase()
-        .animation(.glassSpring, value: appState.sidebarCollapsed)
+        .environmentObject(appState.playback)
+        .animation(reduceMotion ? nil : .glassSpring, value: appState.sidebarCollapsed)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !appState.isStageMaximized {
                 StatusBarView()
@@ -50,7 +59,7 @@ struct ContentView: View {
             }
         }
         .toolbar {
-            AppToolbar(refreshToken: appState.toolbarRefreshToken)
+            AppToolbar()
         }
         #if os(macOS)
         .toolbar(appState.isStageMaximized ? .hidden : .visible, for: .windowToolbar)
@@ -82,18 +91,7 @@ struct ContentView: View {
             appState.showTraceConsole.toggle()
         }
         .onReceive(NotificationCenter.default.publisher(for: .importFolder)) { _ in
-            #if os(macOS)
-            let panel = NSOpenPanel()
-            panel.canChooseDirectories = true
-            panel.canChooseFiles = false
-            panel.allowsMultipleSelection = false
-            panel.message = locManager.localized("library.chooseFolder.message")
-            panel.prompt = locManager.localized("library.chooseFolder")
-
-            if panel.runModal() == .OK, let url = panel.url {
-                appState.browseDirectory(url)
-            }
-            #endif
+            Task { await appState.presentFolderPicker() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .focusSearch)) { _ in
             appState.requestSearchFocus()

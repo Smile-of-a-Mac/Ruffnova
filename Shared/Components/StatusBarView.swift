@@ -69,10 +69,10 @@ struct StatusBarView: View {
     private func statusItem(icon: String, text: String, helpText: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 9, weight: .regular))
+                .font(.caption2)
                 .foregroundStyle(.tertiary)
             Text(text)
-                .font(.system(size: 10))
+                .font(.caption2)
                 .foregroundStyle(.secondary)
         }
         .help(helpText)
@@ -88,7 +88,7 @@ struct StatusBarView: View {
                 .fill(.tint.opacity(0.6))
                 .frame(width: 5, height: 5)
             Text(text)
-                .font(.system(size: 10, weight: .medium))
+                .font(.caption2.weight(.medium))
                 .foregroundStyle(.secondary)
         }
         .help(helpText)

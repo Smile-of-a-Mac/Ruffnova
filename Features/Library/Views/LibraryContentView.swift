@@ -99,7 +99,7 @@ struct LibraryContentView: View {
                 }
 
                 Button {
-                    AppCommandRouter.openFile(appState: appState, loc: locManager)
+                    AppCommandRouter.openFile(appState: appState)
                 } label: {
                     Label(locManager.localized("toolbar.openSwf"), systemImage: "doc")
                 }
@@ -142,6 +142,7 @@ struct LibrarySectionEmptyState: View {
             systemImage: icon,
             description: Text(locManager.localized(subtitleKey))
         )
+        .centersOnDisplay()
         #else
         VStack(spacing: NativeSpacing.xxl) {
             Spacer()
@@ -227,19 +228,20 @@ struct LibraryGridView: View {
 
     @ViewBuilder
     private var content: some View {
+        let items = displayedItems
         #if os(iOS)
-        scrollContent
+        scrollContent(items)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if isSelecting {
-                    iOSSelectionBar
+                    iOSSelectionBar(items)
                 }
             }
         #else
-        scrollContent
+        scrollContent(items)
         #endif
     }
 
-    private var scrollContent: some View {
+    private func scrollContent(_ items: [LibraryItem]) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: NativeSpacing.md) {
@@ -248,7 +250,7 @@ struct LibraryGridView: View {
                             Text(selectedCollection.name)
                                 .font(.headline)
                         }
-                        Text(isSelecting ? selectedCountText : String(format: locManager.localized("library.fileCount"), displayedItems.count))
+                        Text(isSelecting ? selectedCountText : String(format: locManager.localized("library.fileCount"), items.count))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -261,7 +263,7 @@ struct LibraryGridView: View {
                     }
                     #else
                     if isSelecting {
-                        selectionActions
+                        selectionActions(items)
                     } else if collectionID == nil {
                         Picker(locManager.localized("library.sort"), selection: $sortOrder) {
                             ForEach(LibrarySortOrder.allCases, id: \.self) { order in
@@ -295,7 +297,7 @@ struct LibraryGridView: View {
                 .padding(.top, gridTopPadding)
                 .padding(.bottom, NativeSpacing.md)
 
-                if displayedItems.isEmpty {
+                if items.isEmpty {
                     VStack(spacing: NativeSpacing.md) {
                         Image(systemName: "tray")
                             .font(.system(size: 36, weight: .light))
@@ -307,7 +309,7 @@ struct LibraryGridView: View {
                     .frame(maxWidth: .infinity, minHeight: 320)
                 } else {
                     LazyVGrid(columns: columns, spacing: NativeSpacing.xl) {
-                        ForEach(displayedItems) { item in
+                        ForEach(items) { item in
                             selectableLibraryCell(item)
                         }
                     }
@@ -317,8 +319,8 @@ struct LibraryGridView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: displayedItems.map(\.id)) {
-            syncSelection(with: displayedItems.map(\.id))
+        .task(id: items.map(\.id)) {
+            syncSelection(with: items.map(\.id))
         }
     }
 
@@ -330,18 +332,18 @@ struct LibraryGridView: View {
     }
 
     #if os(iOS)
-    private var iOSSelectionBar: some View {
+    private func iOSSelectionBar(_ items: [LibraryItem]) -> some View {
         VStack(spacing: NativeSpacing.sm) {
             Divider()
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: NativeSpacing.sm) {
                 Button {
-                    selectedIDs = Set(displayedItems.map(\.id))
+                    selectedIDs = Set(items.map(\.id))
                 } label: {
                     Label(locManager.localized("systemMenu.selectAll"), systemImage: "checkmark.circle")
                         .frame(maxWidth: .infinity)
                 }
-                .disabled(displayedItems.isEmpty || selectedIDs.count == displayedItems.count)
+                .disabled(items.isEmpty || selectedIDs.count == items.count)
 
                 Button {
                     setSelectedFavorites(true)
@@ -377,12 +379,12 @@ struct LibraryGridView: View {
     }
     #endif
 
-    private var selectionActions: some View {
+    private func selectionActions(_ items: [LibraryItem]) -> some View {
         HStack(spacing: NativeSpacing.sm) {
             Button(locManager.localized("systemMenu.selectAll")) {
-                selectedIDs = Set(displayedItems.map(\.id))
+                selectedIDs = Set(items.map(\.id))
             }
-            .disabled(displayedItems.isEmpty || selectedIDs.count == displayedItems.count)
+            .disabled(items.isEmpty || selectedIDs.count == items.count)
 
             Button {
                 setSelectedFavorites(true)
@@ -420,8 +422,6 @@ struct LibraryGridView: View {
                     ZStack {
                         Circle()
                             .fill(selectedIDs.contains(item.id) ? Color.accentColor : Color.secondary.opacity(0.18))
-                        Circle()
-                            .strokeBorder(.white.opacity(0.72), lineWidth: 1)
                         if selectedIDs.contains(item.id) {
                             Image(systemName: "checkmark")
                                 .font(.caption.weight(.bold))

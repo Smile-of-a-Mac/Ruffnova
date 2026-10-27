@@ -80,14 +80,9 @@ final class RuffleBridge {
     private var displayTimer: Timer?
     private var lastFrameTime: UInt64 = 0
     private var renderedFrames: UInt64 = 0
-    private var fpsFrames: UInt64 = 0
-    private var fpsLastTime: UInt64 = 0
-    private var currentFPS: Double = 0
     private let timeBase: mach_timebase_info_data_t
     private var renderLoopActive = true
 
-    /// Called on each rendered frame with (fps, frameCount).
-    var onFrameUpdate: ((Double, UInt64) -> Void)?
     var onPolicyDiagnostic: ((RufflePolicyDiagnostic) -> Void)?
 
     // MARK: - Speed state (applied to dt in renderFrame)
@@ -207,19 +202,9 @@ final class RuffleBridge {
         drainPolicyDiagnostics()
         let renderResult = ruffle_player_render(player)
         renderedFrames += 1
-        fpsFrames += 1
-        if fpsLastTime == 0 { fpsLastTime = now }
-        let fpsElapsed = now - fpsLastTime
-        let fpsNanos = fpsElapsed * UInt64(timeBase.numer) / UInt64(timeBase.denom)
-        if Double(fpsNanos) >= 1_000_000_000.0 {
-            currentFPS = Double(fpsFrames) / (Double(fpsNanos) / 1_000_000_000.0)
-            fpsFrames = 0
-            fpsLastTime = now
-        }
         if renderedFrames == 1 || renderedFrames % 120 == 0 {
             Logger.ruffle.debug("frame=\(self.renderedFrames) dt=\(String(format: "%.4f", dt)) playing=\(ruffle_player_is_playing(player)) tick=\(tickResult.rawValue) render=\(renderResult.rawValue)")
         }
-        onFrameUpdate?(currentFPS, renderedFrames)
         #endif
     }
 

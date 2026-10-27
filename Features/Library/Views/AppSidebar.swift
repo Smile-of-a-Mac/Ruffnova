@@ -8,6 +8,7 @@ import SwiftUI
 struct AppSidebar: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var libraryService = LibraryService.shared
     @FocusState private var searchFocused: Bool
     @State private var handledSearchFocusRequest = 0
@@ -37,11 +38,6 @@ struct AppSidebar: View {
         .padding(.horizontal, NativeSpacing.lg)
         .padding(.bottom, NativeSpacing.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        #if os(macOS)
-        .background(Color(nsColor: .windowBackgroundColor))
-        #else
-        .background(Color(.systemBackground))
-        #endif
         .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
         .onAppear {
             handlePendingSearchFocusRequest()
@@ -69,7 +65,7 @@ struct AppSidebar: View {
     private var searchField: some View {
         HStack(spacing: NativeSpacing.sm) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(searchFocused ? .primary : .secondary)
 
             TextField(locManager.localized("search.placeholder"), text: searchBinding)
@@ -83,7 +79,7 @@ struct AppSidebar: View {
                     searchFocused = false
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
@@ -91,7 +87,7 @@ struct AppSidebar: View {
         }
         .padding(.horizontal, NativeSpacing.md)
         .padding(.vertical, NativeSpacing.sm)
-        .toolbarGlassCapsule(material: GlassMaterial.light)
+        .nativeLiquidGlass(in: Capsule(), material: GlassMaterial.light)
         .accessibilityLabel(locManager.localized("toolbar.searchLibrary"))
         .onReceive(appState.$searchFocusRequest.dropFirst()) { _ in
             handlePendingSearchFocusRequest()
@@ -115,13 +111,13 @@ struct AppSidebar: View {
 
     private func sidebarButton(for section: AppState.Section) -> some View {
         Button {
-            withAnimation(.default) {
+            withAnimation(reduceMotion ? nil : .glassSpring) {
                 appState.selectSection(section)
             }
         } label: {
             HStack(spacing: NativeSpacing.md) {
                 Image(systemName: section.icon)
-                    .font(.system(size: 15, weight: .regular))
+                    .font(.subheadline)
                     .foregroundStyle(isSelected(section) ? Color.accentColor : Color.secondary)
                     .frame(width: 22)
 

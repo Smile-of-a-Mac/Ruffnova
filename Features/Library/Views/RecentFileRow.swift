@@ -3,7 +3,6 @@ import SwiftUI
 struct RecentFileRow: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
-    @ObservedObject private var libraryService = LibraryService.shared
     let file: LibraryItem
     @State private var showDetails = false
 
@@ -14,7 +13,7 @@ struct RecentFileRow: View {
                     .font(.title3)
                     .foregroundStyle(.tertiary)
                     .frame(width: 36, height: 36)
-                    .modifier(LiquidGlassModifier(shape: Circle(), material: GlassMaterial.ultraLight))
+                    .nativeLiquidGlass(in: Circle())
                 VStack(alignment: .leading, spacing: NativeSpacing.xs) {
                     Text(file.name)
                         .font(.callout)

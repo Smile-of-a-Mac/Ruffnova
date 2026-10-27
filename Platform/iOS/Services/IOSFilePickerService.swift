@@ -6,62 +6,60 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class IOSFilePickerService: NSObject, FilePickerService, UIDocumentPickerDelegate {
-    private var pickCompletion: ((URL?) -> Void)?
-    private var presentedController: UIViewController?
+    private var continuation: CheckedContinuation<URL?, Never>?
 
-    func pickSWFFile(completion: @escaping (URL?) -> Void) {
-        pickCompletion = completion
-        let picker = UIDocumentPickerViewController(
+    func pickSWFFile(message: String?, title: String?) async -> URL? {
+        await present(
             forOpeningContentTypes: [UTType(filenameExtension: "swf")].compactMap { $0 }
         )
-        picker.delegate = self
-        picker.allowsMultipleSelection = false
-        presentPicker(picker)
     }
 
-    func pickFolder(completion: @escaping (URL?) -> Void) {
-        pickCompletion = completion
-        let picker = UIDocumentPickerViewController(
-            forOpeningContentTypes: [.folder]
-        )
-        picker.delegate = self
-        picker.allowsMultipleSelection = false
-        presentPicker(picker)
+    func pickFolder(message: String?, prompt: String?) async -> URL? {
+        await present(forOpeningContentTypes: [.folder])
     }
 
-    func saveScreenshot(data: Data, suggestedName: String, completion: @escaping (URL?) -> Void) {
-        let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent(suggestedName)
-        do {
-            try data.write(to: tmpURL)
-            let picker = UIDocumentPickerViewController(forExporting: [tmpURL])
-            presentPicker(picker)
-            completion(tmpURL)
-        } catch {
-            completion(nil)
+    private func present(forOpeningContentTypes types: [UTType]) async -> URL? {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+
+            let picker = UIDocumentPickerViewController(forOpeningContentTypes: types)
+            picker.delegate = self
+            picker.allowsMultipleSelection = false
+
+            guard presentPicker(picker) else {
+                self.continuation = nil
+                continuation.resume(returning: nil)
+                return
+            }
         }
     }
 
-    private func presentPicker(_ picker: UIDocumentPickerViewController) {
+    private func presentPicker(_ picker: UIDocumentPickerViewController) -> Bool {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let root = windowScene.windows.first?.rootViewController else { return }
+              let root = windowScene.windows.first?.rootViewController
+        else { return false }
+
         var topController = root
         while let presented = topController.presentedViewController {
             topController = presented
         }
         topController.present(picker, animated: true)
-        presentedController = topController
+        return true
     }
 
     // MARK: - UIDocumentPickerDelegate
 
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-        pickCompletion?(urls.first)
-        pickCompletion = nil
+        finish(with: urls.first)
     }
 
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-        pickCompletion?(nil)
-        pickCompletion = nil
+        finish(with: nil)
+    }
+
+    private func finish(with url: URL?) {
+        continuation?.resume(returning: url)
+        continuation = nil
     }
 }
 #endif

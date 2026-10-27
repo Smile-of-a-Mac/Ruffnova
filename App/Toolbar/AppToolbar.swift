@@ -3,17 +3,8 @@ import SwiftUI
 struct AppToolbar: ToolbarContent {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
-    let refreshToken: Int
-    #if os(macOS)
-    @Environment(\.openWindow) private var openWindow
-    #endif
 
     var body: some ToolbarContent {
-        ToolbarItemGroup(placement: .navigation) {
-            sidebarButton
-                .id(refreshToken)
-        }
-
         ToolbarItemGroup(placement: .primaryAction) {
             importMenu
             settingsButton
@@ -22,25 +13,12 @@ struct AppToolbar: ToolbarContent {
 
     // MARK: - Import Menu
 
-    private var sidebarButton: some View {
-        Button {
-            withAnimation(.default) {
-                appState.toggleSidebar()
-            }
-        } label: {
-            Label(locManager.localized("toolbar.showSidebar"), systemImage: "sidebar.left")
-        }
-        .help(appState.sidebarCollapsed
-              ? locManager.localized("toolbar.showSidebar")
-              : locManager.localized("toolbar.hideSidebar"))
-    }
-
     private var importMenu: some View {
         Menu {
-            Button { AppCommandRouter.openFile(appState: appState, loc: locManager) } label: {
+            Button { AppCommandRouter.openFile(appState: appState) } label: {
                 Label(locManager.localized("toolbar.openSwf"), systemImage: "doc")
             }
-            Button { AppCommandRouter.importFolder(appState: appState, loc: locManager) } label: {
+            Button { AppCommandRouter.importFolder(appState: appState) } label: {
                 Label(locManager.localized("toolbar.importFolder"), systemImage: "folder")
             }
         } label: {
@@ -51,17 +29,21 @@ struct AppToolbar: ToolbarContent {
 
     // MARK: - Settings Button
 
+    @ViewBuilder
     private var settingsButton: some View {
+        #if os(macOS)
+        SettingsLink {
+            Label(locManager.localized("toolbar.settings"), systemImage: "gearshape")
+        }
+        .help(locManager.localized("toolbar.settings"))
+        #else
         Button {
-            #if os(macOS)
-            openWindow(id: "ruffnova-settings")
-            #else
             appState.selectedSection = .settings
-            #endif
         } label: {
             Label(locManager.localized("toolbar.settings"), systemImage: "gearshape")
         }
         .help(locManager.localized("toolbar.settings"))
+        #endif
     }
 
 }

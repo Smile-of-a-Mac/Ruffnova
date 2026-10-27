@@ -80,6 +80,6 @@ struct SWFInfoPanel: View {
             Text(value).fontWeight(.medium)
             Spacer()
         }
-        .font(.system(size: 12))
+        .font(.caption)
     }
 }

@@ -1,43 +1,16 @@
 import SwiftUI
-import UniformTypeIdentifiers
 #if os(macOS)
 import AppKit
 #endif
 
 @MainActor
 enum AppCommandRouter {
-    static func openFile(appState: AppState, loc: LocalizationManager) {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "swf")].compactMap { $0 }
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.title = loc.localized("workspace.openPanel.title")
-        panel.message = loc.localized("workspace.openPanel.message")
-
-        if panel.runModal() == .OK, let url = panel.url {
-            appState.openFile(url)
-        }
-        #elseif os(iOS)
-        appState.showFilePicker()
-        #endif
+    static func openFile(appState: AppState) {
+        Task { await appState.presentOpenFilePanel() }
     }
 
-    static func importFolder(appState: AppState, loc: LocalizationManager) {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.message = loc.localized("library.chooseFolder.message")
-        panel.prompt = loc.localized("library.chooseFolder")
-        if panel.runModal() == .OK, let url = panel.url {
-            appState.browseDirectory(url)
-        }
-        #elseif os(iOS)
-        appState.showFolderPicker()
-        #endif
+    static func importFolder(appState: AppState) {
+        Task { await appState.presentFolderPicker() }
     }
 
     static func reloadCurrentFile(appState: AppState) {

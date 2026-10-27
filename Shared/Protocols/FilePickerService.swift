@@ -5,7 +5,6 @@ import Foundation
 
 @MainActor
 protocol FilePickerService {
-    func pickSWFFile(completion: @escaping (URL?) -> Void)
-    func pickFolder(completion: @escaping (URL?) -> Void)
-    func saveScreenshot(data: Data, suggestedName: String, completion: @escaping (URL?) -> Void)
+    func pickSWFFile(message: String?, title: String?) async -> URL?
+    func pickFolder(message: String?, prompt: String?) async -> URL?
 }

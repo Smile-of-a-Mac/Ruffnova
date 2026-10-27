@@ -3,11 +3,50 @@
 // Animations are subtle and physical.
 
 import SwiftUI
-import UniformTypeIdentifiers
+
+/// iPhone Duo's inner display reserves a vertical control strip on its trailing edge, which
+/// offsets the safe-area center from the physical display center. Centered, non-scrolling
+/// content opts in to spanning that strip so it reads as centered on the display, the same
+/// way Safari centers its start page.
+private struct CentersOnDisplayKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var centersOnDisplay: Bool {
+        get { self[CentersOnDisplayKey.self] }
+        set { self[CentersOnDisplayKey.self] = newValue }
+    }
+}
+
+private struct DisplayCenteredModifier: ViewModifier {
+    @Environment(\.centersOnDisplay) private var centersOnDisplay
+
+    func body(content: Content) -> some View {
+        // Span the reserved trailing strip for the whole regular-width lifetime. The
+        // content position is then driven purely by the split view's own column-width
+        // animation, so showing or hiding the sidebar stays a single smooth motion.
+        // Vertical edges are included so the split view's per-column insets can't shift
+        // the content up or down when the sidebar is toggled.
+        content.ignoresSafeArea(
+            .container,
+            edges: centersOnDisplay ? [.trailing, .top, .bottom] : []
+        )
+    }
+}
+
+extension View {
+    /// Centers non-scrolling content on the physical display, spanning any reserved trailing
+    /// control strip. No effect unless an ancestor sets `centersOnDisplay`.
+    func centersOnDisplay() -> some View {
+        modifier(DisplayCenteredModifier())
+    }
+}
 
 struct EmptyStateView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var libraryService = LibraryService.shared
     @Binding var isDropTargeted: Bool
 
@@ -46,8 +85,13 @@ struct EmptyStateView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
+            guard !appeared else { return }
+            if reduceMotion {
                 appeared = true
+            } else {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
+                    appeared = true
+                }
             }
         }
         .overlay {
@@ -58,34 +102,19 @@ struct EmptyStateView: View {
                     .transition(.opacity)
             }
         }
+        .centersOnDisplay()
     }
 
     // MARK: - Flash Icon
 
     private var flashIcon: some View {
-        ZStack {
-            Circle()
-                .fill(.tint.opacity(0.05))
-                .frame(width: 140, height: 140)
-                .blur(radius: 30)
-                .scaleEffect(appeared ? 1.0 : 0.5)
-                .opacity(appeared ? 1 : 0)
-
-            Circle()
-                .fill(GlassMaterial.light)
-                .frame(width: 104, height: 104)
-                .overlay {
-                    Circle()
-                        .strokeBorder(.quaternary.opacity(0.6), lineWidth: 0.5)
-                }
-                .shadow(color: .black.opacity(0.10), radius: 18, x: 0, y: 10)
-
-            Image(systemName: "play.rectangle.fill")
-                .font(.system(size: 36, weight: .medium))
-                .foregroundStyle(Color.accentColor)
-                .scaleEffect(appeared ? 1.0 : 0.5)
-                .opacity(appeared ? 1 : 0)
-        }
+        Image(systemName: "play.rectangle.fill")
+            .font(.system(size: 36, weight: .medium))
+            .foregroundStyle(.tint)
+            .frame(width: 104, height: 104)
+            .nativeLiquidGlass(in: Circle(), material: GlassMaterial.light)
+            .scaleEffect(appeared ? 1.0 : 0.9)
+            .opacity(appeared ? 1 : 0)
     }
 
     // MARK: - Primary Button
@@ -168,11 +197,6 @@ struct EmptyStateView: View {
                         .fill(GlassMaterial.light)
                         .aspectRatio(4/3, contentMode: .fill)
                         .frame(width: 110, height: 82)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: NativeRadius.lg, style: .continuous)
-                                .strokeBorder(.quaternary.opacity(0.45), lineWidth: 0.5)
-                        }
-                        .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 6)
 
                     Image(systemName: "play.rectangle")
                         .font(.system(size: 20))
@@ -192,31 +216,10 @@ struct EmptyStateView: View {
     // MARK: - Panels
 
     private func showOpenPanel() {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "swf")].compactMap { $0 }
-        panel.allowsMultipleSelection = false
-        panel.message = locManager.localized("workspace.openPanel.message")
-        if panel.runModal() == .OK, let url = panel.url {
-            appState.openFile(url)
-        }
-        #else
-        appState.showFilePicker()
-        #endif
+        Task { await appState.presentOpenFilePanel() }
     }
 
     private func showImportFolderPanel() {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.message = locManager.localized("library.chooseFolder.message")
-        if panel.runModal() == .OK, let url = panel.url {
-            appState.browseDirectory(url)
-        }
-        #else
-        appState.showFolderPicker()
-        #endif
+        Task { await appState.presentFolderPicker() }
     }
 }

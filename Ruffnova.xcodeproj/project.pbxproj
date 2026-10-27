@@ -61,6 +61,7 @@
 		A10055 /* ko InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10060 /* ko InfoPlist.strings */; };
 		A10056 /* WindowAppearancePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10061 /* WindowAppearancePolicy.swift */; };
 		A10057 /* Ruffnova.icon in Resources */ = {isa = PBXBuildFile; fileRef = B10062 /* Ruffnova.icon */; };
+		A10063 /* PlaybackMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10063 /* PlaybackMetrics.swift */; };
 		A20001 /* LibraryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* LibraryItem.swift */; };
 		A20002 /* LibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002 /* LibraryService.swift */; };
 		A20003 /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20003 /* ImportService.swift */; };
@@ -174,6 +175,7 @@
 		B10060 /* ko InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "ko InfoPlist.strings"; path = ko.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B10061 /* WindowAppearancePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowAppearancePolicy.swift; sourceTree = "<group>"; };
 		B10062 /* Ruffnova.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Ruffnova.icon; sourceTree = "<group>"; };
+		B10063 /* PlaybackMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackMetrics.swift; sourceTree = "<group>"; };
 		B20001 /* LibraryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryItem.swift; sourceTree = "<group>"; };
 		B20002 /* LibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryService.swift; sourceTree = "<group>"; };
 		B20003 /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
@@ -304,6 +306,7 @@
 			isa = PBXGroup;
 			children = (
 				B10004 /* AppState.swift */,
+				B10063 /* PlaybackMetrics.swift */,
 			);
 			path = Environment;
 			sourceTree = "<group>";
@@ -791,7 +794,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastUpgradeCheck = 2700;
+				LastUpgradeCheck = 2710;
 			};
 			buildConfigurationList = L10000 /* Build configuration list for PBXProject "Ruffnova" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -846,6 +849,7 @@
 				A10003 /* RuffleCommands.swift in Sources */,
 				A10046 /* AppCommandRouter.swift in Sources */,
 				A10004 /* AppState.swift in Sources */,
+				A10063 /* PlaybackMetrics.swift in Sources */,
 				A10005 /* AppToolbar.swift in Sources */,
 				A10006 /* AboutWindow.swift in Sources */,
 				A10007 /* ContentView.swift in Sources */,
@@ -944,6 +948,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -1001,6 +1006,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";

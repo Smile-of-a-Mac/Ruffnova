@@ -11,6 +11,7 @@ struct IOSContentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var libraryService = LibraryService.shared
     @Namespace private var playerNamespace
     @State private var selectedIPadSection: AppState.Section? = .library
@@ -40,6 +41,7 @@ struct IOSContentView: View {
                 iPhoneLayout
             }
         }
+        .environmentObject(appState.playback)
         .onAppear {
             appState.handleScenePhaseChanged(scenePhase)
             appState.setPlayerSurfaceVisible(appState.isPlayerVisible)
@@ -93,6 +95,12 @@ struct IOSContentView: View {
         } detail: {
             iPadDetailContent(for: appState.selectedSection)
                 .id(appState.selectedSection)
+                .environment(\.centersOnDisplay, true)
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        addContentMenu
+                    }
+                }
         }
         .onAppear {
             selectedIPadSection = appState.selectedCollectionID == nil ? appState.selectedSection : nil
@@ -116,7 +124,7 @@ struct IOSContentView: View {
             selectedIPadSection = collectionID == nil ? appState.selectedSection : nil
         }
         .onChange(of: appState.isStageMaximized) { _, maximized in
-            withAnimation(.stageFullscreen) {
+            withAnimation(reduceMotion ? nil : .stageFullscreen) {
                 iPadColumnVisibility = maximized ? .detailOnly : .all
             }
         }
@@ -165,9 +173,6 @@ struct IOSContentView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 AppBrandHeader(size: .sidebar)
-            }
-            ToolbarItem(placement: .primaryAction) {
-                addContentMenu
             }
         }
     }
@@ -252,14 +257,14 @@ struct IOSContentView: View {
     private var addContentMenu: some View {
         Menu {
             Button {
-                AppCommandRouter.openFile(appState: appState, loc: locManager)
+                AppCommandRouter.openFile(appState: appState)
             } label: {
                 Label(locManager.localized("toolbar.openSwf"), systemImage: "doc")
             }
             .keyboardShortcut("o", modifiers: .command)
 
             Button {
-                AppCommandRouter.importFolder(appState: appState, loc: locManager)
+                AppCommandRouter.importFolder(appState: appState)
             } label: {
                 Label(locManager.localized("toolbar.importFolder"), systemImage: "folder")
             }
@@ -399,13 +404,14 @@ struct IOSContentView: View {
             Text(locManager.localized("player.noMedia.subtitle"))
         } actions: {
             Button {
-                AppCommandRouter.openFile(appState: appState, loc: locManager)
+                AppCommandRouter.openFile(appState: appState)
             } label: {
                 Label(locManager.localized("empty.openSwf"), systemImage: "doc.badge.plus")
             }
             .buttonStyle(.borderedProminent)
         }
         .background(Color(.systemGroupedBackground))
+        .centersOnDisplay()
     }
 
     private var stageBackgroundARGB: UInt32 {
@@ -544,8 +550,8 @@ struct IOSContentView: View {
         .statusBarHidden(hidesStageSystemChrome)
         .toolbar(hidesStageSystemChrome ? .hidden : .visible, for: .navigationBar)
         .toolbar(hidesStageSystemChrome ? .hidden : .visible, for: .tabBar)
-        .animation(.stageFullscreen, value: appState.isStageMaximized)
-        .animation(.easeInOut(duration: 0.2), value: hidesStageSystemChrome)
+        .animation(reduceMotion ? nil : .stageFullscreen, value: appState.isStageMaximized)
+        .animation(reduceMotion ? nil : .glassSmooth, value: hidesStageSystemChrome)
     }
 
     private var nowPlayingPanel: some View {

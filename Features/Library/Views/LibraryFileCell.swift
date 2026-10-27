@@ -1,16 +1,14 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct LibraryFileCell: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
-    @ObservedObject private var libraryService = LibraryService.shared
     @ObservedObject private var collectionService = CollectionService.shared
-    private let thumbnailService = ThumbnailService.shared
     let file: LibraryItem
 
     @State private var isHovered = false
     @State private var showingDetails = false
+    @State private var thumbnail: CGImage?
 
     var body: some View {
         Button { appState.openFile(file.url) } label: {
@@ -90,28 +88,17 @@ struct LibraryFileCell: View {
     }
 
     private func locateFile() {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "swf")].compactMap { $0 }
-        panel.allowsMultipleSelection = false
-        panel.message = locManager.localized("library.locateFile.message")
-        if panel.runModal() == .OK, let url = panel.url {
-            libraryService.locateFile(for: file.id, newURL: url)
-        }
-        #elseif os(iOS)
-        appState.locateLibraryItem(file.id)
-        #endif
+        Task { await appState.relocateLibraryItem(file.id) }
     }
 
     private var thumbnailPreview: some View {
         ZStack {
             if file.availabilityStatus == .missing {
                 missingThumbnail
-            } else if let data = thumbnailData, let cgImage = thumbnailCGImage(from: data) {
-                Image(decorative: cgImage, scale: 1.0)
+            } else if let thumbnail {
+                Image(decorative: thumbnail, scale: 1.0)
                     .resizable()
                     .aspectRatio(4 / 3, contentMode: .fill)
-                    .aspectRatio(4 / 3, contentMode: .fit)
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous))
             } else {
@@ -119,6 +106,13 @@ struct LibraryFileCell: View {
             }
         }
         .aspectRatio(4 / 3, contentMode: .fit)
+        .task(id: file.thumbnailIdentifier) {
+            guard file.availabilityStatus != .missing else { return }
+            thumbnail = await ThumbnailService.shared.image(
+                for: file.thumbnailIdentifier,
+                fallbackData: file.thumbnailData
+            )
+        }
     }
 
     private var missingThumbnail: some View {
@@ -126,11 +120,9 @@ struct LibraryFileCell: View {
             .fill(GlassMaterial.heavy)
             .aspectRatio(4 / 3, contentMode: .fit)
             .overlay {
-                RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
-                    .strokeBorder(.red.opacity(0.3), lineWidth: 0.5)
                 Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 24, weight: .light))
-                    .foregroundStyle(.tertiary)
+                    .font(.title2.weight(.light))
+                    .foregroundStyle(.secondary)
             }
     }
 
@@ -139,29 +131,14 @@ struct LibraryFileCell: View {
             .fill(GlassMaterial.light)
             .aspectRatio(4 / 3, contentMode: .fit)
             .overlay {
-                RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
-                    .strokeBorder(.quaternary.opacity(0.55), lineWidth: 0.5)
-            }
-            .shadow(color: .black.opacity(0.08), radius: 14, x: 0, y: 8)
-            .overlay {
                 Image(systemName: "play.rectangle")
-                    .font(.system(size: 30, weight: .light))
+                    .font(.title2.weight(.light))
                     .foregroundStyle(.tertiary)
             }
     }
 
-    private var thumbnailData: Data? {
-        thumbnailService.data(for: file.thumbnailIdentifier) ?? file.thumbnailData
-    }
-
-    private func thumbnailCGImage(from data: Data) -> CGImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
-        return cgImage
-    }
-
     private var fileInfo: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: NativeSpacing.xs) {
             HStack(spacing: NativeSpacing.xs) {
                 Text(file.name)
                     .font(.callout)

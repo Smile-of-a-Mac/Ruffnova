@@ -5,6 +5,7 @@ import MediaPlayer
 
 struct PlayerControlBar: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject private var playback: PlaybackMetrics
     @EnvironmentObject private var locManager: LocalizationManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -123,7 +124,6 @@ struct PlayerControlBar: View {
                 .foregroundStyle(.white)
                 .frame(width: size, height: size)
                 .background(Color.accentColor, in: Circle())
-                .shadow(color: Color.accentColor.opacity(0.28), radius: 10, x: 0, y: 5)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(locManager.localized(appState.isPlaying ? "menu.pause" : "menu.play"))
@@ -131,19 +131,19 @@ struct PlayerControlBar: View {
 
     private var iosTimeline: some View {
         HStack(spacing: NativeSpacing.sm) {
-            Text(appState.formattedCurrentTime)
+            Text(playback.formattedCurrentTime)
                 .frame(width: 38, alignment: .leading)
 
-            Slider(value: $appState.seekPosition,
-                   in: 0...max(appState.totalFrames > 0 ? Double(appState.totalFrames) : 1, 1)
+            Slider(value: $playback.seekPosition,
+                   in: 0...max(playback.totalFrames > 0 ? Double(playback.totalFrames) : 1, 1)
             ) { editing in
-                if !editing { appState.seekToFrame(UInt32(appState.seekPosition)) }
+                if !editing { appState.seekToFrame(UInt32(playback.seekPosition)) }
             }
             .tint(.primary)
             .accessibilityLabel(locManager.localized("player.timeline"))
-            .accessibilityValue("\(appState.formattedCurrentTime) / \(appState.formattedTotalTime)")
+            .accessibilityValue("\(playback.formattedCurrentTime) / \(playback.formattedTotalTime)")
 
-            Text(appState.formattedTotalTime)
+            Text(playback.formattedTotalTime)
                 .frame(width: 38, alignment: .trailing)
         }
         .font(.caption2.monospacedDigit().weight(.medium))
@@ -213,7 +213,6 @@ struct PlayerControlBar: View {
                 .foregroundStyle(.white)
                 .frame(width: 36, height: 36)
                 .background(Color.accentColor, in: Circle())
-                .shadow(color: Color.accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(locManager.localized(appState.isPlaying ? "menu.pause" : "menu.play"))
@@ -300,10 +299,10 @@ struct PlayerControlBar: View {
     }
 
     private var modernSeekBar: some View {
-        Slider(value: $appState.seekPosition,
-               in: 0...max(appState.totalFrames > 0 ? Double(appState.totalFrames) : 1, 1)
+        Slider(value: $playback.seekPosition,
+               in: 0...max(playback.totalFrames > 0 ? Double(playback.totalFrames) : 1, 1)
         ) { editing in
-            if !editing { appState.seekToFrame(UInt32(appState.seekPosition)) }
+            if !editing { appState.seekToFrame(UInt32(playback.seekPosition)) }
         }
         .tint(.primary)
     }
@@ -332,13 +331,13 @@ struct PlayerControlBar: View {
 
     private var modernTimeDisplay: some View {
         HStack(spacing: 4) {
-            Text(appState.formattedCurrentTime)
+            Text(playback.formattedCurrentTime)
                 .font(.caption.monospacedDigit().weight(.medium))
                 .foregroundStyle(.secondary)
             Text("/")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.tertiary)
-            Text(appState.formattedTotalTime)
+            Text(playback.formattedTotalTime)
                 .font(.caption.monospacedDigit().weight(.medium))
                 .foregroundStyle(.secondary)
         }
@@ -417,7 +416,11 @@ private struct IOSSystemVolumeView: UIViewRepresentable {
 #endif
 
 #Preview("Controls") {
+    let appState = AppState()
     PlayerControlBar()
-        .environmentObject(AppState())
-        .padding(40).frame(width: 600)
+        .environmentObject(appState)
+        .environmentObject(appState.playback)
+        .environmentObject(LocalizationManager.shared)
+        .padding(40)
+        .frame(width: 600)
 }

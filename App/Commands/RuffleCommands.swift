@@ -21,12 +21,12 @@ struct RuffleCommands: Commands {
         // MARK: - File Menu
         CommandGroup(replacing: .newItem) {
             Button(loc.localized("menu.open")) {
-                AppCommandRouter.openFile(appState: appState, loc: loc)
+                AppCommandRouter.openFile(appState: appState)
             }
             .keyboardShortcut("o", modifiers: .command)
 
             Button(loc.localized("toolbar.importFolder")) {
-                AppCommandRouter.importFolder(appState: appState, loc: loc)
+                AppCommandRouter.importFolder(appState: appState)
             }
 
             Divider()
@@ -76,16 +76,6 @@ struct RuffleCommands: Commands {
                     }
                 }
             }
-        }
-
-        // MARK: - Edit Menu
-        CommandGroup(replacing: .appSettings) {
-            #if os(macOS)
-            Button(loc.localized("menu.preferences")) {
-                openWindow(id: "ruffnova-settings")
-            }
-            .keyboardShortcut(",", modifiers: .command)
-            #endif
         }
 
         // MARK: - Control Menu

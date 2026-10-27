@@ -136,7 +136,6 @@ final class AppState: ObservableObject {
     @Published var selectedSection: Section = .library
     @Published var selectedCollectionID: UUID?
     @Published var showToolbar: Bool = true
-    @Published var toolbarRefreshToken: Int = 0
     @Published var showDebugUI: Bool = false
     @Published private(set) var playerLoadState: PlayerLoadState = .idle
     @Published var errorMessage: String?
@@ -180,21 +179,9 @@ final class AppState: ObservableObject {
     private var virtualControlDetectionTask: Task<Void, Never>?
     private var pendingStageMaximizedExitIntent: StageMaximizedExitIntent?
 
-    var formattedCurrentTime: String {
-        let secs = frameRate > 0 ? Double(currentFrame) / Double(frameRate) : 0
-        return formatTime(secs)
-    }
-
-    var formattedTotalTime: String {
-        let secs = frameRate > 0 ? Double(totalFrames) / Double(frameRate) : 0
-        return formatTime(secs)
-    }
-
-    private func formatTime(_ secs: Double) -> String {
-        let m = Int(secs) / 60
-        let s = Int(secs) % 60
-        return String(format: "%d:%02d", m, s)
-    }
+    /// Frame and timeline state live in their own observable so frequent playback
+    /// updates only refresh player chrome instead of every AppState consumer.
+    let playback = PlaybackMetrics()
 
     @Published var quality: RuffleQuality = .high
     @Published var maxExecutionDuration: TimeInterval = 15.0
@@ -203,21 +190,13 @@ final class AppState: ObservableObject {
         LocalizationManager.shared.selectedLanguage.locale.identifier
     }
 
-    @Published var currentFrame: UInt32 = 0
-    @Published var totalFrames: UInt32 = 0
-    @Published var frameRate: Float = 30.0
     @Published var isLooping: Bool = false
     @Published var playbackSpeed: Float = 1.0
-    @Published var seekPosition: Double = 0
-
-    @Published var debugFrameRate: Double = 0
-    @Published var debugCurrentFrame: UInt64 = 0
 
     private(set) var bridge: RuffleBridge?
     private var pendingFileURL: URL?
     private var pendingPermissionRetryURL: URL?
     #if os(iOS)
-    private var filePickerService: IOSFilePickerService?
     private var securityScopedURL: URL?
     #endif
     private var timelinePollTimer: Timer?
@@ -398,12 +377,6 @@ final class AppState: ObservableObject {
             storageRoot: pendingStorageLibraryID == nil ? nil : SharedObjectStoragePaths().rootURL,
             storageLibraryID: pendingStorageLibraryID
         )
-        bridge?.onFrameUpdate = { [weak self] fps, frame in
-            DispatchQueue.main.async {
-                self?.debugFrameRate = fps
-                self?.debugCurrentFrame = frame
-            }
-        }
         bridge?.onPolicyDiagnostic = { [weak self] diagnostic in
             self?.recordEnginePolicyDiagnostic(diagnostic)
         }
@@ -443,6 +416,7 @@ final class AppState: ObservableObject {
         if currentFileURL != url {
             requestAutomaticBackupForCurrentFile()
             stopAutomaticBackups()
+            playback.reset()
             PermissionPolicyService.shared.clearSessionAllowances(for: currentFileURL)
         }
         #if os(iOS)
@@ -631,8 +605,8 @@ final class AppState: ObservableObject {
         else { return }
 
         bridge?.seekFrame(frame)
-        currentFrame = frame
-        seekPosition = Double(frame)
+        playback.currentFrame = frame
+        playback.seekPosition = Double(frame)
     }
 
     private func detectContentType() {
@@ -723,7 +697,7 @@ final class AppState: ObservableObject {
             fileURL: currentFileURL,
             fileSize: currentFileSizeForDiagnostics(),
             metadata: metadata,
-            currentFrame: currentFrame,
+            currentFrame: playback.currentFrame,
             issues: playerIssues,
             permissionPolicy: permissionPolicySummary(),
             traceMessages: traceMessages,
@@ -1095,7 +1069,7 @@ final class AppState: ObservableObject {
 
         LibraryService.shared.update(item.id) {
             $0.metadata = metadata
-            $0.lastPlaybackFrame = currentFrame
+            $0.lastPlaybackFrame = playback.currentFrame
         }
     }
 
@@ -1255,13 +1229,13 @@ final class AppState: ObservableObject {
             letterbox: SettingsPersistence.shared.letterbox,
             isLooping: isLooping,
             speed: playbackSpeed,
-            lastPlaybackFrame: currentFrame,
+            lastPlaybackFrame: playback.currentFrame,
             preferredMode: playerMode
         )
 
         LibraryService.shared.update(item.id) {
             $0.playbackPreferences = preferences
-            $0.lastPlaybackFrame = currentFrame
+            $0.lastPlaybackFrame = playback.currentFrame
         }
     }
 
@@ -1463,6 +1437,7 @@ final class AppState: ObservableObject {
         persistPlaybackPreferences()
         pausePlayback()
         stopTimelinePolling()
+        playback.reset()
         enterNormalPlayerMode()
         currentFileURL = nil
         updateIOSRenderLoopAvailability()
@@ -1862,7 +1837,6 @@ final class AppState: ObservableObject {
             preparePlayerChromeForStableLayout()
         }
         isStageMaximized = false
-        toolbarRefreshToken += 1
         setWindowToolbarVisible(true)
         updateIOSOrientations()
     }
@@ -1911,43 +1885,40 @@ final class AppState: ObservableObject {
         selectedSection = .library
     }
 
-    func showFilePicker() {
-        #if os(iOS)
-        let service = IOSFilePickerService()
-        filePickerService = service
-        service.pickSWFFile { [weak self] url in
-            self?.filePickerService = nil
-            if let url {
-                DispatchQueue.main.async { self?.openFile(url) }
-            }
-        }
-        #endif
+    func presentOpenFilePanel() async {
+        let localization = LocalizationManager.shared
+        let url = await makeFilePicker().pickSWFFile(
+            message: localization.localized("workspace.openPanel.message"),
+            title: localization.localized("workspace.openPanel.title")
+        )
+        guard let url else { return }
+        openFile(url)
     }
 
-    func showFolderPicker() {
-        #if os(iOS)
-        let service = IOSFilePickerService()
-        filePickerService = service
-        service.pickFolder { [weak self] url in
-            self?.filePickerService = nil
-            if let url {
-                DispatchQueue.main.async { self?.browseDirectory(url) }
-            }
-        }
-        #endif
+    func presentFolderPicker() async {
+        let localization = LocalizationManager.shared
+        let url = await makeFilePicker().pickFolder(
+            message: localization.localized("library.chooseFolder.message"),
+            prompt: localization.localized("library.chooseFolder")
+        )
+        guard let url else { return }
+        browseDirectory(url)
     }
 
-    func locateLibraryItem(_ itemID: UUID) {
-        #if os(iOS)
-        let service = IOSFilePickerService()
-        filePickerService = service
-        service.pickSWFFile { [weak self] url in
-            self?.filePickerService = nil
-            guard let url else { return }
-            DispatchQueue.main.async {
-                LibraryService.shared.locateFile(for: itemID, newURL: url)
-            }
-        }
+    func relocateLibraryItem(_ itemID: UUID) async {
+        let url = await makeFilePicker().pickSWFFile(
+            message: LocalizationManager.shared.localized("library.locateFile.message"),
+            title: nil
+        )
+        guard let url else { return }
+        LibraryService.shared.locateFile(for: itemID, newURL: url)
+    }
+
+    private func makeFilePicker() -> any FilePickerService {
+        #if os(macOS)
+        MacFilePickerService()
+        #else
+        IOSFilePickerService()
         #endif
     }
 
@@ -2264,24 +2235,27 @@ final class AppState: ObservableObject {
     private func pollPlaybackInfo() {
         bridge?.drainPolicyDiagnostics()
         guard let info = bridge?.getPlaybackInfo() else { return }
-        currentFrame = info.currentFrame
-        totalFrames = info.totalFrames
-        frameRate = info.frameRate
-        if totalFrames > 0 {
-            let pos = Double(currentFrame)
-            if abs(pos - seekPosition) > 0.5 { seekPosition = pos }
+        playback.currentFrame = info.currentFrame
+        playback.totalFrames = info.totalFrames
+        playback.frameRate = info.frameRate
+        if playback.totalFrames > 0 {
+            let position = Double(playback.currentFrame)
+            if abs(position - playback.seekPosition) > 0.5 {
+                playback.seekPosition = position
+            }
         }
-        if isLooping && totalFrames > 0 && currentFrame >= totalFrames {
+        if isLooping, playback.totalFrames > 0, playback.currentFrame >= playback.totalFrames {
             bridge?.rewind()
         }
     }
 
     func seekToFrame(_ frame: UInt32) {
         bridge?.seekFrame(frame)
-        currentFrame = frame
+        playback.currentFrame = frame
+        playback.seekPosition = Double(frame)
         persistPlaybackPreferences()
     }
-    func seekToEnd() { bridge?.seekFrame(totalFrames) }
+    func seekToEnd() { bridge?.seekFrame(playback.totalFrames) }
     func stepBackward() { bridge?.stepBack(1) }
     func rewind() { bridge?.rewind() }
     func toggleLoop() {
@@ -2356,7 +2330,7 @@ final class AppState: ObservableObject {
     func toggleFavorite(for url: URL) {
         let shouldFavorite = !bookmarkManager.contains(url)
         if shouldFavorite {
-            bookmarkManager.add(url: url, frame: currentFrame)
+            bookmarkManager.add(url: url, frame: playback.currentFrame)
         } else {
             bookmarkManager.remove(url: url)
         }

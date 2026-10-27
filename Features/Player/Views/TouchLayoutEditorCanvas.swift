@@ -147,7 +147,7 @@ private struct TouchLayoutEditorControl: View {
     private var borderColor: Color {
         if isOverlapping { return .yellow }
         if isSelected || isTesting { return .accentColor }
-        return .white.opacity(0.35)
+        return .secondary.opacity(0.35)
     }
 
     private func symbol(for action: GameAction?) -> String {

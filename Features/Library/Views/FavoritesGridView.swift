@@ -1,13 +1,9 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct FavoritesGridView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject private var libraryService = LibraryService.shared
-    @State private var detailsItemID: UUID?
-    @State private var showDetails = false
 
     private var favoriteItems: [LibraryItem] {
         libraryService.filtered(by: .favorites)
@@ -22,7 +18,13 @@ struct FavoritesGridView: View {
         #endif
     }
 
-    private let columns = [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: NativeSpacing.xxxl)]
+    private var columns: [GridItem] {
+        #if os(iOS)
+        [GridItem(.adaptive(minimum: 280, maximum: 320), spacing: NativeSpacing.xxxl)]
+        #else
+        [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: NativeSpacing.xxxl)]
+        #endif
+    }
 
     var body: some View {
         Group {
@@ -34,54 +36,9 @@ struct FavoritesGridView: View {
                 )
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: NativeSpacing.xxxl) {
-                        LazyVGrid(columns: columns, spacing: NativeSpacing.xl) {
-                            ForEach(favoriteItems) { item in
-                                Button { appState.openFile(item.url) } label: {
-                                    VStack(alignment: .leading, spacing: NativeSpacing.md) {
-                                        ZStack {
-                                            if item.availabilityStatus == .missing {
-                                                RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
-                                                    .fill(GlassMaterial.heavy)
-                                                Image(systemName: "exclamationmark.triangle")
-                                                    .font(.system(size: 28, weight: .light))
-                                                    .foregroundStyle(.tertiary)
-                                            } else {
-                                                RoundedRectangle(cornerRadius: NativeRadius.md, style: .continuous)
-                                                    .fill(GlassMaterial.ultraLight)
-                                                Image(systemName: "star")
-                                                    .font(.system(size: 28, weight: .light))
-                                                    .foregroundStyle(.tertiary)
-                                            }
-                                        }
-                                        .frame(height: 112)
-
-                                        Text(item.name)
-                                            .font(.callout)
-                                            .lineLimit(1)
-                                            .truncationMode(.middle)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel(item.name)
-                                .contextMenu {
-                                     Button(locManager.localized("favorites.remove")) {
-                                         appState.toggleFavorite(for: item.url)
-                                     }
-                                     Button(locManager.localized("library.details.edit")) {
-                                         detailsItemID = item.id
-                                         showDetails = true
-                                     }
-                                    if item.availabilityStatus == .missing {
-                                        Button(locManager.localized("library.locateFile")) {
-                                            locateFile(item)
-                                        }
-                                        Button(locManager.localized("library.remove")) {
-                                            appState.removeLibraryItem(item.id)
-                                        }
-                                    }
-                                }
-                            }
+                    LazyVGrid(columns: columns, spacing: NativeSpacing.xl) {
+                        ForEach(favoriteItems) { item in
+                            LibraryFileCell(file: item)
                         }
                     }
                     .padding(contentInsets)
@@ -89,26 +46,5 @@ struct FavoritesGridView: View {
             }
         }
         .accessibilityLabel(locManager.localized("sidebar.favorites"))
-        .sheet(isPresented: $showDetails) {
-            if let detailsItemID {
-                LibraryItemDetailsView(itemID: detailsItemID)
-                    .environmentObject(appState)
-                    .environmentObject(locManager)
-            }
-        }
-    }
-
-    private func locateFile(_ item: LibraryItem) {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "swf")].compactMap { $0 }
-        panel.allowsMultipleSelection = false
-        panel.message = locManager.localized("library.locateFile.message")
-        if panel.runModal() == .OK, let url = panel.url {
-            libraryService.locateFile(for: item.id, newURL: url)
-        }
-        #elseif os(iOS)
-        appState.locateLibraryItem(item.id)
-        #endif
     }
 }

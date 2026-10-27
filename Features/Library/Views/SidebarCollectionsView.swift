@@ -3,6 +3,7 @@ import SwiftUI
 struct SidebarCollectionsView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var locManager: LocalizationManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var collectionService = CollectionService.shared
     var onSelectCollection: (LibraryCollection) -> Void = { _ in }
 
@@ -67,14 +68,14 @@ struct SidebarCollectionsView: View {
 
     private func collectionButton(_ collection: LibraryCollection) -> some View {
         Button {
-            withAnimation(.default) {
+            withAnimation(reduceMotion ? nil : .glassSpring) {
                 appState.selectCollection(collection.id)
             }
             onSelectCollection(collection)
         } label: {
             HStack(spacing: NativeSpacing.md) {
                 Image(systemName: "folder")
-                    .font(.system(size: 15, weight: .regular))
+                    .font(.subheadline)
                     .foregroundStyle(isSelected(collection) ? Color.accentColor : Color.secondary)
                     .frame(width: 22)
 
